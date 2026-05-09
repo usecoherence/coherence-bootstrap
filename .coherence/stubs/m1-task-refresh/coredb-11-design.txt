@@ -1,0 +1,1 @@
+Review smell: if COREDB-11 executes shell commands, stop — that is COREDB-12.

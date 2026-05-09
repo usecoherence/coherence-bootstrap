@@ -1,0 +1,3 @@
+Smoke command only. Prove the M1 spec store works end-to-end against live Dolt.
+
+Goal: add a command that proves Spec / AcceptanceCriterion / SpecRelation persistence works through the current repository/store layer and refinery-applied schema.

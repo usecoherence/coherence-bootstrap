@@ -1,0 +1,1 @@
+Review smell: if COREDB-10 adds put_code_location or link commands, stop — that is COREDB-11.

@@ -1,0 +1,3 @@
+Repository/storage only for codeintel links. Minimal Rust models if needed.
+
+Goal: persist and read links from AcceptanceCriteria to code/test locations. COREDB-12 must consume readback without raw SQL.

@@ -1,0 +1,3 @@
+Run linked test commands for one AC. No spec-level report (COREDB-13).
+
+Goal: given AC id, find verified_by links, run linked commands, report passed/failed/skipped. Expose a reusable internal result type for COREDB-13 (not only stdout).

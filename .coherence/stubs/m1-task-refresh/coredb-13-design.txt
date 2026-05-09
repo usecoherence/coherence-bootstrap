@@ -1,0 +1,1 @@
+Review smell: if COREDB-13 adds evidence/artifact tables, stop — later M1/M2.

@@ -1,0 +1,15 @@
+Commands (names may match CLI style): `spec add`, `spec list`, `spec show <SPEC_ID>`, `ac add --spec-id <SPEC_ID>`, `ac list --spec-id <SPEC_ID>`.
+
+spec add: support at least --id (optional/generated), --slug, --title, --description, --level, --status.
+
+ac add: support at least --id (optional/generated), --spec-id, --title, --intent, --review-mode, --risk-level, --concern (repeatable if easy).
+
+Use existing spec_store / repository functions; assume schema via migrate; print created IDs clearly; stable output for copy-paste into later codeintel tasks.
+
+Example flow: `cargo run -p coherence-core-db -- spec add --slug coredb-spec-store --title "core-db persists specs" --description "Spec records stored and read through Dolt" --level module --status draft` then `ac add` with linked spec-id.
+
+Do NOT: codeintel; test links; verification runner; separate coherence-spec-cli; final UX; docs export; SQLx/TinyORM; ad-hoc SQL in handlers (use repository layer).
+
+Verification: `make tool run`; live commands create Spec and AC; spec list / ac list show them; `m1-spec-smoke` still passes.
+
+Close: manual Spec and AC creation works; IDs can be copied into codeintel-linking tasks.

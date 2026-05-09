@@ -1,0 +1,1 @@
+Review smell: if COREDB-9 adds generic `spec add`, stop — that belongs in COREDB-16.

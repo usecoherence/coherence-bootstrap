@@ -1,0 +1,3 @@
+Spike / decision note only. Not mainline M1. Do not adopt SQLx/TinyORM in production.
+
+Goal: compare mysql+refinery manual repos vs SQLx vs TinyORM; Dolt compatibility; boilerplate estimate; migration impact; explicit recommendation.

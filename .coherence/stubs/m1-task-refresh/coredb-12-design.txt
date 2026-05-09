@@ -1,0 +1,1 @@
+Review smell: if COREDB-12 aggregates whole Spec status, stop — that is COREDB-13. Provide structured results, not only println.

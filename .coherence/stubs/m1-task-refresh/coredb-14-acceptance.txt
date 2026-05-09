@@ -1,0 +1,11 @@
+Cover: one repo-local Dolt DB, multiple logical modules; core-db owns lifecycle + migration execution; migration mechanics via library; spec vs codeintel table ownership; beads/deliverables/workflow out of this M1 slice; boundaries visible in layout/comments.
+
+Document M1 flow: migrate; spec add; ac add; code location/link; verify-ac; verify-spec (names as implemented).
+
+Explicit non-goals: full SCIP; docs export; Temporal; artifact store; generic graph; final spec-cli UX.
+
+Do NOT: schema/repo/command changes except docs (or trivial wording); new tasks unless doc gap requires follow-up.
+
+Verification: `make tool run`; doc names match implemented commands; ownership explicit.
+
+Close: new reader understands who owns which tables and what M1 proves.
