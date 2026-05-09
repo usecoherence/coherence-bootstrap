@@ -6,17 +6,12 @@ if ! command -v dolt >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "migrate: scaffold migrations for this repo-local Coherence DB"
-echo "migrate: core-db owns shared conventions; this template does not own final DB architecture"
+echo "migrate: run module migrations via refinement library"
+echo "migrate: core-db owns migration orchestration; library owns migration mechanics"
 
 if [ ! -d .dolt ]; then
   echo "migrate: .dolt missing; run make tool dolt-start or dolt init first" >&2
   exit 1
 fi
 
-for migration in .coherence/migrations/*.sql; do
-  echo "applying $migration"
-  dolt sql < "$migration"
-done
-
-echo "migrate: ok"
+cargo run -p coherence-core-db -- migrate

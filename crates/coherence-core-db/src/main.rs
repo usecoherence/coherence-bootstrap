@@ -1,6 +1,7 @@
 mod cli;
 mod commands;
 mod db;
+mod migrations;
 mod models;
 
 fn main() {

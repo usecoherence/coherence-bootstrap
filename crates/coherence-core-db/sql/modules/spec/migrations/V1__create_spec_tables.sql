@@ -1,6 +1,8 @@
--- M1 spec-module schema
--- Logical owner: spec module (co-located in repo-local core-db Dolt database)
--- Scope: Spec, AcceptanceCriterion, ConcernKind repeats, and SpecRelation records.
+-- module: spec
+-- owner: spec module
+-- applied_by: coherence-core-db migration library (refinery)
+-- id: spec/V1__create_spec_tables
+-- depends_on: project DB initialized
 
 CREATE TABLE IF NOT EXISTS specs (
   id VARCHAR(191) PRIMARY KEY,
