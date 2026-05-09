@@ -41,6 +41,10 @@ The goal is to reduce boilerplate and keep every Coherence CLI tool homogeneous:
 - Do not write into dependency/vendor repositories' Dolt DBs.
 - Cross-repo coordination happens through links, contracts, commits, versions, releases, and future workspace indexes.
 - `core-db` owns shared conventions and future workspace indexing, not one global writable DB for every repo.
+- Product work belongs in local `CDB-*` (coherence-core-db) tasks.
+- Reusable generator/template feedback belongs in `tasks/upstream/coherence-generate-cli.ndjson` as `CGC-RUST-*` (coherence-generate-cli) proposals.
+- Do not mix `CGC-RUST-*` proposals into local beads backlog (`bd list` scope).
+- Do not implement upstream proposals here unless the same change is required locally.
 
 ## Orchestration note
 
