@@ -246,6 +246,133 @@ fn slug_from_id(id: &str) -> String {
     id.to_ascii_lowercase().replace('_', "-")
 }
 
+/// Kind of stored code location (`codeintel_code_locations.kind`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CodeLocationKind {
+    /// Path to a test file (verified-by file target).
+    TestFile,
+    /// A runnable test command (e.g. `cargo test ...`).
+    TestCommand,
+}
+
+impl CodeLocationKind {
+    #[must_use]
+    pub fn as_db_str(self) -> &'static str {
+        match self {
+            Self::TestFile => "test_file",
+            Self::TestCommand => "test_command",
+        }
+    }
+
+    #[must_use]
+    pub fn from_db_str(value: &str) -> Option<Self> {
+        match value {
+            "test_file" => Some(Self::TestFile),
+            "test_command" => Some(Self::TestCommand),
+            _ => None,
+        }
+    }
+}
+
+/// Relation between an acceptance criterion and a code location (`codeintel_ac_links.relation_kind`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AcCodeRelationKind {
+    VerifiedBy,
+    ImplementedBy,
+    TouchedBy,
+}
+
+impl AcCodeRelationKind {
+    #[must_use]
+    pub fn as_db_str(self) -> &'static str {
+        match self {
+            Self::VerifiedBy => "verified_by",
+            Self::ImplementedBy => "implemented_by",
+            Self::TouchedBy => "touched_by",
+        }
+    }
+
+    #[must_use]
+    pub fn from_db_str(value: &str) -> Option<Self> {
+        match value {
+            "verified_by" => Some(Self::VerifiedBy),
+            "implemented_by" => Some(Self::ImplementedBy),
+            "touched_by" => Some(Self::TouchedBy),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CodeLocation {
+    pub id: String,
+    pub repo_path: String,
+    pub file_path: String,
+    pub kind: CodeLocationKind,
+    pub symbol: Option<String>,
+    pub test_command: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+impl CodeLocation {
+    #[must_use]
+    pub fn new(
+        id: impl Into<String>,
+        repo_path: impl Into<String>,
+        file_path: impl Into<String>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            repo_path: repo_path.into(),
+            file_path: file_path.into(),
+            kind: CodeLocationKind::TestFile,
+            symbol: None,
+            test_command: None,
+            created_at: String::new(),
+            updated_at: String::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AcCodeLink {
+    pub id: String,
+    pub ac_id: String,
+    pub code_location_id: String,
+    pub relation_kind: AcCodeRelationKind,
+    pub note: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+impl AcCodeLink {
+    #[must_use]
+    pub fn new(
+        id: impl Into<String>,
+        ac_id: impl Into<String>,
+        code_location_id: impl Into<String>,
+        relation_kind: AcCodeRelationKind,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            ac_id: ac_id.into(),
+            code_location_id: code_location_id.into(),
+            relation_kind,
+            note: String::new(),
+            created_at: String::new(),
+            updated_at: String::new(),
+        }
+    }
+}
+
+/// Link row plus [`CodeLocation`], for consumers that need paths and `test_command` without a second query.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AcCodeLinkWithLocation {
+    pub link: AcCodeLink,
+    pub location: CodeLocation,
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
