@@ -10,6 +10,7 @@ pub fn run(args: Vec<String>) -> i32 {
         "doctor" => commands::doctor::run(),
         "migrate" => commands::migrate::run(),
         "m0-smoke" => commands::m0_smoke::run(),
+        "m1-spec-smoke" => commands::m1_spec_smoke::run(),
         "version" | "--version" | "-V" => {
             println!("coherence-core-db 0.1.0");
             0
@@ -29,8 +30,9 @@ fn print_help() {
            help       Show this help\n\
            doctor     Check runtime assumptions\n\
            migrate    Run migrations via migration library\n\
-           m0-smoke   Run minimal Rust -> Dolt DB vertical slice\n\
-           version    Print version\n\n\
+           m0-smoke       Run minimal Rust -> Dolt DB vertical slice\n\
+           m1-spec-smoke  Run M1 spec store smoke (Spec / AC / SpecRelation)\n\
+           version        Print version\n\n\
          Repository workflow:\n\
            make tool help\n\
            make tool doctor\n\
