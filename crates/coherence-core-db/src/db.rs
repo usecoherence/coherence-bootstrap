@@ -1,12 +1,12 @@
 use std::env;
 use std::fmt::{Display, Formatter};
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use mysql::prelude::Queryable;
-use mysql::{params, Conn, OptsBuilder};
+use mysql::{Conn, OptsBuilder};
 
 use crate::models::{AcceptanceCriterion, Spec};
+use crate::spec_store;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConnectionMode {
@@ -106,55 +106,38 @@ pub fn connect(config: &ConnectionConfig) -> Result<(Conn, ConnectionMode), Stri
     }
 }
 
-pub fn apply_schema_from_file(conn: &mut Conn, schema_path: &Path) -> Result<(), String> {
-    let sql = fs::read_to_string(schema_path).map_err(|err| {
-        format!(
-            "failed to read schema file {}: {err}",
-            schema_path.display()
-        )
-    })?;
-    apply_schema_sql(conn, &sql)
-}
-
-fn apply_schema_sql(conn: &mut Conn, sql: &str) -> Result<(), String> {
-    for statement in sql.split(';') {
-        let trimmed = statement.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-        let executable = format!("{trimmed};");
-        conn.query_drop(executable)
-            .map_err(|err| format!("failed to execute schema statement: {err}"))?;
-    }
-    Ok(())
-}
-
 pub fn insert_spec(conn: &mut Conn, spec: &Spec) -> Result<(), String> {
-    conn.exec_drop(
-        r"INSERT INTO specs (id, title) VALUES (:id, :title)
-          ON DUPLICATE KEY UPDATE title = VALUES(title)",
-        params! {
-            "id" => spec.id.as_str(),
-            "title" => spec.title.as_str(),
-        },
-    )
-    .map_err(|err| format!("failed to insert spec {}: {err}", spec.id))
+    let mut normalized = spec.clone();
+    if normalized.slug.is_empty() {
+        normalized.slug = normalized.id.to_ascii_lowercase();
+    }
+    if normalized.description.is_empty() {
+        normalized.description = "m0-smoke spec".to_string();
+    }
+    if normalized.created_at.is_empty() {
+        normalized.created_at = "m0".to_string();
+    }
+    if normalized.updated_at.is_empty() {
+        normalized.updated_at = "m0".to_string();
+    }
+    spec_store::put_spec(conn, &normalized)
 }
 
 pub fn insert_acceptance_criterion(
     conn: &mut Conn,
     ac: &AcceptanceCriterion,
 ) -> Result<(), String> {
-    conn.exec_drop(
-        r"INSERT INTO acceptance_criteria (id, spec_id, title) VALUES (:id, :spec_id, :title)
-          ON DUPLICATE KEY UPDATE spec_id = VALUES(spec_id), title = VALUES(title)",
-        params! {
-            "id" => ac.id.as_str(),
-            "spec_id" => ac.spec_id.as_str(),
-            "title" => ac.title.as_str(),
-        },
-    )
-    .map_err(|err| format!("failed to insert acceptance criterion {}: {err}", ac.id))
+    let mut normalized = ac.clone();
+    if normalized.intent.is_empty() {
+        normalized.intent = "m0-smoke intent".to_string();
+    }
+    if normalized.created_at.is_empty() {
+        normalized.created_at = "m0".to_string();
+    }
+    if normalized.updated_at.is_empty() {
+        normalized.updated_at = "m0".to_string();
+    }
+    spec_store::put_acceptance_criterion(conn, &normalized)
 }
 
 pub fn counts(conn: &mut Conn) -> Result<(u64, u64), String> {

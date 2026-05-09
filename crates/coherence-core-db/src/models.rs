@@ -5,6 +5,27 @@ pub enum SpecLevel {
     Module,
 }
 
+impl SpecLevel {
+    #[must_use]
+    pub fn as_db_str(self) -> &'static str {
+        match self {
+            Self::Product => "product",
+            Self::System => "system",
+            Self::Module => "module",
+        }
+    }
+
+    #[must_use]
+    pub fn from_db_str(value: &str) -> Option<Self> {
+        match value {
+            "product" => Some(Self::Product),
+            "system" => Some(Self::System),
+            "module" => Some(Self::Module),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SpecStatus {
     Draft,
@@ -13,11 +34,55 @@ pub enum SpecStatus {
     Archived,
 }
 
+impl SpecStatus {
+    #[must_use]
+    pub fn as_db_str(self) -> &'static str {
+        match self {
+            Self::Draft => "draft",
+            Self::Active => "active",
+            Self::Deprecated => "deprecated",
+            Self::Archived => "archived",
+        }
+    }
+
+    #[must_use]
+    pub fn from_db_str(value: &str) -> Option<Self> {
+        match value {
+            "draft" => Some(Self::Draft),
+            "active" => Some(Self::Active),
+            "deprecated" => Some(Self::Deprecated),
+            "archived" => Some(Self::Archived),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReviewMode {
     Manual,
     Automated,
     Hybrid,
+}
+
+impl ReviewMode {
+    #[must_use]
+    pub fn as_db_str(self) -> &'static str {
+        match self {
+            Self::Manual => "manual",
+            Self::Automated => "automated",
+            Self::Hybrid => "hybrid",
+        }
+    }
+
+    #[must_use]
+    pub fn from_db_str(value: &str) -> Option<Self> {
+        match value {
+            "manual" => Some(Self::Manual),
+            "automated" => Some(Self::Automated),
+            "hybrid" => Some(Self::Hybrid),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,6 +93,29 @@ pub enum RiskLevel {
     Critical,
 }
 
+impl RiskLevel {
+    #[must_use]
+    pub fn as_db_str(self) -> &'static str {
+        match self {
+            Self::Low => "low",
+            Self::Medium => "medium",
+            Self::High => "high",
+            Self::Critical => "critical",
+        }
+    }
+
+    #[must_use]
+    pub fn from_db_str(value: &str) -> Option<Self> {
+        match value {
+            "low" => Some(Self::Low),
+            "medium" => Some(Self::Medium),
+            "high" => Some(Self::High),
+            "critical" => Some(Self::Critical),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConcernKind {
     Correctness,
@@ -35,6 +123,31 @@ pub enum ConcernKind {
     Performance,
     Reliability,
     Maintainability,
+}
+
+impl ConcernKind {
+    #[must_use]
+    pub fn as_db_str(self) -> &'static str {
+        match self {
+            Self::Correctness => "correctness",
+            Self::Security => "security",
+            Self::Performance => "performance",
+            Self::Reliability => "reliability",
+            Self::Maintainability => "maintainability",
+        }
+    }
+
+    #[must_use]
+    pub fn from_db_str(value: &str) -> Option<Self> {
+        match value {
+            "correctness" => Some(Self::Correctness),
+            "security" => Some(Self::Security),
+            "performance" => Some(Self::Performance),
+            "reliability" => Some(Self::Reliability),
+            "maintainability" => Some(Self::Maintainability),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
