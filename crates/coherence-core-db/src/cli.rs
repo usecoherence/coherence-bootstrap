@@ -8,6 +8,7 @@ pub fn run(args: Vec<String>) -> i32 {
             0
         }
         "doctor" => commands::doctor::run(),
+        "m0-smoke" => commands::m0_smoke::run(),
         "version" | "--version" | "-V" => {
             println!("coherence-core-db 0.1.0");
             0
@@ -26,6 +27,7 @@ fn print_help() {
          Commands:\n\
            help       Show this help\n\
            doctor     Check runtime assumptions\n\
+           m0-smoke   Run minimal Rust -> Dolt DB vertical slice\n\
            version    Print version\n\n\
          Repository workflow:\n\
            make tool help\n\

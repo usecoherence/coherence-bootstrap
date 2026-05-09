@@ -1,0 +1,10 @@
+CREATE TABLE IF NOT EXISTS specs (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS acceptance_criteria (
+  id TEXT PRIMARY KEY,
+  spec_id TEXT NOT NULL,
+  title TEXT NOT NULL
+);
