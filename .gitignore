@@ -1,4 +1,6 @@
 /target/
+# Local cursor_agent_coredb_loop.sh evidence (timestamped rounds)
+/.agent-runs/
 /.coherence/run/
 /.coherence/review/
 /.dolt/run/
