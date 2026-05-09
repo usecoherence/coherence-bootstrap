@@ -63,7 +63,7 @@ fn default_database_name() -> String {
         .ok()
         .and_then(|path| {
             path.file_name()
-                .map(|name| name.to_string_lossy().replace('-', "_"))
+                .map(|name| name.to_string_lossy().to_string())
         })
         .unwrap_or_else(|| "dolt".to_string())
 }

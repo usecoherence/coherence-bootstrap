@@ -11,7 +11,29 @@ echo "  owner: this repository"
 echo "  boundary: do not write dependency/vendor repos' Dolt DBs"
 
 if [ ! -d .dolt ]; then
-  dolt init
+  author_name="${DOLT_AUTHOR_NAME:-}"
+  author_email="${DOLT_AUTHOR_EMAIL:-}"
+  identity_source="env"
+
+  if [ -z "$author_name" ]; then
+    author_name="$(git config user.name 2>/dev/null || true)"
+  fi
+  if [ -z "$author_email" ]; then
+    author_email="$(git config user.email 2>/dev/null || true)"
+  fi
+  if [ -n "$author_name" ] && [ -n "$author_email" ]; then
+    identity_source="git-config"
+  else
+    author_name="${author_name:-Coherence Local Dev}"
+    author_email="${author_email:-coherence-local-dev@localhost.invalid}"
+    identity_source="fallback"
+  fi
+
+  echo "dolt init identity"
+  echo "  source: $identity_source"
+  echo "  name:   $author_name"
+  echo "  email:  $author_email"
+  dolt init --name "$author_name" --email "$author_email"
 fi
 
 mkdir -p .coherence/run
