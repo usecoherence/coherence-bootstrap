@@ -5,3 +5,4 @@ pub mod m0_smoke;
 pub mod m1_spec_smoke;
 pub mod migrate;
 pub mod spec_cmd;
+pub mod verify_ac_cmd;

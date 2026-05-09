@@ -13,6 +13,7 @@ pub fn run(args: Vec<String>) -> i32 {
         "m1-spec-smoke" => commands::m1_spec_smoke::run(),
         "spec" => commands::spec_cmd::run(&args[2..]),
         "ac" => commands::ac_cmd::run(&args[2..]),
+        "verify-ac" => commands::verify_ac_cmd::run(&args[2..]),
         "version" | "--version" | "-V" => {
             println!("coherence-core-db 0.1.0");
             0
@@ -36,6 +37,7 @@ fn print_help() {
            m1-spec-smoke  Run M1 spec store smoke (Spec / AC / SpecRelation)\n\
            spec           Manage spec records (add, list, show)\n\
            ac             Manage acceptance criteria (add, list)\n\
+           verify-ac      Run verified_by linked test commands for one AC\n\
            version        Print version\n\n\
          Repository workflow:\n\
            make tool help\n\

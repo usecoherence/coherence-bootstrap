@@ -1,4 +1,5 @@
 mod ac_code_link_store;
+mod ac_verify;
 mod cli;
 mod commands;
 mod db;
@@ -10,6 +11,9 @@ mod spec_store;
 pub mod codeintel_repo {
     pub use crate::ac_code_link_store::{
         get_code_location, list_code_links_for_ac, put_ac_code_link, put_code_location,
+    };
+    pub use crate::ac_verify::{
+        verify_acceptance_criterion, AcVerifyAcRunResult, AcVerifyLinkRunRecord, AcVerifyLinkStatus,
     };
     pub use crate::models::{
         AcCodeLink, AcCodeLinkWithLocation, AcCodeRelationKind, CodeLocation, CodeLocationKind,
