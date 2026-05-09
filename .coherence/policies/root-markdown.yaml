@@ -1,0 +1,10 @@
+policy:
+  name: root-markdown
+  status: desired
+  enforcement: script-and-optional-workgate
+  deny:
+    - path: "*.md"
+      operations: ["create", "write", "delete", "rename"]
+      except:
+        - "AGENTS.md"
+  reason: "Root Markdown files become context dumps. Keep durable docs in spec store and export them."

@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+strict=0
+if [ "${1:-}" = "--strict" ]; then strict=1; fi
+status=0
+
+check() {
+  local label="$1" cmd="$2" required="${3:-required}"
+  if command -v "$cmd" >/dev/null 2>&1; then
+    printf "%-32s ok\n" "$label"
+  else
+    printf "%-32s missing (%s)\n" "$label" "$required"
+    if [ "$required" = "required" ]; then status=1; fi
+    if [ "$required" = "optional" ] && [ "$strict" -eq 1 ]; then status=1; fi
+  fi
+}
+
+echo "coherence-core-db doctor"
+echo
+check git git required
+check cargo cargo required
+check rustc rustc required
+check make make required
+check dolt dolt optional
+check beads/bd bd optional
+check beads-deliverables/bdx bdx required
+check workgate workgate optional
+
+echo
+./scripts/check-policy || status=1
+
+echo
+printf "%-32s %s\n" "workflow_backend" "local_stub"
+printf "%-32s %s\n" "orchestration_owner" "external"
+printf "%-32s %s\n" "external_future_backend" "temporal_candidate"
+printf "%-32s %s\n" "event_signal_hooks" "NOT_IMPLEMENTED"
+printf "%-32s %s\n" "contracts_repo" "coherence-contracts"
+printf "%-32s %s\n" "contracts_status" "external_dependency"
+printf "%-32s %s\n" "contracts_runtime" "not_required"
+printf "%-32s %s\n" "contracts_codegen" "NOT_IMPLEMENTED"
+printf "%-32s %s\n" "local_proto_defs" "false"
+printf "%-32s %s\n" "coherence_db_owner" "local_repo"
+printf "%-32s %s\n" "cross_repo_writes" "forbidden"
+printf "%-32s %s\n" "core_db_role" "shared_conventions_and_indexes"
+printf "%-32s %s\n" "dolt_socket_desired" ".dolt/dolt.sock"
+printf "%-32s %s\n" "task_seed" "tasks/beads-tasks.ndjson"
+printf "%-32s %s\n" "task_bootstrap" "make tool bootstrap-tasks"
+
+if [ -S ".dolt/dolt.sock" ]; then
+  printf "%-32s ok\n" "dolt_socket"
+else
+  printf "%-32s missing/degraded\n" "dolt_socket"
+fi
+
+if [ -f ".coherence/run/dolt.pid" ]; then
+  printf "%-32s %s\n" "dolt_pid_file" "present"
+else
+  printf "%-32s %s\n" "dolt_pid_file" "missing"
+fi
+
+echo
+if [ "$status" -eq 0 ]; then
+  echo "status: ok"
+else
+  echo "status: degraded-or-failed"
+fi
+exit "$status"

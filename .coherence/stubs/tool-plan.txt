@@ -1,0 +1,13 @@
+NOT_IMPLEMENTED: full tool-plan
+
+Current behavior:
+  - print planning checklist
+  - record that planning is manual/stubbed
+
+Future behavior:
+  - external orchestrator may start requirements gathering
+  - fetch related specs/ACs/tasks
+  - propose minimal spec/AC edits
+  - compute blast radius through AC_CODE_LINK + SCIP graph
+  - create/update beads tasks and beads-deliverables contracts
+  - record attempt history

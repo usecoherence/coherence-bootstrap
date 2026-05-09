@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cmd="${1:-help}"
+shift || true
+
+case "$cmd" in
+  help) ./scripts/help "$@" ;;
+  doctor) ./scripts/doctor "$@" ;;
+  bootstrap) ./scripts/bootstrap "$@" ;;
+  bootstrap-tasks) ./scripts/bootstrap-tasks "$@" ;;
+  dolt-start) ./scripts/dolt-start "$@" ;;
+  dolt-stop) ./scripts/dolt-stop "$@" ;;
+  dolt-status) ./scripts/dolt-status "$@" ;;
+  migrate) ./scripts/migrate "$@" ;;
+  context) ./scripts/context "$@" ;;
+  next) ./scripts/next "$@" ;;
+  plan) ./scripts/plan "$@" ;;
+  run) ./scripts/run "$@" ;;
+  present-work) ./scripts/present-work "$@" ;;
+  feedback) ./scripts/feedback "$@" ;;
+  docs-export) ./scripts/docs-export "$@" ;;
+  check-policy) ./scripts/check-policy "$@" ;;
+  *)
+    echo "Unknown tool command: $cmd" >&2
+    echo "Run: make tool help" >&2
+    exit 64
+    ;;
+esac

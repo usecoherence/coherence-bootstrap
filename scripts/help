@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cat <<'EOF'
+coherence-core-db
+
+Coherence-compatible Rust CLI tool workflow
+
+Start:
+  make tool doctor       check dependencies and repo state
+  make tool context      understand why this project exists
+  make tool next         fetch next task + minimal viable context
+  make tool bootstrap-tasks prepare/import BOOT-* task seeds for beads
+
+Planning:
+  make tool plan         HITL planning loop [stub]
+
+Implementation:
+  make tool run          fmt/check/test/policy checks
+
+Review:
+  make tool present-work create review package [partial]
+  make tool feedback     read feedback and choose next loop [partial]
+
+Dolt:
+  make tool dolt-start
+  make tool dolt-status
+  make tool dolt-stop
+  make tool migrate
+
+Coherence DB ownership:
+  one repository = one local Coherence DB
+  preferred local socket: .dolt/dolt.sock
+  cross-repo coordination uses links/contracts/commits/versions, not shared writes
+  consumer repos must not write into dependency/vendor repos' Dolt DBs
+  core-db owns shared conventions and future workspace indexing, not this repo's truth
+
+Docs/policy:
+  make tool docs-export  NOT_IMPLEMENTED
+  make tool check-policy enforce root Markdown/docs policy
+
+Backend:
+  workflow_backend: local_stub
+  orchestration_owner: external
+  external_future_backend: temporal_candidate
+  event_signal_hooks: NOT_IMPLEMENTED
+
+Orchestration:
+  Generated CLI tools expose stable local commands only.
+  External coherence-orchestrator/coherence-worker may use Temporal later.
+  Do not configure Temporal URLs, namespaces, task queues, or workflow IDs here.
+
+Contracts:
+  coherence-contracts: external dependency
+  proto definitions: NOT_IMPLEMENTED here; do not duplicate contracts in this repo
+  runtime blocker: false
+  local proto definitions: false
+  future path: consume versioned contracts from coherence-contracts when tooling exists
+
+Dependency policy:
+  beads-deliverables/bdx: required
+  workgate: optional policy enforcer
+
+Task tracking:
+  BOOT seed file: tasks/beads-tasks.ndjson
+  Start tracking: make tool bootstrap-tasks
+  Missing beads: command reports prepared/degraded state without blocking local workflow
+
+Rules:
+  docs/ is generated/read-only
+  root Markdown is forbidden except AGENTS.md
+EOF

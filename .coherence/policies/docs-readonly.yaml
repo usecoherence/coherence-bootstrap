@@ -1,0 +1,12 @@
+policy:
+  name: docs-readonly
+  status: desired
+  enforcement: optional-workgate
+  deny:
+    - path: "docs/**/*.md"
+      operations: ["write", "delete", "rename"]
+    - path: "docs/**/*"
+      operations: ["write", "delete", "rename"]
+      except_commands:
+        - "make tool docs-export"
+  reason: "docs/ is generated from spec source of truth; agents should not manually edit it."

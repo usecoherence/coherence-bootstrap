@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ ! -f .coherence/run/dolt.pid ]; then
+  echo "dolt-stop: no pid file"
+  exit 0
+fi
+
+pid="$(cat .coherence/run/dolt.pid)"
+if kill -0 "$pid" 2>/dev/null; then
+  kill "$pid"
+  echo "stopped dolt sql-server pid $pid"
+else
+  echo "dolt pid was stale: $pid"
+fi
+rm -f .coherence/run/dolt.pid

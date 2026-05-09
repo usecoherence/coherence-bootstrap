@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cat <<'EOF'
+NOT_IMPLEMENTED: docs export
+
+Future command:
+  coherence-spec-cli export --out docs/generated
+
+Rule:
+  docs/ is generated/read-only. Do not manually edit docs/.
+EOF
+exit 2

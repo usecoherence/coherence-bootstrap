@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "Work summary"
+echo
+echo "Generated at: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+echo
+echo "Git status:"
+git status --short || true
+echo
+echo "Recent commits:"
+git log --oneline -5 || true
+echo
+echo "Checks:"
+echo "  run: execute make tool run before presenting"
+echo
+echo "Contracts:"
+echo "  beads-deliverables integration: NOT_IMPLEMENTED"
+echo
+echo "Known gaps:"
+echo "  blast-radius: NOT_IMPLEMENTED"
+echo "  external orchestration event/signal hooks: NOT_IMPLEMENTED"
+echo "  spec/docs export: NOT_IMPLEMENTED"

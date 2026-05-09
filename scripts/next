@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "next task"
+echo
+if command -v bd >/dev/null 2>&1; then
+  echo "beads: installed"
+  echo "beads query: NOT_IMPLEMENTED in template; wire exact bd command for your installed version."
+else
+  echo "beads: missing"
+fi
+
+echo
+if command -v bdx >/dev/null 2>&1; then
+  echo "beads-deliverables: installed"
+else
+  echo "beads-deliverables: missing"
+fi
+
+echo
+cat <<'EOF'
+Minimal viable context shape:
+  milestone: NOT_IMPLEMENTED
+  task:      NOT_IMPLEMENTED
+  contract:  NOT_IMPLEMENTED
+  specs:     NOT_IMPLEMENTED
+  ACs:       NOT_IMPLEMENTED
+  files:     NOT_IMPLEMENTED
+
+Fallback:
+  cat BEADS_TASKS.txt
+EOF

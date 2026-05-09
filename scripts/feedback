@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cat <<'EOF'
+feedback loop
+
+Current status: partial/stub
+
+Choose next loop manually:
+  - simple code feedback -> edit code -> make tool run -> make tool present-work
+  - bad deliverable contract -> make tool plan and update task contract
+  - bad AC/spec scope -> make tool plan and re-plan target AC/spec
+  - implementation discovered larger blast radius -> stop and report planning mismatch
+
+Future:
+  External orchestration may classify feedback and route to the right loop.
+EOF

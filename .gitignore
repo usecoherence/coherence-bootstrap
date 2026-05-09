@@ -1,0 +1,6 @@
+/target/
+/.coherence/run/
+/.coherence/review/
+/.dolt/run/
+.DS_Store
+*.log

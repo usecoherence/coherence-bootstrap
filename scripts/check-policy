@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+status=0
+
+while IFS= read -r path; do
+  case "$path" in
+    ./AGENTS.md) ;;
+    *)
+      echo "policy violation: root Markdown file is forbidden: $path" >&2
+      status=1
+      ;;
+  esac
+done < <(find . -maxdepth 1 -type f -name '*.md' | sort)
+
+if find docs -type f -name '*.md' | grep -q . 2>/dev/null; then
+  echo "policy violation: docs/ Markdown files must be generated, not manually edited" >&2
+  find docs -type f -name '*.md' >&2
+  status=1
+fi
+
+if [ "$status" -eq 0 ]; then
+  echo "policy: ok"
+fi
+exit "$status"

@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cat .coherence/stubs/tool-plan.txt
+cat <<'EOF'
+
+Manual M0 planning checklist:
+  1. What requirement changed?
+  2. Which Spec/AC is targeted?
+  3. Which task contract needs to exist or change?
+  4. What verification proves the Plan -> AC connection?
+  5. Is this small enough to implement without blast-radius automation?
+
+External orchestration note:
+  Future external orchestration may consume local event/signal hooks.
+EOF

@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+seed="tasks/beads-tasks.ndjson"
+
+if [ ! -f "$seed" ]; then
+  echo "bootstrap-tasks: missing seed file: $seed" >&2
+  exit 1
+fi
+
+echo "bootstrap-tasks: BOOT task seed"
+echo "  seed: $seed"
+
+if ! command -v bd >/dev/null 2>&1; then
+  echo "  beads: missing"
+  echo "  status: prepared"
+  echo "  next: install beads, initialize a local beads workspace, then rerun this command"
+  echo "  note: NOT_IMPLEMENTED full task migration framework"
+  exit 0
+fi
+
+if ! bd where >/dev/null 2>&1; then
+  echo "  beads: installed, no active workspace"
+  echo "  status: prepared"
+  echo "  next: initialize/connect beads for this repo, then rerun this command"
+  echo "  note: NOT_IMPLEMENTED automatic beads workspace creation"
+  exit 0
+fi
+
+if bd import "$seed" --dedup >/dev/null; then
+  echo "  beads: imported or already present"
+  echo "  status: ok"
+else
+  echo "bootstrap-tasks: beads import failed" >&2
+  exit 1
+fi

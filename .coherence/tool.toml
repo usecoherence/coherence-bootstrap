@@ -1,0 +1,48 @@
+[tool]
+name = "coherence-core-db"
+package = "coherence-core-db"
+description = "Coherence core DB lifecycle and schema tool"
+generated_by = "coherence-generate-cli"
+
+[workflow]
+backend = "local_stub"
+entrypoint = "make tool help"
+
+[orchestration]
+owner = "external"
+future_backend_candidate = "temporal"
+runtime_dependency = false
+event_signal_hooks = "not_implemented"
+notes = "Generated CLI exposes stable local commands; external coherence-orchestrator/coherence-worker may orchestrate them later."
+
+[contracts]
+repository = "coherence-contracts"
+status = "external_dependency"
+owner = "external_repo"
+proto_source = "coherence-contracts"
+local_proto_definitions = false
+runtime_blocker = false
+codegen_status = "not_implemented"
+future_integration = "consume versioned contracts from coherence-contracts when contract tooling exists"
+notes = "coherence-contracts owns .proto primitives for tool interfaces and connections."
+
+[docs]
+source_of_truth = "coherence-spec-cli"
+generated_dir = "docs/generated"
+manual_edits_allowed = false
+
+[task_tracking]
+tracker = "beads"
+deliverable_contracts = "beads-deliverables"
+
+[coherence_db]
+owner = "local_repo"
+backend = "dolt"
+socket_path = ".dolt/dolt.sock"
+shared_writable_db = false
+cross_repo_coordination = "links_contracts_commits_versions_workspace_indexes"
+core_db_role = "shared_schema_lifecycle_conventions_and_future_workspace_indexing"
+notes = "One repository owns one local Coherence DB. Consumers link to dependency repos by reference and must not write into dependency/vendor Dolt DBs."
+
+[policy]
+optional_enforcer = "workgate"

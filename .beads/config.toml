@@ -1,0 +1,22 @@
+# Generated placeholder for this repository's local beads/coherence storage.
+# Desired storage topology:
+#   one repository = one local Coherence DB
+#   beads tables live in this repo-local Dolt database with coherence bridge tables.
+#   preferred connection path: .dolt/dolt.sock
+#   fallback: local TCP listener when socket support is unavailable.
+#
+# Ownership boundary:
+#   consumer repos must not write into dependency/vendor repos' Dolt DBs.
+#   cross-repo coordination uses links, contracts, commits, versions, and future workspace indexes.
+#   core-db owns shared schema/lifecycle conventions and future workspace indexing, not this repo's truth.
+
+[storage]
+mode = "external"
+backend = "dolt"
+socket_path = ".dolt/dolt.sock"
+owner = "local_repo"
+shared_writable_db = false
+
+[status]
+implementation = "not_implemented"
+reason = "Exact beads external Dolt/socket configuration is tool-version dependent. `make tool doctor` reports current support."

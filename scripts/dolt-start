@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! command -v dolt >/dev/null 2>&1; then
+  echo "dolt-start: dolt is missing" >&2
+  exit 1
+fi
+
+echo "dolt-start: repo-local Coherence DB"
+echo "  owner: this repository"
+echo "  boundary: do not write dependency/vendor repos' Dolt DBs"
+
+if [ ! -d .dolt ]; then
+  dolt init
+fi
+
+mkdir -p .coherence/run
+if [ -f .coherence/run/dolt.pid ] && kill -0 "$(cat .coherence/run/dolt.pid)" 2>/dev/null; then
+  echo "dolt sql-server already running: pid $(cat .coherence/run/dolt.pid)"
+  exit 0
+fi
+
+port="${DOLT_PORT:-3306}"
+socket=".dolt/dolt.sock"
+
+# Dolt socket support exists, but beads/socket-only support may vary by version.
+# Keep TCP fallback enabled until the full integration is verified.
+nohup dolt sql-server --host 127.0.0.1 --port "$port" --socket "$socket" \
+  > .coherence/run/dolt.log 2>&1 &
+echo "$!" > .coherence/run/dolt.pid
+
+echo "dolt sql-server starting"
+echo "  pid:    $(cat .coherence/run/dolt.pid)"
+echo "  host:   127.0.0.1"
+echo "  port:   $port"
+echo "  socket: $socket"
+echo "  log:    .coherence/run/dolt.log"

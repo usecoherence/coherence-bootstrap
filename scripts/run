@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+./scripts/check-policy
+cargo fmt --all --check
+cargo check --workspace
+cargo test --workspace
+
+echo "run: ok"

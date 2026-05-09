@@ -1,0 +1,25 @@
+Repository-local Coherence DB ownership
+
+Rule:
+  One repository = one local Coherence DB.
+
+This generated CLI repo owns only its local project state:
+  - local specs and acceptance criteria
+  - local plans/runs/attempts/reviews
+  - local beads/tasks and deliverable links
+  - local evidence pointers
+  - local links to external repositories
+
+Cross-repo boundary:
+  Consumer repos must not write into dependency/vendor repos' Dolt DBs.
+  Cross-repo coordination happens through links, contracts, commits, versions,
+  releases, and future workspace indexes, not shared mutable rows.
+
+core-db role:
+  core-db owns shared schema conventions, DB lifecycle conventions, migration
+  framework conventions, and future workspace index conventions.
+  core-db does not imply one global writable Dolt DB across repositories.
+
+Current state:
+  beads/Dolt storage adapter: NOT_IMPLEMENTED
+  workspace index: NOT_IMPLEMENTED

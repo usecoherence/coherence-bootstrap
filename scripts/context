@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ "$#" -eq 0 ]; then
+  cat .coherence/product-statement.txt
+  echo
+  echo "Connected context:"
+  echo "  specs: NOT_IMPLEMENTED"
+  echo "  ACs: NOT_IMPLEMENTED"
+  echo "  code links: NOT_IMPLEMENTED"
+  echo "  workflow backend: local_stub"
+  echo "  orchestration owner: external"
+  echo "  event/signal hooks: NOT_IMPLEMENTED"
+  exit 0
+fi
+
+cat <<EOF
+context query: $*
+
+NOT_IMPLEMENTED: graph context query.
+Future shape:
+  make tool context -- --spec ID --depth 1
+  make tool context -- --ac ID --depth 2
+  make tool context -- --file relative/path --depth 1
+  make tool context -- --spec A --spec B --intersections
+EOF
