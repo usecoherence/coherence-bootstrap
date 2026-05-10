@@ -18,7 +18,7 @@ test: test-isolated
 test-isolated:
 	@./scripts/with-isolated-test-profile cargo test --workspace
 
-# Mutating smoke against Dolt requires the same profile as unit integration tests (see test_world_guard).
+# Mutating smoke uses with-isolated-test-profile (COHERENCE_DB_PROFILE=test, COHERENCE_ENV=test); guard in test_world_guard.rs.
 smoke-isolated smoke:
 	@./scripts/with-isolated-test-profile cargo run -p coherence-core-db -- m0-smoke
 	@./scripts/with-isolated-test-profile cargo run -p coherence-core-db -- m1-spec-smoke

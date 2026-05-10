@@ -11,7 +11,10 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=dolt-layout.sh
 source "$(dirname "${BASH_SOURCE[0]}")/dolt-layout.sh"
 
+# Test profile + test-tier catalog resolution when `DOLT_DB` is unset and `project_hash` is bound
+# (see `ConnectionConfig::from_env` / COREDB-zx5). Disposable `DOLT_DB` still wins when user-scoped.
 export COHERENCE_DB_PROFILE=test
+export COHERENCE_ENV=test
 
 if ! coherence_use_user_scoped_dolt; then
   exec "$@"

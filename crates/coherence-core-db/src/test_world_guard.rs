@@ -2,10 +2,14 @@
 //! `COHERENCE_DB_PROFILE=test` and, on the **user-scoped shared Dolt** layout (ADR-0006), the resolved
 //! [`ConnectionConfig`] points at a disposable or otherwise non-canonical database name (see [`require_isolated_test_world_for_writes`]).
 //! Repo-local `.dolt` catalogs use the legacy **profile=test-only** gate so checkout workflows remain usable.
+//!
+//! When `.coherence/project.toml` binds **`project_hash`**, mutating tests/smoke must not target the
+//! manifest-derived **dev** tier catalog (`normalize(slug, hash, dev)`) — see [`refuse_manifest_bound_dev_catalog_for_test_writes`].
 
 use std::env;
 
 use crate::db::{user_scoped_dolt_from_env, ConnectionConfig};
+use crate::project_manifest::{self, CoherenceEnv};
 
 /// Environment variable that must name an isolated profile before mutating workflows run.
 pub const PROFILE_ENV_VAR: &str = "COHERENCE_DB_PROFILE";
@@ -136,6 +140,58 @@ fn check_test_world_expectation(database: &str) -> Result<(), String> {
     }
 }
 
+/// When the cwd manifest binds [`project_manifest::ProjectManifest::project_hash`], refuse mutating
+/// workflows that resolve to the **dev** tier catalog name for that slug/hash, so `COHERENCE_ENV=test`
+/// (and an unset `DOLT_DB`) cannot be implied while still pointing at `…_dev` (COREDB-zx5).
+fn refuse_manifest_bound_dev_catalog_for_test_writes(
+    context: &str,
+    config: &ConnectionConfig,
+) -> Result<(), String> {
+    let Some(manifest) = project_manifest::try_read_project_manifest_from_cwd() else {
+        return Ok(());
+    };
+    let Some(ref hash_raw) = manifest.project_hash else {
+        return Ok(());
+    };
+    let hash = hash_raw.trim();
+    if hash.is_empty() {
+        return Ok(());
+    }
+    let slug = manifest.project_slug.trim();
+    if slug.is_empty() {
+        return Ok(());
+    }
+    let dev_catalog =
+        project_manifest::effective_dolt_catalog_name(slug, Some(hash), CoherenceEnv::Dev)?;
+    let database = config.database.as_str();
+    if !database.eq_ignore_ascii_case(dev_catalog.as_str()) {
+        return Ok(());
+    }
+    if database_is_explicitly_allowlisted(database) {
+        return Ok(());
+    }
+    let env_name = project_manifest::COHERENCE_ENV_VAR;
+    Err(format!(
+        "{context}: blocked: refusing database writes — isolated test profile must not target the manifest-bound **dev** catalog (ADR-0004).\n\
+         \n\
+         Cause: resolved `DOLT_DB`={database:?} matches dev-tier name {dev_catalog:?} derived from `{env_name}=dev` rules; use the **test** tier or a disposable database.\n\
+         Resolved target: database={database:?}, socket={sock}, host={host}:{port}\n\
+         \n\
+         {remediation}\
+         \n\
+         Fix: export `{env_name}=test` (as in `scripts/with-isolated-test-profile`) and avoid overriding `DOLT_DB` with the dev catalog, or use a disposable `coherence_test_*` name / `{allow_var}`.",
+        context = context,
+        database = database,
+        dev_catalog = dev_catalog,
+        env_name = env_name,
+        sock = config.socket_path.display(),
+        host = config.host,
+        port = config.port,
+        remediation = STANDARD_REMEDIATION_TARGETS,
+        allow_var = TEST_WORLD_ALLOWLIST_ENV_VAR,
+    ))
+}
+
 /// Returns `Ok(())` when this process may run mutating smoke or test workflows against the resolved [`ConnectionConfig`].
 ///
 /// `context` labels the caller in errors (for example `m0-smoke` or a test module path).
@@ -159,6 +215,7 @@ pub fn require_isolated_test_world_for_writes(
     }
 
     check_test_world_expectation(&config.database)?;
+    refuse_manifest_bound_dev_catalog_for_test_writes(context, config)?;
     resolved_database_identity_allows_writes(config).map_err(|identity_cause| {
         format!(
             "{context}: blocked: refusing database writes — resolved connection identity fails isolated test-world policy (ADR-0004).\n\
@@ -227,6 +284,7 @@ mod tests {
     #![allow(clippy::expect_used, clippy::unwrap_used)]
 
     use super::*;
+    use crate::project_manifest;
     use std::path::PathBuf;
 
     /// Keys touched by [`clear_guard_env`] or guard scenarios that must be restored so parallel
@@ -237,6 +295,7 @@ mod tests {
         TEST_WORLD_ALLOWLIST_ENV_VAR,
         TEST_WORLD_EXPECTED_DB_ENV_VAR,
         "COHERENCE_TEST_DB_PREFIX",
+        "COHERENCE_ENV",
         "DOLT_DB",
         "COHERENCE_USE_USER_SCOPED_DOLT",
         "DOLT_SOCKET",
@@ -247,6 +306,40 @@ mod tests {
         "DOLT_PASSWORD",
         "COHERENCE_DOLT_RUNTIME_DIR",
     ];
+
+    struct SaveCwd(std::path::PathBuf);
+
+    impl SaveCwd {
+        fn chdir(path: &std::path::Path) -> Self {
+            let prev = env::current_dir().expect("cwd");
+            env::set_current_dir(path).expect("chdir");
+            Self(prev)
+        }
+    }
+
+    impl Drop for SaveCwd {
+        fn drop(&mut self) {
+            let _ = env::set_current_dir(&self.0);
+        }
+    }
+
+    fn tmp_git_repo() -> tempfile::TempDir {
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::fs::create_dir_all(tmp.path().join(".git")).unwrap();
+        tmp
+    }
+
+    fn write_v2_manifest_with_hash(repo: &std::path::Path) {
+        std::fs::create_dir_all(repo.join(".coherence")).unwrap();
+        std::fs::write(
+            repo.join(".coherence/project.toml"),
+            r#"version = 2
+project_slug = "svc"
+project_hash = "cafe"
+"#,
+        )
+        .unwrap();
+    }
 
     struct SavedTestEnv {
         pairs: Vec<(String, Option<String>)>,
@@ -290,6 +383,7 @@ mod tests {
         env::remove_var(TEST_WORLD_ALLOWLIST_ENV_VAR);
         env::remove_var(TEST_WORLD_EXPECTED_DB_ENV_VAR);
         env::remove_var("COHERENCE_TEST_DB_PREFIX");
+        env::remove_var("COHERENCE_ENV");
         env::remove_var("DOLT_DB");
         env::remove_var("COHERENCE_USE_USER_SCOPED_DOLT");
     }
@@ -421,5 +515,61 @@ mod tests {
             msg.contains(TEST_WORLD_EXPECTED_DB_ENV_VAR),
             "unexpected: {msg}"
         );
+    }
+
+    #[test]
+    fn refuse_when_resolved_db_matches_manifest_dev_catalog_even_if_coherence_env_test() {
+        let _lock = lock_test_env();
+        let _restore = SavedTestEnv::snapshot(SNAPSHOT_KEYS);
+        clear_guard_env();
+        env::set_var(PROFILE_ENV_VAR, "test");
+        env::set_var("COHERENCE_ENV", "test");
+
+        let tmp = tmp_git_repo();
+        write_v2_manifest_with_hash(tmp.path());
+        let _cwd = SaveCwd::chdir(tmp.path());
+
+        let config = dummy_config("svc_cafe_dev");
+        let msg = require_isolated_test_world_for_writes("test_ctx", &config).unwrap_err();
+        assert!(
+            msg.contains("dev") && msg.contains("ADR-0004"),
+            "unexpected: {msg}"
+        );
+        assert!(
+            msg.contains(project_manifest::COHERENCE_ENV_VAR),
+            "expected COHERENCE_ENV in remediation: {msg}"
+        );
+    }
+
+    #[test]
+    fn ok_when_resolved_db_matches_manifest_test_catalog() {
+        let _lock = lock_test_env();
+        let _restore = SavedTestEnv::snapshot(SNAPSHOT_KEYS);
+        clear_guard_env();
+        env::set_var(PROFILE_ENV_VAR, "test");
+        env::set_var("COHERENCE_ENV", "test");
+
+        let tmp = tmp_git_repo();
+        write_v2_manifest_with_hash(tmp.path());
+        let _cwd = SaveCwd::chdir(tmp.path());
+
+        let config = dummy_config("svc_cafe_test");
+        require_isolated_test_world_for_writes("test_ctx", &config).unwrap();
+    }
+
+    #[test]
+    fn manifest_dev_catalog_allowed_when_explicitly_allowlisted() {
+        let _lock = lock_test_env();
+        let _restore = SavedTestEnv::snapshot(SNAPSHOT_KEYS);
+        clear_guard_env();
+        env::set_var(PROFILE_ENV_VAR, "test");
+        env::set_var(TEST_WORLD_ALLOWLIST_ENV_VAR, "svc_cafe_dev");
+
+        let tmp = tmp_git_repo();
+        write_v2_manifest_with_hash(tmp.path());
+        let _cwd = SaveCwd::chdir(tmp.path());
+
+        let config = dummy_config("svc_cafe_dev");
+        require_isolated_test_world_for_writes("test_ctx", &config).unwrap();
     }
 }
