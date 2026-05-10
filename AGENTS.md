@@ -28,6 +28,20 @@ The goal is to reduce boilerplate and keep every Coherence CLI tool homogeneous:
 7. `make tool present-work`
 8. `make tool feedback`
 
+## Optional dev Git hook (rebuild CLI after commit)
+
+If you run an installed `coherence-core-db` from `PATH` and keep forgetting to rebuild after edits, two layers help:
+
+1. **Debug binary (fast):** enable the repo’s hooks once per clone so each **`git commit`** runs an incremental `cargo build -p coherence-core-db` (updates **`target/debug/coherence-core-db`** only):
+
+   ```bash
+   git config core.hooksPath .githooks
+   ```
+
+   Skip for a single commit: `GIT_HOOK_SKIP_COHERENCE_BUILD=1 git commit ...`
+
+2. **Installed copy under `~/.local/bin`:** the hook does not run `make install-local-force` (too slow for every commit). After a batch of commits, run **`make install-local-force`** when you rely on the PATH binary.
+
 ## Repository rules
 
 - Do not create root-level Markdown files except `AGENTS.md`.
