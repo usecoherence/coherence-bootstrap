@@ -47,11 +47,12 @@ fn print_help() {
            verify-spec    Aggregate verify-ac across all ACs for one spec\n\
            evidence-sample  Create a demo run under .coherence/runs/<run-id>/ (ADR-0005 skeleton)\n\
            version        Print version\n\n\
-         Canonical repository database:\n\
-           Curated reasoning state lives in this checkout's Dolt catalog. Workspace tests never write it:\n\
-           they require COHERENCE_DB_PROFILE=test and a disposable Dolt target.\n\
-           Mutating smoke (m0-smoke / m1-spec-smoke) uses the same rule — prefer `make smoke` from repo root.\n\
-           Details: AGENTS.md (canonical DB policy / test-world lifecycle).\n\n\
+         Canonical repository database — curated catalog vs disposable tests:\n\
+           • Curated catalog — long-lived spec/AC/codeintel rows; never written by tests/smoke without isolation.\n\
+           • Isolated test world — COHERENCE_DB_PROFILE=test and a disposable Dolt target (DOLT_DB naming on user-scoped Dolt).\n\
+           • Per-run evidence — under .coherence/runs/<run-id>/ per ADR-0005; not heavy blobs in canonical tables.\n\
+           • Optional user-scoped server — COHERENCE_USE_USER_SCOPED_DOLT=1: one dolt sql-server, pick catalog with DOLT_DB.\n\
+           Key env: DOLT_SOCKET, DOLT_DB, COHERENCE_DB_PROFILE, COHERENCE_PROJECT_SLUG, COHERENCE_KEEP_TEST_WORLD.\n\n\
          Repository workflow:\n\
            make tool help\n\
            make tool doctor\n\

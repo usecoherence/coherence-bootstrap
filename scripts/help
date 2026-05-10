@@ -21,6 +21,19 @@ Implementation:
   make smoke / smoke-isolated   m0 + m1 Dolt smoke (isolated-by-default wrappers)
   make test-world-reset  remove repo-local .dolt (requires COHERENCE_DB_PROFILE=test; Makefile sets this)
 
+Four database surfaces (same Dolt stack, different intent — see AGENTS.md):
+  • Canonical catalog    — curated specs/ACs/codeintel rows; not a test fixture store
+  • Isolated test world  — COHERENCE_DB_PROFILE=test + disposable DOLT_DB (esp. under user-scoped Dolt)
+  • Per-run evidence     — .coherence/runs/<run-id>/ on disk (ADR-0005); not heavy blobs in canonical tables
+  • User-scoped server   — optional one sql-server, many logical DBs via DOLT_DB (ADR-0006)
+
+Env quick reference (ADR-0004/0006 operational):
+  DOLT_SOCKET               socket path (repo-local .dolt vs user-scoped runtime dir)
+  DOLT_DB                   logical database name on that server
+  COHERENCE_DB_PROFILE      must be "test" for mutating tests/smoke (guard refuses otherwise)
+  COHERENCE_PROJECT_SLUG    canonical slug; guard blocks test writes when resolved DOLT_DB matches (user-scoped)
+  COHERENCE_KEEP_TEST_WORLD non-empty: keep disposable DBs; failure path prints COHERENCE_PRESERVED_TEST_WORLD
+
 Review:
   make tool present-work create review package [partial]
   make tool feedback     read feedback and choose next loop [partial]
@@ -47,7 +60,9 @@ ADR-0006 (optional user-scoped shared server):
 Canonical repository database policy (ADR-0004):
   this checkout's Dolt catalog is curated reasoning state — do not mutate it from tests
   workspace tests require COHERENCE_DB_PROFILE=test and a disposable Dolt target (make test-isolated, make tool run)
+  on user-scoped Dolt (ADR-0006), disposable DOLT_DB names (coherence_test_* by default) are provisioned by with-isolated-test-profile
   mutating smoke (writes fixtures) uses the same profile — use make smoke from repo root, not raw m*-smoke without env
+  per-run verification evidence is file-based under .coherence/runs/ (ADR-0005), not stored as large payloads in curated tables
   optional teardown of a disposable catalog: make tool dolt-stop then make test-world-reset (omit reset after a failure if you need forensics)
   full operator lifecycle: AGENTS.md
 

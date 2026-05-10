@@ -46,6 +46,31 @@ The goal is to reduce boilerplate and keep every Coherence CLI tool homogeneous:
 - Do not mix `CGC-RUST-*` proposals into local beads backlog (`bd list` scope).
 - Do not implement upstream proposals here unless the same change is required locally.
 
+## Coherence database surfaces (read this first)
+
+Operators juggle four ideas that reuse the **same MySQL-compatible Dolt toolchain** but must not be confused:
+
+| Surface | What it is | Primary ADR |
+|---------|------------|---------------|
+| **Canonical project catalog** | Curated reasoning rows (specs, ACs, codeintel links). The long-lived “truth” for this repo’s Coherence slice. | **0004** *(isolation rules protect this)* |
+| **Isolated test world** | Disposable database identity + `COHERENCE_DB_PROFILE=test` for workspace tests and mutating smoke. Never the canonical slug by accident. | **0004** |
+| **Per-run evidence** | Verification output and snapshot envelopes under **`.coherence/runs/<run-id>/`** (files), not heavy blobs in canonical tables. | **0005** |
+| **User-scoped Dolt service** (optional) | One `dolt sql-server` on your machine; **logical catalogs** are separate MySQL `DATABASE` names selected with **`DOLT_DB`**. | **0006** |
+
+Normative wording lives in the **Coherence ADR pack** (`coherence-spec-beads-agent-pack/adr/`, e.g. `ADR-0004-isolated-test-worlds.md`, `ADR-0005-adapter-runtime-snapshots-managed-evidence.md`, `ADR-0006-user-scoped-dolt-service.md` next to your beads agent checkout). This file summarizes how `coherence-core-db` applies those decisions.
+
+### Environment variables (operator cheat sheet)
+
+| Variable | Role |
+|----------|------|
+| `DOLT_SOCKET` | Unix socket for CLI connections (repo-local defaults under `.dolt/`; user-scoped defaults under runtime dir — see below). |
+| `DOLT_DB` | Logical database **name** on the server (canonical project slug vs disposable `coherence_test_*` for isolation). |
+| `COHERENCE_DB_PROFILE` | Must be **`test`** for workspace tests and mutating smoke writes; refusal messages cite ADR-0004. |
+| `COHERENCE_PROJECT_SLUG` | Canonical catalog identity on user-scoped Dolt; when set, the guard refuses writes when resolved `DOLT_DB` matches this slug under the test profile. |
+| `COHERENCE_KEEP_TEST_WORLD` | Any non-empty value preserves disposable DBs across runs and triggers **`COHERENCE_PRESERVED_TEST_WORLD`** identity logging on failure (user-scoped path); see test-world lifecycle below. |
+
+Related (optional layouts): **`COHERENCE_USE_USER_SCOPED_DOLT=1`** opts into ADR-0006 defaults; **`COHERENCE_TEST_DB_PREFIX`**, **`COHERENCE_TEST_WORLD_DB_ALLOWLIST`**, and **`COHERENCE_ISOLATED_TEST_VERBOSE`** refine isolation and logging.
+
 ## Canonical repository database policy (ADR-0004)
 
 The Dolt catalog configured for this checkout (paths and env from `make tool help` / Dolt targets) holds **curated reasoning state**. Treat it as the canonical record for human-driven work, not as a throwaway fixture store.
@@ -71,6 +96,10 @@ Operators select the logical catalog with **`DOLT_DB=<project_slug>`**. **`Conne
 Verification helper: **`./scripts/user-scoped-dolt-smoke.sh`** (isolated **`/tmp`** unless **`COHERENCE_USER_SCOPED_SMOKE_ROOT`** overrides).
 
 Interactive commands that **curate** the database (`migrate`, `spec add`, `ac add`, …) are for intentional work on the canonical catalog and are not gated by the test-world profile—the guard applies to automated tests and mutating smoke only.
+
+## Per-run evidence (ADR-0005)
+
+Managed **verification and adapter-runtime evidence** is stored **outside** canonical Dolt rows: primarily under **`.coherence/runs/<run-id>/`** (artifacts, metadata JSON, content hashes). The canonical catalog may later hold **pointers** to evidence, not large stdout blobs or raw payloads in spec tables. CLI exploration: `evidence-sample`; implementation: `evidence_store` / `ac_verify` in the Rust crate. See ADR-0005 in the ADR pack for the full contract.
 
 ## M1 module ownership (one physical DB, two logical slices)
 
