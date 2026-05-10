@@ -56,8 +56,8 @@ The Dolt catalog configured for this checkout (paths and env from `make tool hel
 
 1. **Create / start**: bring up repo-local Dolt (`make tool dolt-start`) or configure TCP/socket env for your disposable catalog.
 2. **Migrate**: run `make tool migrate` when preparing a catalog for normal use; smoke targets also apply migrations against the configured target.
-3. **Run**: execute `make tool run`, `make test-isolated`, or `make smoke` so the isolated profile wraps mutating workflows.
-4. **Destroy**: `make tool dolt-stop` then `make test-world-reset` removes the repository’s `.dolt` directory when you intend to discard disposable state.
+3. **Run**: execute `make tool run`, `make test-isolated`, or `make smoke` so the isolated profile wraps mutating workflows. With **`COHERENCE_USE_USER_SCOPED_DOLT=1`**, `scripts/with-isolated-test-profile` assigns a unique disposable **`DOLT_DB`** (default prefix `coherence_test_`) per run and drops it after success unless **`COHERENCE_KEEP_TEST_WORLD`** is set; **`drop-isolated-test-db`** refuses to remove databases outside that prefix.
+4. **Destroy (repo-local)**: `make tool dolt-stop` then `make test-world-reset` removes the repository’s `.dolt` directory when you intend to discard disposable state (this does not `DROP DATABASE` on a user-scoped server—that cleanup is handled by the isolated-test wrapper + `drop-isolated-test-db` for `coherence_test_*` names).
 5. **Keep-on-fail**: after a failed test or smoke run, skip `make test-world-reset` if you need to inspect tables, logs, or socket paths; wipe when finished.
 
 ### User-scoped shared Dolt (ADR-0006, optional)

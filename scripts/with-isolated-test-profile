@@ -1,5 +1,70 @@
 #!/usr/bin/env bash
 # Run a command with the isolated test-world DB profile (ADR-0004).
+# When COHERENCE_USE_USER_SCOPED_DOLT is set (ADR-0006), assigns a fresh disposable DOLT_DB
+# (coherence_test_<uuid> by default) for the child process and drops it on success unless
+# COHERENCE_KEEP_TEST_WORLD is set.
 set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=dolt-layout.sh
+source "$(dirname "${BASH_SOURCE[0]}")/dolt-layout.sh"
+
 export COHERENCE_DB_PROFILE=test
-exec "$@"
+
+if ! coherence_use_user_scoped_dolt; then
+  exec "$@"
+fi
+
+coherence_new_test_db_name() {
+  local prefix uuid
+  prefix="${COHERENCE_TEST_DB_PREFIX:-coherence_test_}"
+  if command -v uuidgen >/dev/null 2>&1; then
+    uuid="$(uuidgen)"
+  elif [ -r /proc/sys/kernel/random/uuid ]; then
+    uuid="$(cat /proc/sys/kernel/random/uuid)"
+  elif command -v python3 >/dev/null 2>&1; then
+    uuid="$(python3 -c 'import uuid; print(uuid.uuid4())')"
+  else
+    uuid="$(openssl rand -hex 16)"
+  fi
+  printf '%s%s' "$prefix" "$uuid"
+}
+
+invoke_drop_isolated_test_db() {
+  local bin_cmd
+  if [ -n "${COHERENCE_CORE_DB_BIN:-}" ]; then
+    bin_cmd=("${COHERENCE_CORE_DB_BIN}" drop-isolated-test-db)
+  else
+    bin_cmd=(cargo run --manifest-path "$ROOT/Cargo.toml" -q -p coherence-core-db -- drop-isolated-test-db)
+  fi
+  DOLT_DB="${1}" "${bin_cmd[@]}"
+}
+
+COHERENCE_ISOLATED_TEST_DB="$(coherence_new_test_db_name)"
+export DOLT_DB="$COHERENCE_ISOLATED_TEST_DB"
+
+echo "with-isolated-test-profile: user-scoped disposable DB DOLT_DB=$DOLT_DB" >&2
+
+set +e
+"$@"
+exit_code=$?
+set -e
+
+if [ "$exit_code" -ne 0 ]; then
+  if [ -n "${COHERENCE_KEEP_TEST_WORLD:-}" ]; then
+    echo "with-isolated-test-profile: failed (exit $exit_code); preserved DOLT_DB=$DOLT_DB (COHERENCE_KEEP_TEST_WORLD)" >&2
+  fi
+  exit "$exit_code"
+fi
+
+if [ -n "${COHERENCE_KEEP_TEST_WORLD:-}" ]; then
+  echo "with-isolated-test-profile: success; kept DOLT_DB=$DOLT_DB (COHERENCE_KEEP_TEST_WORLD)" >&2
+  exit 0
+fi
+
+if ! invoke_drop_isolated_test_db "$COHERENCE_ISOLATED_TEST_DB"; then
+  echo "with-isolated-test-profile: warning — tests passed but drop-isolated-test-db failed; leaked DOLT_DB=$DOLT_DB" >&2
+  exit 1
+fi
+
+exit 0

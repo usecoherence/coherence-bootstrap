@@ -10,6 +10,7 @@ pub fn run(args: Vec<String>) -> i32 {
         "doctor" => commands::doctor::run(),
         "migrate" => commands::migrate::run(),
         "db-ping" => commands::db_ping::run(),
+        "drop-isolated-test-db" => commands::drop_isolated_test_db::run(),
         "m0-smoke" => commands::m0_smoke::run(),
         "m1-spec-smoke" => commands::m1_spec_smoke::run(),
         "spec" => commands::spec_cmd::run(&args[2..]),
@@ -37,6 +38,7 @@ fn print_help() {
            doctor     Check runtime assumptions\n\
            migrate    Run migrations via migration library\n\
            db-ping    Verify MySQL-protocol readiness (socket first, then TCP)\n\
+           drop-isolated-test-db  Drop a coherence_test_* DB on user-scoped server (ADR-0004)\n\
            m0-smoke       Run minimal Rust -> Dolt DB vertical slice\n\
            m1-spec-smoke  Run M1 spec store smoke (Spec / AC / SpecRelation)\n\
            spec           Manage spec records (add, list, show)\n\

@@ -2,6 +2,7 @@ pub mod ac_cmd;
 pub mod cli_parse;
 pub mod db_ping;
 pub mod doctor;
+pub mod drop_isolated_test_db;
 pub mod evidence_sample_cmd;
 pub mod m0_smoke;
 pub mod m1_spec_smoke;
