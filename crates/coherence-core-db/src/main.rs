@@ -12,7 +12,7 @@ mod db;
 mod evidence_store;
 mod migrations;
 mod models;
-// Env tier + normalized catalog naming are unit-tested in-module; `ConnectionConfig` wiring is COREDB-6uf.
+// Env tier + normalized catalog naming: `project_manifest`; connection wiring in `db`.
 #[allow(dead_code)]
 mod project_manifest;
 mod spec_store;

@@ -41,7 +41,7 @@ fn run_impl(args: &[String]) -> Result<i32, String> {
 }
 
 fn connect_migrated() -> Result<mysql::Conn, String> {
-    let config = ConnectionConfig::from_env();
+    let config = ConnectionConfig::from_env()?;
     migrations::apply_all(&config)?;
     let (conn, _) = connect(&config)?;
     Ok(conn)

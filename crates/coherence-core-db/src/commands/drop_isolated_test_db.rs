@@ -16,7 +16,14 @@ pub fn run() -> i32 {
         );
         return 0;
     }
-    let config = ConnectionConfig::from_env();
+    let config = match ConnectionConfig::from_env() {
+        Ok(c) => c,
+        Err(err) => {
+            eprintln!("drop-isolated-test-db: failed");
+            eprintln!("{err}");
+            return 1;
+        }
+    };
     let db_name = config.database.clone();
     let prefix = configured_test_db_prefix();
     if !db_name.starts_with(&prefix) {

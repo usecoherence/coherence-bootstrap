@@ -43,7 +43,7 @@ fn count_spec_relations(conn: &mut mysql::Conn) -> Result<usize, String> {
 }
 
 fn run_impl() -> Result<(), String> {
-    let config = ConnectionConfig::from_env();
+    let config = ConnectionConfig::from_env()?;
     test_world_guard::require_isolated_test_world_for_writes("m1-spec-smoke", &config)?;
 
     println!("m1-spec-smoke: run migrations");

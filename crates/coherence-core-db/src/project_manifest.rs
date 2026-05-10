@@ -20,8 +20,9 @@
 //!
 //! ## Effective Dolt catalog name (normalized)
 //!
-//! [`effective_dolt_catalog_name`] builds a single SQL-safe MySQL/Dolt **database identifier** (not
-//! wired to connection config in this module — see follow-up tasks):
+//! [`effective_dolt_catalog_name`] builds a single SQL-safe MySQL/Dolt **database identifier**; the
+//! CLI wires it via [`crate::db::ConnectionConfig::from_env`] when **`DOLT_DB`** is unset and the
+//! manifest has a bound **`project_hash`** (see `db.rs` / COREDB-6uf).
 //!
 //! 1. Sanitize [`sanitize_dolt_db_segment`] **slug** from `project_slug`.
 //! 2. If `project_hash` is `Some` and non-whitespace, sanitize the trimmed hash as a middle **segment**

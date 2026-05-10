@@ -339,7 +339,7 @@ mod tests {
 
     fn maybe_conn() -> Option<test_world_guard::EnvConnLock<Conn>> {
         let lock = test_world_guard::lock_test_env();
-        let config = ConnectionConfig::from_env();
+        let config = ConnectionConfig::from_env().ok()?;
         test_world_guard::panic_unless_isolated_test_world_for_writes("ac_verify::tests", &config);
         migrations::apply_all(&config).ok()?;
         let (conn, _) = db::connect(&config).ok()?;

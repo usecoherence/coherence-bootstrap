@@ -7,7 +7,14 @@ pub fn run() -> i32 {
         eprintln!("{err}");
         return 1;
     }
-    let config = ConnectionConfig::from_env();
+    let config = match ConnectionConfig::from_env() {
+        Ok(c) => c,
+        Err(err) => {
+            eprintln!("migrate: failed");
+            eprintln!("{err}");
+            return 1;
+        }
+    };
     match migrations::apply_all(&config) {
         Ok(applied) => {
             println!("migrate: success");
