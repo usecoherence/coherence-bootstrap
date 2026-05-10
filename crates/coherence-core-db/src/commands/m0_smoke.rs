@@ -1,6 +1,7 @@
 use crate::db::{connect, counts, insert_acceptance_criterion, insert_spec, ConnectionConfig};
 use crate::migrations;
 use crate::models::{AcceptanceCriterion, Spec};
+use crate::test_world_guard;
 
 pub fn run() -> i32 {
     match run_impl() {
@@ -14,6 +15,8 @@ pub fn run() -> i32 {
 }
 
 fn run_impl() -> Result<(), String> {
+    test_world_guard::require_isolated_test_world_for_writes("m0-smoke")?;
+
     let config = ConnectionConfig::from_env();
 
     println!("m0-smoke: run migrations");

@@ -11,6 +11,7 @@ mod db;
 mod migrations;
 mod models;
 mod spec_store;
+mod test_world_guard;
 
 /// **Codeintel persistence + verification helpers** (`codeintel_*` tables): put/list locations &
 /// AC links (`verify-*` consumes `verified_by` links). CLI writes for locations/links may land

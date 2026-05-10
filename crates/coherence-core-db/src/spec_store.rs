@@ -348,8 +348,10 @@ mod tests {
     use crate::migrations;
     use crate::models::{AcceptanceCriterion, ConcernKind, Spec, SpecRelation};
     use crate::spec_store;
+    use crate::test_world_guard;
 
     fn maybe_conn() -> Option<Conn> {
+        test_world_guard::panic_unless_isolated_test_world_for_writes("spec_store::tests");
         let config = ConnectionConfig::from_env();
         let _ = migrations::apply_all(&config).ok()?;
         db::connect(&config).ok().map(|(conn, _)| conn)

@@ -4,6 +4,7 @@ use crate::db::{connect, ConnectionConfig};
 use crate::migrations;
 use crate::models::{AcceptanceCriterion, Spec, SpecRelation};
 use crate::spec_store;
+use crate::test_world_guard;
 
 /// Smoke identifiers — stable and namespaced away from `m0-smoke` fixtures.
 const SMOKE_SPEC_ID: &str = "M1-SMOKE-SPEC-1";
@@ -42,6 +43,8 @@ fn count_spec_relations(conn: &mut mysql::Conn) -> Result<usize, String> {
 }
 
 fn run_impl() -> Result<(), String> {
+    test_world_guard::require_isolated_test_world_for_writes("m1-spec-smoke")?;
+
     let config = ConnectionConfig::from_env();
 
     println!("m1-spec-smoke: run migrations");

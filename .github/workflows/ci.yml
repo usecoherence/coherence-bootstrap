@@ -15,5 +15,5 @@ jobs:
           components: rustfmt, clippy
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
-      - run: cargo test --workspace
+      - run: COHERENCE_DB_PROFILE=test cargo test --workspace
       - run: make tool check-policy

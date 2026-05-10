@@ -12,7 +12,7 @@ check:
 	@$(MAKE) tool run
 
 test:
-	@cargo test --workspace
+	@COHERENCE_DB_PROFILE=test cargo test --workspace
 
 fmt:
 	@cargo fmt --all
