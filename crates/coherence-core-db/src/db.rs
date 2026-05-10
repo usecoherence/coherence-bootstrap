@@ -337,13 +337,13 @@ pub fn mysql_quote_identifier(name: &str) -> String {
     format!("`{escaped}`")
 }
 
-/// Ensures `config.database` exists on the server (ADR-0006 multi-db `--data-dir` layout).
+/// Ensures `config.database` exists on the server (`CREATE DATABASE IF NOT EXISTS`).
+///
+/// Runs for **repo-local** `.dolt` sockets as well as user-scoped Dolt (ADR-0006): after
+/// `project init`, the manifest catalog name must exist before `migrate` / Refinery connect.
 pub fn ensure_project_database(config: &ConnectionConfig) -> Result<(), String> {
-    if !user_scoped_dolt_from_env() {
-        return Ok(());
-    }
     if config.database.is_empty() {
-        return Err("DOLT_DB is empty; cannot ensure database".to_string());
+        return Err("logical catalog name is empty; cannot ensure database".to_string());
     }
     let (mut conn, _) = connect_without_database(config)?;
     let ident = mysql_quote_identifier(&config.database);
