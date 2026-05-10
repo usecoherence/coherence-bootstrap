@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Run a command with the isolated test-world DB profile (ADR-0004).
+set -euo pipefail
+export COHERENCE_DB_PROFILE=test
+exec "$@"

@@ -1,4 +1,5 @@
-.PHONY: tool check test fmt clippy install-local install-local-force install-local-check print-bin-name
+.PHONY: tool check test test-isolated smoke smoke-isolated \
+	test-world-reset fmt clippy install-local install-local-force install-local-check print-bin-name
 
 BIN_NAME ?= coherence-core-db
 INSTALL_ROOT ?= $(HOME)/.local
@@ -11,8 +12,19 @@ tool:
 check:
 	@$(MAKE) tool run
 
-test:
-	@COHERENCE_DB_PROFILE=test cargo test --workspace
+# Isolated-by-default: workspace tests never run without explicit test-world profile.
+test: test-isolated
+
+test-isolated:
+	@./scripts/with-isolated-test-profile cargo test --workspace
+
+# Mutating smoke against Dolt requires the same profile as unit integration tests (see test_world_guard).
+smoke-isolated smoke:
+	@./scripts/with-isolated-test-profile cargo run -p coherence-core-db -- m0-smoke
+	@./scripts/with-isolated-test-profile cargo run -p coherence-core-db -- m1-spec-smoke
+
+test-world-reset:
+	@COHERENCE_DB_PROFILE=test ./scripts/test-world-reset
 
 fmt:
 	@cargo fmt --all

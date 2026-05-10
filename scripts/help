@@ -16,7 +16,10 @@ Planning:
   make tool plan         HITL planning loop [stub]
 
 Implementation:
-  make tool run          fmt/check/test/policy checks
+  make tool run          fmt/check/test/policy checks (workspace tests run under isolated profile)
+  make test-isolated      cargo test workspace (explicit isolated profile helper)
+  make smoke / smoke-isolated   m0 + m1 Dolt smoke (isolated-by-default wrappers)
+  make test-world-reset  remove repo-local .dolt (requires COHERENCE_DB_PROFILE=test; Makefile sets this)
 
 Review:
   make tool present-work create review package [partial]

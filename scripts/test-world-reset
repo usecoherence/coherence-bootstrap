@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Drop repo-local Dolt state after ./scripts/dolt-stop. Only when COHERENCE_DB_PROFILE=test
+# (same gate as mutating smoke paths) so canonical/default sessions do not wipe .dolt by accident.
+set -euo pipefail
+
+raw="${COHERENCE_DB_PROFILE:-}"
+norm="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+if [ "$norm" != "test" ]; then
+  echo "test-world-reset: blocked: refusing to remove .dolt without an isolated test-world profile." >&2
+  if [ -n "$raw" ]; then
+    echo "  Cause: COHERENCE_DB_PROFILE is set to $(printf '%q' "$raw") — want test." >&2
+  else
+    echo "  Cause: COHERENCE_DB_PROFILE is unset — want test." >&2
+  fi
+  echo "  Fix: export COHERENCE_DB_PROFILE=test (or run: make test-world-reset)" >&2
+  exit 1
+fi
+
+"$(dirname "$0")/dolt-stop" || true
+rm -rf .dolt
+rm -f .coherence/run/dolt.pid
+echo "test-world-reset: removed repo-local .dolt; next: make tool dolt-start, then migrate/smoke via isolated targets"

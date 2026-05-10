@@ -4,6 +4,6 @@ set -euo pipefail
 ./scripts/check-policy
 cargo fmt --all --check
 cargo check --workspace
-COHERENCE_DB_PROFILE=test cargo test --workspace
+./scripts/with-isolated-test-profile cargo test --workspace
 
 echo "run: ok"
