@@ -15,6 +15,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 const MANIFEST_REL_PATH: &str = ".coherence/project.toml";
 const PROJECT_FILENAME: &str = "project.toml";
@@ -120,6 +121,48 @@ pub fn sanitize_dolt_db_segment(input: &str) -> String {
     out
 }
 
+/// First four lowercase hex digits of SHA-256 over UTF-8 bytes of `path_for_hash`
+/// (use the same string you persist as `frozen_git_toplevel`, after trimming).
+pub fn short_hash_frozen_git_path(path_for_hash: &str) -> String {
+    let trimmed = path_for_hash.trim();
+    let mut hasher = Sha256::new();
+    hasher.update(trimmed.as_bytes());
+    let full = format!("{:x}", hasher.finalize());
+    full[..4].to_string()
+}
+
+/// `sanitize_dolt_db_segment(project_slug) + '_' + short_hash(frozen_git_toplevel)`,
+/// capped at [`DOLT_DB_NAME_MAX_LEN`] for MySQL/Dolt database names.
+pub fn dolt_db_name_for_bind(
+    project_slug: &str,
+    frozen_git_toplevel: &str,
+) -> Result<String, String> {
+    let short = short_hash_frozen_git_path(frozen_git_toplevel);
+    let mut base = sanitize_dolt_db_segment(project_slug);
+    if base.is_empty() {
+        return Err(
+            "project_slug sanitizes to an empty database name segment; use letters, digits, or underscores"
+                .to_string(),
+        );
+    }
+    let suffix = format!("_{short}");
+    let max_base = DOLT_DB_NAME_MAX_LEN.saturating_sub(suffix.len());
+    if base.len() > max_base {
+        base.truncate(max_base);
+        while base.ends_with('_') {
+            base.pop();
+        }
+    }
+    if base.is_empty() {
+        return Err(
+            "project_slug is too long to fit a stable dolt_db_name (max 64 characters)".to_string(),
+        );
+    }
+    let name = format!("{base}{suffix}");
+    debug_assert!(name.len() <= DOLT_DB_NAME_MAX_LEN);
+    Ok(name)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -195,5 +238,20 @@ mod tests {
         let s = sanitize_dolt_db_segment(&long);
         assert_eq!(s.len(), DOLT_DB_NAME_MAX_LEN);
         assert!(s.chars().all(|c| matches!(c, 'a'..='z' | '0'..='9' | '_')));
+    }
+
+    #[test]
+    fn short_hash_strips_whitespace_consistently() {
+        let a = short_hash_frozen_git_path("/tmp/repo");
+        let b = short_hash_frozen_git_path("  /tmp/repo  ");
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn dolt_db_name_for_bind_formula_matches_slug_and_path_hash() {
+        let n = dolt_db_name_for_bind("My-Project", "/workspace/foo").unwrap();
+        let h = short_hash_frozen_git_path("/workspace/foo");
+        assert_eq!(n, format!("my_project_{}", h));
+        assert!(n.len() <= DOLT_DB_NAME_MAX_LEN);
     }
 }

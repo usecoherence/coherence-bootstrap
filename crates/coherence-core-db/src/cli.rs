@@ -19,6 +19,7 @@ pub fn run(args: Vec<String>) -> i32 {
         "verify-ac" => commands::verify_ac_cmd::run(&args[2..]),
         "verify-spec" => commands::verify_spec_cmd::run(&args[2..]),
         "evidence-sample" => commands::evidence_sample_cmd::run(&args[2..]),
+        "project" => commands::project_cmd::run(&args[2..]),
         "version" | "--version" | "-V" => {
             println!("coherence-core-db 0.1.0");
             0
@@ -48,6 +49,7 @@ fn print_help() {
            verify-ac      Run verified_by linked test commands for one AC\n\
            verify-spec    Aggregate verify-ac across all ACs for one spec\n\
            evidence-sample  Create a demo run under .coherence/runs/<run-id>/ (ADR-0005 skeleton)\n\
+           project        Project manifest: init freezes dolt_db_name = sanitize(project_slug)_<sha256-prefix4(git-toplevel))>\n\
            version        Print version\n\n\
          Canonical repository database — curated catalog vs disposable tests:\n\
            • Curated catalog — long-lived spec/AC/codeintel rows; never written by tests/smoke without isolation.\n\

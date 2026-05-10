@@ -12,8 +12,6 @@ mod db;
 mod evidence_store;
 mod migrations;
 mod models;
-// Manifest helpers are consumed by upcoming init / config; unit-tested here without CLI wiring yet (COREDB-2ft).
-#[allow(dead_code)]
 mod project_manifest;
 mod spec_store;
 mod test_world_guard;
