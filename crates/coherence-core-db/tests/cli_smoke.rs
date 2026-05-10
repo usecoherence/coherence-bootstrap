@@ -8,6 +8,7 @@ fn help_prints_workflow_entrypoint() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("make tool help"));
     assert!(stdout.contains("verify-ac"));
+    assert!(stdout.contains("verify-spec"));
 }
 
 #[test]

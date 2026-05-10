@@ -14,6 +14,7 @@ pub fn run(args: Vec<String>) -> i32 {
         "spec" => commands::spec_cmd::run(&args[2..]),
         "ac" => commands::ac_cmd::run(&args[2..]),
         "verify-ac" => commands::verify_ac_cmd::run(&args[2..]),
+        "verify-spec" => commands::verify_spec_cmd::run(&args[2..]),
         "version" | "--version" | "-V" => {
             println!("coherence-core-db 0.1.0");
             0
@@ -38,6 +39,7 @@ fn print_help() {
            spec           Manage spec records (add, list, show)\n\
            ac             Manage acceptance criteria (add, list)\n\
            verify-ac      Run verified_by linked test commands for one AC\n\
+           verify-spec    Aggregate verify-ac across all ACs for one spec\n\
            version        Print version\n\n\
          Repository workflow:\n\
            make tool help\n\
