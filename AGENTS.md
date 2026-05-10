@@ -70,6 +70,25 @@ Normative wording lives in the **Coherence ADR pack** (`coherence-spec-beads-age
 | `COHERENCE_PROJECT_SLUG` | Canonical catalog identity on user-scoped Dolt; when set, the guard refuses writes when resolved `DOLT_DB` matches this slug under the test profile. When **unset**, a successful `ConnectionConfig::from_env()` may set this from `project_slug` in `.coherence/project.toml` (manifest read only; no `git` subprocess) so isolation checks align with the on-disk manifest. |
 | `COHERENCE_KEEP_TEST_WORLD` | Any non-empty value preserves disposable DBs across runs and triggers **`COHERENCE_PRESERVED_TEST_WORLD`** identity logging on failure (user-scoped path); see test-world lifecycle below. |
 
+### Manifest and env tier (agent-oriented contract)
+
+This is the **naming contract** for a bound manifest—not a repeat of the ADR pack.
+
+- **`project_slug`** is always required for the normal path: every intentional checkout should carry a non-empty slug in **`.coherence/project.toml`** (establish it before relying on manifest-derived catalog names).
+- **`project_hash`** is **frozen after a successful `project init`** (one git-root binding written with legacy **`dolt_db_name`**). Re-run **`--force-rebind`** only when you deliberately accept orphan-data risk.
+- **`COHERENCE_ENV`** selects the **tier suffix** of the effective catalog: the resolved name is **`effective_dolt_catalog_name(project_slug, project_hash, tier)`** (normalized segments; same formula for dev, test, and prod).
+- Non-empty **`DOLT_DB`** is an **override** (disposable catalogs, CI, emergencies): it **wins** over the manifest and **skips** manifest catalog preflight.
+
+| `COHERENCE_ENV` | Tier suffix | Example pattern (`DOLT_DB` unset, `project_hash` bound) |
+|-----------------|-------------|-----------------------------------------------------------|
+| `dev` | `_dev` | `{slug}_{hash}_dev` (default when unset or empty) |
+| `test` | `_test` | `{slug}_{hash}_test` |
+| `prod` | `_prod` | `{slug}_{hash}_prod` |
+
+Slug and hash cells here are the **sanitized** segments the CLI composes; see implementation in **`project_manifest`**.
+
+**Preflight before connect (`db-ping`, `migrate`, `scripts/dolt-start`):** when **`DOLT_DB`** is **not** set, the shared check requires a git work tree, readable **`.coherence/project.toml`**, non-empty **`project_slug`**, and a catalog binding (**`project_hash`** or legacy **`dolt_db_name`**). **`COHERENCE_ENV`** must be valid (**`dev`**, **`test`**, **`prod`**, or unset/empty→dev) or connect-start paths fail early with the same remediation text as **`doctor`**.
+
 **Dev vs test catalogs (same repo, same `project_hash`):** the normalized database name is `{slug}_{hash}_dev`, `{slug}_{hash}_test`, or `{slug}_{hash}_prod` according to **`COHERENCE_ENV`**. Workspace tests (`make test-isolated`) and mutating smoke (`make smoke`) run under **`scripts/with-isolated-test-profile`**, which sets both **`COHERENCE_DB_PROFILE=test`** and **`COHERENCE_ENV=test`** so an unset **`DOLT_DB`** resolves to the **`*_test`** catalog, never the **`*_dev`** catalog. The test-world guard also refuses mutating smoke/tests that resolve to the manifest-bound **dev** tier name while the isolated profile is active (disposable `coherence_test_*` and explicit allow-lists still apply).
 
 Related (optional layouts): **`COHERENCE_USE_USER_SCOPED_DOLT=1`** opts into ADR-0006 defaults; **`COHERENCE_TEST_DB_PREFIX`**, **`COHERENCE_TEST_WORLD_DB_ALLOWLIST`**, and **`COHERENCE_ISOLATED_TEST_VERBOSE`** refine isolation and logging.

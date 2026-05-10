@@ -56,7 +56,7 @@ fn print_help() {
            • Isolated test world — COHERENCE_DB_PROFILE=test and a disposable Dolt target (DOLT_DB naming on user-scoped Dolt).\n\
            • Per-run evidence — under .coherence/runs/<run-id>/ per ADR-0005; not heavy blobs in canonical tables.\n\
            • Optional user-scoped server — COHERENCE_USE_USER_SCOPED_DOLT=1: one dolt sql-server, pick catalog with DOLT_DB.\n\
-           Key env: DOLT_SOCKET, DOLT_DB, COHERENCE_DB_PROFILE, COHERENCE_PROJECT_SLUG, COHERENCE_KEEP_TEST_WORLD.\n\n\
+           Key env: DOLT_SOCKET, DOLT_DB, COHERENCE_ENV (dev|test|prod; unset/empty=dev; picks catalog tier when project_hash bound and DOLT_DB unset), COHERENCE_DB_PROFILE, COHERENCE_PROJECT_SLUG, COHERENCE_KEEP_TEST_WORLD.\n\n\
          Repository workflow:\n\
            make tool help\n\
            make tool doctor\n\

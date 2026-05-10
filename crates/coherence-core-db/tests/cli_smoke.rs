@@ -49,6 +49,10 @@ fn help_prints_workflow_entrypoint() {
         stdout.contains("Project identity and manifest lifecycle"),
         "help should point at AGENTS.md subsection: {stdout}"
     );
+    assert!(
+        stdout.contains("COHERENCE_ENV (dev|test|prod"),
+        "help should summarize COHERENCE_ENV one-liner: {stdout}"
+    );
 }
 
 #[test]
