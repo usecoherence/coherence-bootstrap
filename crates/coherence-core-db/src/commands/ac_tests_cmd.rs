@@ -1,9 +1,9 @@
-//! `ac-tests` CLI: materialize Rust AC test skeleton files from the live spec graph.
+//! `ac-tests` CLI: materialize and check Rust AC test files against the live spec graph.
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::ac_test_layout::expected_rust_ac_test_files;
+use crate::ac_test_layout::{expected_rust_ac_test_files, ExpectedAcTestFile};
 use crate::commands::cli_parse::parse_args;
 use crate::db::{connect, ConnectionConfig};
 use crate::migrations;
@@ -12,7 +12,7 @@ use crate::spec_store;
 
 pub fn run(args: &[String]) -> i32 {
     match run_impl(args) {
-        Ok(()) => 0,
+        Ok(code) => code,
         Err(err) => {
             eprintln!("ac-tests: {err}");
             1
@@ -20,16 +20,22 @@ pub fn run(args: &[String]) -> i32 {
     }
 }
 
-fn run_impl(args: &[String]) -> Result<(), String> {
-    let sub = args
-        .first()
-        .map(String::as_str)
-        .ok_or_else(|| "usage: coherence-core-db ac-tests <materialize-rust> ...".to_string())?;
+fn run_impl(args: &[String]) -> Result<i32, String> {
+    let sub = args.first().map(String::as_str).ok_or_else(|| {
+        "usage: coherence-core-db ac-tests <materialize-rust | check-rust> [--workspace <dir>] ..."
+            .to_string()
+    })?;
     let tail = &args[1..];
     match sub {
-        "materialize-rust" => materialize_rust(tail),
+        "materialize-rust" => {
+            materialize_rust(tail)?;
+            Ok(0)
+        }
+        "check-rust" => check_rust(tail),
         other => Err(format!(
-            "unknown ac-tests subcommand: {other} (expected materialize-rust)"
+            "unknown ac-tests subcommand: {other} (expected materialize-rust or check-rust)\n\
+             materialize-rust: create missing tests/ac/**/*.rs from the DB graph (see ac-tests check-rust)\n\
+             check-rust: verify every expected file exists; exits 1 if any are missing"
         )),
     }
 }
@@ -69,6 +75,14 @@ fn resolve_workspace_root(workspace_flag: Option<&str>) -> Result<PathBuf, Strin
     }
 }
 
+/// Expected per-AC Rust files in deterministic order (`file_path`).
+/// Shared by [`materialize_rust_ac_tests`] and [`missing_rust_ac_test_files`].
+fn sorted_expected_rust_ac_test_files(graph: &SpecGraph) -> Vec<ExpectedAcTestFile> {
+    let mut expected = expected_rust_ac_test_files(graph);
+    expected.sort_by(|a, b| a.file_path.cmp(&b.file_path));
+    expected
+}
+
 fn validate_tests_ac_rel_path(rel: &str) -> Result<(), String> {
     if !rel.starts_with("tests/ac/") {
         return Err(format!(
@@ -87,8 +101,7 @@ fn materialize_rust_ac_tests(
     workspace: &Path,
     graph: &SpecGraph,
 ) -> Result<(Vec<String>, Vec<String>), String> {
-    let mut expected = expected_rust_ac_test_files(graph);
-    expected.sort_by(|a, b| a.file_path.cmp(&b.file_path));
+    let expected = sorted_expected_rust_ac_test_files(graph);
 
     let tests_ac_root = workspace.join("tests/ac");
 
@@ -127,6 +140,37 @@ fn materialize_rust_ac_tests(
     Ok((created, existing))
 }
 
+/// Lists `(ac_id, relative file_path)` for expected Rust AC tests that are absent or not regular files.
+fn missing_rust_ac_test_files(
+    workspace: &Path,
+    graph: &SpecGraph,
+) -> Result<Vec<(String, String)>, String> {
+    let tests_ac_root = workspace.join("tests/ac");
+    let mut missing = Vec::new();
+
+    for file in sorted_expected_rust_ac_test_files(graph) {
+        validate_tests_ac_rel_path(&file.file_path)?;
+        let abs = workspace.join(&file.file_path);
+        if !abs.starts_with(&tests_ac_root) {
+            return Err(format!(
+                "refusing to scan outside tests/ac: {}",
+                abs.display()
+            ));
+        }
+        if abs.exists() && !abs.is_file() {
+            return Err(format!(
+                "expected AC test path exists but is not a regular file: {}",
+                abs.display()
+            ));
+        }
+        if !abs.is_file() {
+            missing.push((file.ac_id, file.file_path));
+        }
+    }
+
+    Ok(missing)
+}
+
 fn materialize_rust(args: &[String]) -> Result<(), String> {
     let parsed = parse_args(args)?;
     let ws_flag = parsed.single_flag("workspace")?;
@@ -145,6 +189,27 @@ fn materialize_rust(args: &[String]) -> Result<(), String> {
         println!("  {p}");
     }
     Ok(())
+}
+
+fn check_rust(args: &[String]) -> Result<i32, String> {
+    let parsed = parse_args(args)?;
+    let ws_flag = parsed.single_flag("workspace")?;
+    let root = resolve_workspace_root(ws_flag)?;
+
+    let mut conn = connect_migrated()?;
+    let graph = spec_store::load_spec_graph(&mut conn)?;
+    let missing = missing_rust_ac_test_files(&root, &graph)?;
+
+    if missing.is_empty() {
+        println!("All expected AC test files are present.");
+        Ok(0)
+    } else {
+        println!("Missing AC test files:");
+        for (ac_id, path) in &missing {
+            println!("  {ac_id} -> {path}");
+        }
+        Ok(1)
+    }
 }
 
 #[cfg(test)]
@@ -201,5 +266,56 @@ mod tests {
         );
         assert!(created[0].contains("/ac-a."));
         assert!(created[1].contains("/ac-z."));
+    }
+
+    #[test]
+    fn check_reports_none_missing_after_materialize() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let root = tmp.path();
+
+        let mut ac = AcceptanceCriterion::new("AC-CHK-1", "SPEC-R", "Check happy path");
+        ac.slug = "chk-ac".into();
+        let spec = Spec::new("SPEC-R", "Root");
+        let graph = SpecGraph::new(vec![spec], vec![ac], vec![]);
+
+        materialize_rust_ac_tests(root, &graph).expect("materialize");
+        let missing = missing_rust_ac_test_files(root, &graph).expect("check scan");
+        assert!(missing.is_empty());
+    }
+
+    #[test]
+    fn check_reports_missing_after_file_deleted() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let root = tmp.path();
+
+        let mut ac = AcceptanceCriterion::new("AC-DEL", "SPEC-R", "Del");
+        ac.slug = "gone-ac".into();
+        let spec = Spec::new("SPEC-R", "Root");
+        let graph = SpecGraph::new(vec![spec], vec![ac], vec![]);
+
+        let (created, _) = materialize_rust_ac_tests(root, &graph).expect("materialize");
+        fs::remove_file(root.join(&created[0])).expect("remove");
+        let missing = missing_rust_ac_test_files(root, &graph).expect("check scan");
+        assert_eq!(missing.len(), 1);
+        assert_eq!(missing[0].0, "AC-DEL");
+        assert_eq!(missing[0].1, created[0]);
+    }
+
+    #[test]
+    fn check_reports_missing_when_graph_extended_without_materialize() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let root = tmp.path();
+
+        let mut ac1 = AcceptanceCriterion::new("AC-ONE", "SPEC-R", "One");
+        ac1.slug = "one-ac".into();
+        let spec = Spec::new("SPEC-R", "Root");
+        let graph1 = SpecGraph::new(vec![spec.clone()], vec![ac1.clone()], vec![]);
+        materialize_rust_ac_tests(root, &graph1).expect("materialize");
+
+        let ac2 = AcceptanceCriterion::new("AC-TWO", "SPEC-R", "Two");
+        let graph2 = SpecGraph::new(vec![spec], vec![ac1, ac2], vec![]);
+        let missing = missing_rust_ac_test_files(root, &graph2).expect("check scan");
+        assert_eq!(missing.len(), 1);
+        assert_eq!(missing[0].0, "AC-TWO");
     }
 }

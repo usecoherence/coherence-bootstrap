@@ -44,7 +44,7 @@ fn print_help() {
            m1-spec-smoke  Run M1 spec store smoke (Spec / AC / SpecRelation)\n\
            spec           Manage spec records (add, list, show)\n\
            ac             Manage acceptance criteria (add, list, show); each AC has a per-spec slug (default from id)\n\
-           ac-tests       AC test file helpers (materialize-rust: create missing tests/ac/*.rs from DB graph)\n\
+           ac-tests       AC test files: materialize-rust (create missing tests/ac/**/*.rs), check-rust (hard gate vs graph)\n\
            verify-ac      Run verified_by linked test commands for one AC\n\
            verify-spec    Aggregate verify-ac across all ACs for one spec\n\
            evidence-sample  Create a demo run under .coherence/runs/<run-id>/ (ADR-0005 skeleton)\n\

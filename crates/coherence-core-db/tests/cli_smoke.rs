@@ -10,6 +10,10 @@ fn help_prints_workflow_entrypoint() {
     assert!(stdout.contains("verify-ac"));
     assert!(stdout.contains("verify-spec"));
     assert!(stdout.contains("ac-tests"));
+    assert!(
+        stdout.contains("check-rust") && stdout.contains("materialize-rust"),
+        "help should describe ac-tests subcommands: {stdout}"
+    );
     assert!(stdout.contains("evidence-sample"));
     assert!(
         stdout.contains("COHERENCE_DB_PROFILE=test"),
