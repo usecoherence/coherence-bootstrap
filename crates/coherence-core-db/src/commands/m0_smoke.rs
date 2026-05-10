@@ -15,9 +15,8 @@ pub fn run() -> i32 {
 }
 
 fn run_impl() -> Result<(), String> {
-    test_world_guard::require_isolated_test_world_for_writes("m0-smoke")?;
-
     let config = ConnectionConfig::from_env();
+    test_world_guard::require_isolated_test_world_for_writes("m0-smoke", &config)?;
 
     println!("m0-smoke: run migrations");
     let applied = migrations::apply_all(&config)?;

@@ -235,8 +235,11 @@ mod tests {
     use crate::test_world_guard;
 
     fn maybe_conn() -> Option<Conn> {
-        test_world_guard::panic_unless_isolated_test_world_for_writes("ac_code_link_store::tests");
         let config = ConnectionConfig::from_env();
+        test_world_guard::panic_unless_isolated_test_world_for_writes(
+            "ac_code_link_store::tests",
+            &config,
+        );
         let _ = migrations::apply_all(&config).ok()?;
         db::connect(&config).ok().map(|(conn, _)| conn)
     }
