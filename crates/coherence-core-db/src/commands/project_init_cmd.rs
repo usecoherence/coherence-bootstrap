@@ -55,6 +55,7 @@ fn run_impl(args: &[String]) -> Result<(), String> {
             project_slug: slug,
             dolt_db_name: None,
             frozen_git_toplevel: None,
+            project_hash: None,
         }
     };
 

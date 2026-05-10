@@ -3,6 +3,34 @@
 //! Discover the git repository root by walking parents until a `.git` file or directory exists
 //! (no `git` subprocess). Read/write the manifest as TOML with serde.
 //!
+//! ## Manifest schema `version`
+//!
+//! - **Version 1**: `project_slug`, optional `dolt_db_name`, optional `frozen_git_toplevel`.
+//! - **Version 2**: adds optional `project_hash`; when `project_hash` is present, `version` must
+//!   be at least **2** ([`CURRENT_MANIFEST_SCHEMA_VERSION`]).
+//!
+//! ## `COHERENCE_ENV`
+//!
+//! Operators select a logical deployment tier with the **`COHERENCE_ENV`** environment variable.
+//! Allowed values (ASCII, case-insensitive): **`dev`**, **`test`**, **`prod`**.
+//!
+//! When **`COHERENCE_ENV` is unset or empty**, interactive tooling treats the tier as **`dev`**
+//! ([`parse_coherence_env`], [`coherence_env_from_std_env`]). Invalid non-empty values are
+//! rejected with an error from [`coherence_env_from_std_env`].
+//!
+//! ## Effective Dolt catalog name (normalized)
+//!
+//! [`effective_dolt_catalog_name`] builds a single SQL-safe MySQL/Dolt **database identifier** (not
+//! wired to connection config in this module — see follow-up tasks):
+//!
+//! 1. Sanitize [`sanitize_dolt_db_segment`] **slug** from `project_slug`.
+//! 2. If `project_hash` is `Some` and non-whitespace, sanitize the trimmed hash as a middle **segment**
+//!    (otherwise omit the segment).
+//! 3. Append the **`env`** tier as a literal segment: `dev`, `test`, or `prod`.
+//! 4. Join segments with a single underscore (`_`). If the joined string exceeds
+//!    [`DOLT_DB_NAME_MAX_LEN`], the implementation shortens the slug and/or hash segments (never the
+//!    env suffix) until the full name fits — same style as [`dolt_db_name_for_bind`].
+//!
 //! ## `dolt_db_name` sanitization
 //!
 //! [`sanitize_dolt_db_segment`] produces a **MySQL-style identifier segment**: lowercase ASCII
@@ -13,6 +41,7 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -20,8 +49,73 @@ use sha2::{Digest, Sha256};
 const MANIFEST_REL_PATH: &str = ".coherence/project.toml";
 const PROJECT_FILENAME: &str = "project.toml";
 
+/// Latest manifest [`ProjectManifest::version`] when authoring optional `project_hash`.
+pub const CURRENT_MANIFEST_SCHEMA_VERSION: u32 = 2;
+
 /// Maximum length for a sanitized Dolt/MySQL database name segment.
 pub const DOLT_DB_NAME_MAX_LEN: usize = 64;
+
+/// Environment variable name for the logical Coherence deployment tier (`dev` / `test` / `prod`).
+pub const COHERENCE_ENV_VAR: &str = "COHERENCE_ENV";
+
+/// Logical deployment tier used when composing normalized catalog names ([`effective_dolt_catalog_name`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CoherenceEnv {
+    Dev,
+    Test,
+    Prod,
+}
+
+impl CoherenceEnv {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            CoherenceEnv::Dev => "dev",
+            CoherenceEnv::Test => "test",
+            CoherenceEnv::Prod => "prod",
+        }
+    }
+}
+
+impl FromStr for CoherenceEnv {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "dev" => Ok(Self::Dev),
+            "test" => Ok(Self::Test),
+            "prod" => Ok(Self::Prod),
+            other => Err(format!(
+                "{COHERENCE_ENV_VAR}: invalid value {other:?} (expected dev, test, or prod)"
+            )),
+        }
+    }
+}
+
+/// Parse `COHERENCE_ENV`-style tier text.
+///
+/// Returns [`CoherenceEnv::Dev`] when `raw` is `None`, empty, or whitespace-only (default for
+/// interactive work when the variable is unset).
+pub fn parse_coherence_env(raw: Option<&str>) -> Result<CoherenceEnv, String> {
+    let Some(s) = raw.map(str::trim).filter(|s| !s.is_empty()) else {
+        return Ok(CoherenceEnv::Dev);
+    };
+    s.parse()
+}
+
+/// Read [`COHERENCE_ENV_VAR`] from the process environment.
+///
+/// Missing or empty/unset values default to [`CoherenceEnv::Dev`]. Non-empty invalid values return
+/// [`Err`].
+pub fn coherence_env_from_std_env() -> Result<CoherenceEnv, String> {
+    match std::env::var_os(COHERENCE_ENV_VAR) {
+        None => Ok(CoherenceEnv::Dev),
+        Some(os) => {
+            let cow = os.to_string_lossy();
+            parse_coherence_env(Some(cow.as_ref()))
+        }
+    }
+}
 
 /// On-disk project manifest: identity and optional catalog binding (see design ADR / issue COREDB-2ft).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -32,6 +126,9 @@ pub struct ProjectManifest {
     pub dolt_db_name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub frozen_git_toplevel: Option<String>,
+    /// Stable hash segment bound at project init (schema ≥ 2 when present).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_hash: Option<String>,
 }
 
 /// Walk `start` and ancestors until a `.git` file or directory is found; return that directory.
@@ -96,6 +193,16 @@ pub fn try_read_project_manifest_from_cwd() -> Option<ProjectManifest> {
 fn validate_manifest(manifest: &ProjectManifest) -> Result<(), String> {
     if manifest.project_slug.trim().is_empty() {
         return Err("project_slug must be non-empty".to_string());
+    }
+    if let Some(ref h) = manifest.project_hash {
+        if manifest.version < CURRENT_MANIFEST_SCHEMA_VERSION {
+            return Err(format!(
+                "project_hash requires manifest version >= {CURRENT_MANIFEST_SCHEMA_VERSION}"
+            ));
+        }
+        if h.trim().is_empty() {
+            return Err("project_hash must be non-empty when set".to_string());
+        }
     }
     Ok(())
 }
@@ -181,6 +288,77 @@ pub fn dolt_db_name_for_bind(
     Ok(name)
 }
 
+/// Normalized Dolt/MySQL database identifier from slug, optional hash segment, and env tier.
+///
+/// Formula: sanitized **slug** `+` optional `_` **hash** `+` `_` **env** (`dev` / `test` / `prod`),
+/// capped at [`DOLT_DB_NAME_MAX_LEN`]. See module docs.
+pub fn effective_dolt_catalog_name(
+    project_slug: &str,
+    project_hash: Option<&str>,
+    env: CoherenceEnv,
+) -> Result<String, String> {
+    let env_seg = env.as_str();
+    let slug_full = sanitize_dolt_db_segment(project_slug);
+    if slug_full.is_empty() {
+        return Err(
+            "project_slug sanitizes to an empty database name segment; use letters, digits, or underscores"
+                .to_string(),
+        );
+    }
+
+    let mut hash_owned = project_hash
+        .map(|h| sanitize_dolt_db_segment(h.trim()))
+        .filter(|s| !s.is_empty());
+
+    loop {
+        let suffix: String = match &hash_owned {
+            Some(h) => format!("_{h}_{env_seg}"),
+            None => format!("_{env_seg}"),
+        };
+
+        if suffix.len() > DOLT_DB_NAME_MAX_LEN {
+            if let Some(ref mut h) = hash_owned {
+                if h.pop().is_none() {
+                    hash_owned = None;
+                }
+                continue;
+            }
+            return Err(format!(
+                "{COHERENCE_ENV_VAR}: composed catalog suffix exceeds maximum identifier length"
+            ));
+        }
+
+        let max_base = DOLT_DB_NAME_MAX_LEN.saturating_sub(suffix.len());
+        let mut base = slug_full.clone();
+        if base.len() > max_base {
+            base.truncate(max_base);
+            while base.ends_with('_') {
+                base.pop();
+            }
+        }
+
+        if base.is_empty() {
+            if max_base == 0 && hash_owned.is_none() {
+                return Err(
+                    "project_slug is too long to fit a stable catalog name (max 64 characters)"
+                        .to_string(),
+                );
+            }
+            if let Some(ref mut h) = hash_owned {
+                if h.pop().is_some() {
+                    continue;
+                }
+            }
+            hash_owned = None;
+            continue;
+        }
+
+        let name = format!("{base}{suffix}");
+        debug_assert!(name.len() <= DOLT_DB_NAME_MAX_LEN);
+        return Ok(name);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -197,6 +375,7 @@ mod tests {
             project_slug: "my-project".to_string(),
             dolt_db_name: Some("my_catalog".to_string()),
             frozen_git_toplevel: Some("/tmp/repo".to_string()),
+            project_hash: None,
         };
         write_manifest(tmp.path(), &manifest).unwrap();
         let loaded = read_manifest(tmp.path()).unwrap();
@@ -211,6 +390,7 @@ mod tests {
             project_slug: "   ".to_string(),
             dolt_db_name: None,
             frozen_git_toplevel: None,
+            project_hash: None,
         };
         assert!(write_manifest(tmp.path(), &bad).is_err());
     }
@@ -271,5 +451,115 @@ mod tests {
         let h = short_hash_frozen_git_path("/workspace/foo");
         assert_eq!(n, format!("my_project_{}", h));
         assert!(n.len() <= DOLT_DB_NAME_MAX_LEN);
+    }
+
+    #[test]
+    fn round_trip_write_read_with_project_hash_v2() {
+        let tmp = TempDir::new().unwrap();
+        let manifest = ProjectManifest {
+            version: CURRENT_MANIFEST_SCHEMA_VERSION,
+            project_slug: "acme-core".to_string(),
+            dolt_db_name: None,
+            frozen_git_toplevel: None,
+            project_hash: Some("a1b2".to_string()),
+        };
+        write_manifest(tmp.path(), &manifest).unwrap();
+        let loaded = read_manifest(tmp.path()).unwrap();
+        assert_eq!(loaded, manifest);
+    }
+
+    #[test]
+    fn write_rejects_project_hash_on_schema_v1() {
+        let tmp = TempDir::new().unwrap();
+        let bad = ProjectManifest {
+            version: 1,
+            project_slug: "x".to_string(),
+            dolt_db_name: None,
+            frozen_git_toplevel: None,
+            project_hash: Some("abcd".to_string()),
+        };
+        assert!(write_manifest(tmp.path(), &bad).is_err());
+    }
+
+    #[test]
+    fn write_rejects_empty_project_hash_string() {
+        let tmp = TempDir::new().unwrap();
+        let bad = ProjectManifest {
+            version: CURRENT_MANIFEST_SCHEMA_VERSION,
+            project_slug: "x".to_string(),
+            dolt_db_name: None,
+            frozen_git_toplevel: None,
+            project_hash: Some("   ".to_string()),
+        };
+        assert!(write_manifest(tmp.path(), &bad).is_err());
+    }
+
+    #[test]
+    fn parse_coherence_env_defaults_and_cases() {
+        assert_eq!(parse_coherence_env(None).unwrap(), CoherenceEnv::Dev);
+        assert_eq!(parse_coherence_env(Some("")).unwrap(), CoherenceEnv::Dev);
+        assert_eq!(parse_coherence_env(Some("   ")).unwrap(), CoherenceEnv::Dev);
+        assert_eq!(parse_coherence_env(Some("dev")).unwrap(), CoherenceEnv::Dev);
+        assert_eq!(parse_coherence_env(Some("DEV")).unwrap(), CoherenceEnv::Dev);
+        assert_eq!(
+            parse_coherence_env(Some("test")).unwrap(),
+            CoherenceEnv::Test
+        );
+        assert_eq!(
+            parse_coherence_env(Some("Prod")).unwrap(),
+            CoherenceEnv::Prod
+        );
+        assert!(parse_coherence_env(Some("staging")).is_err());
+    }
+
+    #[test]
+    fn coherence_env_from_std_env_reads_variable() {
+        let prev = std::env::var_os(COHERENCE_ENV_VAR);
+        std::env::set_var(COHERENCE_ENV_VAR, "test");
+        assert_eq!(coherence_env_from_std_env().unwrap(), CoherenceEnv::Test);
+        std::env::set_var(COHERENCE_ENV_VAR, "");
+        assert_eq!(coherence_env_from_std_env().unwrap(), CoherenceEnv::Dev);
+        match prev {
+            None => std::env::remove_var(COHERENCE_ENV_VAR),
+            Some(v) => std::env::set_var(COHERENCE_ENV_VAR, v),
+        }
+    }
+
+    #[test]
+    fn effective_dolt_catalog_name_three_segments() {
+        let n = effective_dolt_catalog_name("My-App", Some("cafe"), CoherenceEnv::Dev).unwrap();
+        assert_eq!(n, "my_app_cafe_dev");
+        assert!(n.len() <= DOLT_DB_NAME_MAX_LEN);
+    }
+
+    #[test]
+    fn effective_dolt_catalog_name_skips_empty_hash() {
+        let n = effective_dolt_catalog_name("svc", Some("   "), CoherenceEnv::Test).unwrap();
+        assert_eq!(n, "svc_test");
+    }
+
+    #[test]
+    fn effective_dolt_catalog_name_env_segments() {
+        assert_eq!(
+            effective_dolt_catalog_name("p", None, CoherenceEnv::Test).unwrap(),
+            "p_test"
+        );
+        assert_eq!(
+            effective_dolt_catalog_name("p", None, CoherenceEnv::Prod).unwrap(),
+            "p_prod"
+        );
+    }
+
+    #[test]
+    fn effective_dolt_catalog_name_truncates_for_max_len() {
+        let slug = "s".repeat(DOLT_DB_NAME_MAX_LEN);
+        let n = effective_dolt_catalog_name(&slug, Some("hh"), CoherenceEnv::Prod).unwrap();
+        assert_eq!(n.len(), DOLT_DB_NAME_MAX_LEN);
+        assert!(n.ends_with("_hh_prod"), "got {n:?}");
+    }
+
+    #[test]
+    fn effective_dolt_catalog_name_errors_empty_slug() {
+        assert!(effective_dolt_catalog_name("@@@", Some("x"), CoherenceEnv::Dev).is_err());
     }
 }
