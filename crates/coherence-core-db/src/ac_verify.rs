@@ -1,5 +1,6 @@
 //! Run shell commands linked to an acceptance criterion via `verified_by` codeintel links.
 //! Loads links through [`crate::ac_code_link_store::list_code_links_for_ac`] (COREDB-11).
+//! Implemented CLI surfaces: `verify-ac`, `verify-spec` (`AGENTS.md` § M1 module ownership).
 
 use std::path::PathBuf;
 use std::process::{Command, Stdio};

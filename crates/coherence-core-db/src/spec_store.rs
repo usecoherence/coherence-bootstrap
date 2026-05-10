@@ -1,3 +1,7 @@
+//! Persistence for the **spec** module: specs, acceptance criteria, concerns, relations.
+//!
+//! Schema source: `sql/modules/spec/migrations/`. Ownership and boundary with **codeintel** are
+//! described in `AGENTS.md` (“M1 module ownership”).
 use mysql::prelude::Queryable;
 use mysql::{params, Conn};
 

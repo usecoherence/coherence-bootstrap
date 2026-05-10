@@ -1,3 +1,10 @@
+//! Applies all embedded SQL migrations to the repo-local DB.
+//!
+//! **Logical modules**: `spec_module` (`sql/modules/spec/migrations`) and `codeintel_module`
+//! (`sql/modules/codeintel/migrations`) share one physical database; each has its own owner for
+//! table design and evolves through its migration chain. coherence-core-db runs both via Refinery,
+//! including a distinct history table for codeintel (`CODEINTEL_MIGRATION_TABLE`) so version IDs
+//! do not collide. See `AGENTS.md` → “M1 module ownership”.
 use refinery::config::ConfigDbType;
 
 use crate::db::ConnectionConfig;

@@ -46,6 +46,36 @@ The goal is to reduce boilerplate and keep every Coherence CLI tool homogeneous:
 - Do not mix `CGC-RUST-*` proposals into local beads backlog (`bd list` scope).
 - Do not implement upstream proposals here unless the same change is required locally.
 
+## M1 module ownership (one physical DB, two logical slices)
+
+Scope here is documentation for the Milestone‑1 slice in this CLI: persisted specs/criteria/codeintel linkage and deterministic shell verification—not beads/deliverables/workflow backends, Temporal, docs export, or “full SCIP”.
+
+Physical layout: **one repository-local Dolt (MySQL-protocol) database** hosts every table. Paths and connection settings follow `make tool help` → Dolt/make targets; migrations run against that single catalog.
+
+Logical owners (who designs and evolves which tables—not separate servers):
+
+| Logical module | Tables (SQL migrations under `sql/modules/…`) | Rust responsibilities |
+|----------------|------------------------------------------------|-----------------------|
+| **spec** (`spec`) | `specs`, `acceptance_criteria`, `acceptance_criterion_concerns`, `spec_relations` (`refinery_schema_history` tracks spec migrations) | `spec_store.rs` + `commands/spec_cmd.rs`, `commands/ac_cmd.rs` |
+| **codeintel** (`codeintel`) | `codeintel_code_locations`, `codeintel_ac_links` (`refinery_schema_history_codeintel` for parallel version streams) | `ac_code_link_store.rs`, verification in `ac_verify.rs`; **`codeintel_repo` in `main.rs` exposes store + verify for reuse** |
+
+**Lifecycle and migration execution**: this repo’s `migrate` command loads connection config from the environment and runs **`migrations::apply_all`**, which applies embedded **Refinery** migration sets (`refinery` library). Responsibility split: Refinery/mechanics are library concerns; coherence-core-db **owns orchestration**, ordering (spec migrations first, then codeintel), and the **dual history tables** so both modules keep independent `V1`, `V2`, … numbering on the **same physical DB**.
+
+**Out of scope for this M1 data slice** (lives elsewhere in the Coherence toolchain): bd issue rows, beads-deliverables, workflow/stub backends, Temporal, cross-repo writable “shared cores.” This binary may mention workflow in `doctor`/`help`; it does not own those schemas here.
+
+Implemented **command flow** (names match CLI—subcommands spelled as users type them):
+
+1. `migrate` — create/upgrade tables for **both** modules.
+2. `spec add` (and `spec list`, `spec show`) — author spec rows.
+3. `ac add` (and `ac list`) — author acceptance criteria for a spec.
+4. Populate **code locations** and AC↔code **links** (e.g. `verified_by`) via the **`codeintel_repo`** APIs in Rust (`put_code_location`, `put_ac_code_link`). There is **no** dedicated `coherence-core-db …` CLI subcommand for these writes yet; smoke/tests use the APIs directly.
+5. `verify-ac <AC_ID>` — run linked shell commands for that AC (`sh -c` on `test_command` from eligible links).
+6. `verify-spec <SPEC_ID>` — aggregate `verify-ac` across every AC belonging to that spec.
+
+**Explicit non-goals for M1**: full SCIP/code intelligence ingestion; exporting human docs from specs (`docs/` generation is not wired here yet); Temporal or other external orchestrators; artifact/file stores; arbitrary graph query UX; finalized “spec CLI” product ergonomics—these are deliberately not required to recognize value from the DB + verification loop above.
+
+Boundary markers: migration headers in `sql/modules/*/migrations/V*.sql`; module dirs under `sql/modules/`; owning Rust files referenced in this section. **`m1-spec-smoke`** proves spec-domain CRUD smoke; linkage + verification behaviors are exercised in store/unit tests plus `verify-ac`/`verify-spec` when fixtures exist.
+
 ## Orchestration note
 
 Workflow backend is currently `local_stub`.

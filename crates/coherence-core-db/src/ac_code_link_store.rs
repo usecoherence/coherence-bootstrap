@@ -1,5 +1,6 @@
 //! Persistence for codeintel code locations and AC↔code links (`codeintel_*` tables).
 //! Does not run tests or shell commands — storage only.
+//! Table/schema ownership narrative: see `AGENTS.md` § M1 module ownership.
 
 use mysql::prelude::Queryable;
 use mysql::{params, Conn};
