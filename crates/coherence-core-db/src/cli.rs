@@ -49,7 +49,7 @@ fn print_help() {
            verify-ac      Run verified_by linked test commands for one AC\n\
            verify-spec    Aggregate verify-ac across all ACs for one spec\n\
            evidence-sample  Create a demo run under .coherence/runs/<run-id>/ (ADR-0005 skeleton)\n\
-           project        Project manifest — run `project init` to bind project_hash and derived dolt_db_name in .coherence/project.toml once project_slug exists (formula in project init usage); operator flow in AGENTS.md (“Project identity and manifest lifecycle”).\n\
+           project        project catalog-preflight (manifest/git binding check); project init binds project_hash + legacy dolt_db_name once project_slug exists; operator flow in AGENTS.md \"Project identity and manifest lifecycle\".\n\
            version        Print version\n\n\
          Canonical repository database — curated catalog vs disposable tests:\n\
            • Curated catalog — long-lived spec/AC/codeintel rows; never written by tests/smoke without isolation.\n\

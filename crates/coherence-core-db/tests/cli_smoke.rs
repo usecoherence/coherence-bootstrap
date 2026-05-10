@@ -42,6 +42,10 @@ fn help_prints_workflow_entrypoint() {
         "help should describe project init: {stdout}"
     );
     assert!(
+        stdout.contains("catalog-preflight"),
+        "help should mention project catalog-preflight: {stdout}"
+    );
+    assert!(
         stdout.contains("Project identity and manifest lifecycle"),
         "help should point at AGENTS.md subsection: {stdout}"
     );
@@ -71,12 +75,28 @@ fn doctor_reports_local_stub_backend() {
         "doctor should name isolated profile env: {stdout}"
     );
     assert!(
+        stdout.contains("COHERENCE_ENV:"),
+        "doctor should report coherence env tier: {stdout}"
+    );
+    assert!(
+        stdout.contains("effective_catalog_without_DOLT_DB_override:"),
+        "doctor should report hypothetical catalog sans DOLT_DB: {stdout}"
+    );
+    assert!(
+        stdout.contains("manifest_catalog_complete_for_connect_preflight:"),
+        "doctor should report manifest completeness for guarded connect: {stdout}"
+    );
+    assert!(
         stdout.contains("git_root_found:")
             && stdout.contains("manifest_present:")
             && stdout.contains("manifest_path:")
             && stdout.contains("dolt_db_name_manifest:")
             && stdout.contains("env_DOLT_DB_override_active:"),
         "doctor should report manifest snapshot lines: {stdout}"
+    );
+    assert!(
+        stdout.contains("project_hash_manifest:"),
+        "doctor should summarize project_hash presence: {stdout}"
     );
 }
 
@@ -251,5 +271,54 @@ dolt_db_name = "orphan_abcd"
     assert!(
         err.contains("frozen_git_toplevel") && err.contains("force-rebind"),
         "expected migration error; stderr: {err}"
+    );
+}
+
+#[test]
+fn db_ping_manifest_preflight_errors_in_git_repo_without_manifest_file() {
+    if !git_available() {
+        eprintln!(
+            "skip db_ping_manifest_preflight_errors_in_git_repo_without_manifest_file: git not available"
+        );
+        return;
+    }
+
+    let tmp = TempDir::new().unwrap();
+    assert!(Command::new("git")
+        .args(["init"])
+        .current_dir(tmp.path())
+        .status()
+        .expect("git init")
+        .success());
+
+    let bin = env!("CARGO_BIN_EXE_coherence-core-db");
+    let out = Command::new(bin)
+        .current_dir(tmp.path())
+        .arg("db-ping")
+        .env_remove("DOLT_DB")
+        .env_remove("COHERENCE_ENV")
+        .env_remove("COHERENCE_PROJECT_SLUG")
+        .env_remove("COHERENCE_DB_PROFILE")
+        .env_remove("COHERENCE_USE_USER_SCOPED_DOLT")
+        .output()
+        .expect("db-ping");
+    assert!(
+        !out.status.success(),
+        "db-ping should refuse before socket/tcp when manifest is missing\nstderr:{}\nstdout:{}",
+        String::from_utf8_lossy(&out.stderr),
+        String::from_utf8_lossy(&out.stdout)
+    );
+    let combined = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stderr),
+        String::from_utf8_lossy(&out.stdout)
+    );
+    assert!(
+        combined.contains("db-ping:") || combined.contains("missing project manifest"),
+        "expected manifest preflight error; got:{combined}",
+    );
+    assert!(
+        combined.contains("project init") || combined.contains("--slug"),
+        "expected remediation hint in output; got:{combined}",
     );
 }

@@ -145,6 +145,18 @@ start_repo_local() {
 
 cd "$ROOT"
 
+catalog_preflight() {
+  if [ -n "${COHERENCE_CORE_DB_BIN:-}" ]; then
+    "${COHERENCE_CORE_DB_BIN}" project catalog-preflight
+    return "$?"
+  fi
+  cargo run --manifest-path "${ROOT}/Cargo.toml" -p coherence-core-db --quiet -- project catalog-preflight
+}
+
+if ! catalog_preflight; then
+  exit 1
+fi
+
 if coherence_use_user_scoped_dolt; then
   start_user_scoped
 else

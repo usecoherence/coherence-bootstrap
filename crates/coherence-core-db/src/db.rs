@@ -10,7 +10,7 @@ use crate::project_manifest;
 use crate::spec_store;
 
 /// Environment variable holding the logical MySQL/Dolt database name.
-const DOLT_DB_ENV: &str = "DOLT_DB";
+pub(crate) const DOLT_DB_ENV: &str = "DOLT_DB";
 /// Populated from `.coherence/project.toml` when unset so ADR-0004 isolation checks align with manifest identity.
 const COHERENCE_PROJECT_SLUG_ENV: &str = "COHERENCE_PROJECT_SLUG";
 
@@ -62,6 +62,14 @@ fn runtime_coherence_dir() -> PathBuf {
 #[must_use]
 pub fn user_scoped_socket_default_path() -> PathBuf {
     runtime_coherence_dir().join("dolt.sock")
+}
+
+/// True when non-empty **`DOLT_DB`** is set (logical catalog explicitly selected).
+#[must_use]
+pub fn explicit_dolt_database_from_env() -> bool {
+    env::var(DOLT_DB_ENV)
+        .map(|s| !s.trim().is_empty())
+        .unwrap_or(false)
 }
 
 const USER_SCOPED_INTERNAL_TCP_PORT: u16 = 33_306;
@@ -126,6 +134,106 @@ impl ConnectionConfig {
     }
 }
 
+/// Resolve the logical MySQL/Dolt database name from the manifest (**ignores **`DOLT_DB`**).
+///
+/// When the manifest includes a non-empty **`project_hash`**, the name is
+/// [`project_manifest::effective_dolt_catalog_name`]. Legacy **`dolt_db_name`** is used only when no
+/// non-empty **`project_hash`** is set on the manifest.
+pub fn manifest_bound_catalog_name(
+    manifest: &project_manifest::ProjectManifest,
+    coherence_env: project_manifest::CoherenceEnv,
+) -> Result<String, String> {
+    let slug = manifest.project_slug.trim();
+    if let Some(ref h) = manifest.project_hash {
+        let ht = h.trim();
+        if !ht.is_empty() {
+            return project_manifest::effective_dolt_catalog_name(slug, Some(ht), coherence_env);
+        }
+    }
+
+    if let Some(ref db) = manifest.dolt_db_name {
+        let t = db.trim();
+        if !t.is_empty() {
+            return Ok(t.to_string());
+        }
+    }
+
+    Err(
+        "connection: `.coherence/project.toml` has no catalog binding (`project_hash` from `project init`, or legacy `dolt_db_name`). \
+         Fix: run `project init`, or set `DOLT_DB`."
+            .to_string(),
+    )
+}
+
+/// Effective catalog **`ConnectionConfig`** would use when **`DOLT_DB`** were unset (**mirrors**
+/// [`ConnectionConfig::from_env`] without reading **`DOLT_DB`**).
+///
+/// Parses **`COHERENCE_ENV`** against the OS environment — invalid values propagate as **`Err`**.
+pub fn hypothetical_effective_catalog_from_cwd() -> Result<String, String> {
+    let coherence_env = project_manifest::coherence_env_from_std_env()?;
+    let manifest = project_manifest::try_read_project_manifest_from_cwd();
+    resolve_effective_catalog_without_explicit_dolt_override(manifest.as_ref(), coherence_env)
+}
+
+/// **`DOLT_DB` env omitted** (`ConnectionConfig`-style basename / manifest semantics only).
+fn resolve_effective_catalog_without_explicit_dolt_override(
+    manifest: Option<&project_manifest::ProjectManifest>,
+    coherence_env: project_manifest::CoherenceEnv,
+) -> Result<String, String> {
+    let Some(m) = manifest else {
+        return Ok(default_database_name());
+    };
+    manifest_bound_catalog_name(m, coherence_env)
+}
+
+/// Manifest + git prerequisites used by **`db-ping`**, **`migrate`**, and **`scripts/dolt-start`**
+/// before touching Dolt (**when **`DOLT_DB`** override is inactive**): git root, readable manifest,
+/// **`project_slug`**, catalog binding (**`project_hash`** or **`dolt_db_name`**).
+///
+/// Returns **`Ok`** when **`explicit_dolt_database_from_env`** is true (**skip manifest path**).
+pub fn manifest_catalog_rules_without_dolt_db() -> Result<(), String> {
+    if explicit_dolt_database_from_env() {
+        return Ok(());
+    }
+
+    project_manifest::coherence_env_from_std_env()?;
+
+    let cwd = env::current_dir().map_err(|e| format!("cannot read working directory: {e}"))?;
+    let Some(repo_root) = project_manifest::find_git_repo_root(cwd) else {
+        return Err(
+            "not inside a git work tree (.git not found upstream of cwd).\n\
+             Fix: cd into your Coherence project repository, or set DOLT_DB to select a logical catalog explicitly."
+                .to_string(),
+        );
+    };
+
+    let manifest_path = project_manifest::coherence_manifest_path(&repo_root);
+    if !manifest_path.is_file() {
+        return Err(format!(
+            "missing project manifest `{}`.\n\
+             Fix: coherence-core-db project init --slug YOUR_SLUG (binds `project_hash` once the repo identity is pinned; see AGENTS.md § Project identity and manifest lifecycle)",
+            manifest_path.display()
+        ));
+    }
+
+    let manifest = project_manifest::read_manifest(&repo_root).map_err(|e| {
+        format!(
+            "invalid project manifest ({}): {e}",
+            manifest_path.display()
+        )
+    })?;
+
+    manifest_bound_catalog_name(&manifest, project_manifest::coherence_env_from_std_env()?)?;
+    Ok(())
+}
+
+pub fn manifest_catalog_preflight_for_connect(context: &str) -> Result<(), String> {
+    if explicit_dolt_database_from_env() {
+        return Ok(());
+    }
+    manifest_catalog_rules_without_dolt_db().map_err(|detail| format!("{context}: {detail}"))
+}
+
 /// Resolve the logical MySQL/Dolt database name: non-empty **`DOLT_DB`** wins; else manifest at the
 /// git root of [`std::env::current_dir`].
 ///
@@ -144,79 +252,7 @@ fn resolve_effective_database_name(
             return Ok(db);
         }
     }
-    let Some(m) = manifest else {
-        return Ok(default_database_name());
-    };
-
-    let slug = m.project_slug.trim();
-    if let Some(ref h) = m.project_hash {
-        let ht = h.trim();
-        if !ht.is_empty() {
-            return project_manifest::effective_dolt_catalog_name(slug, Some(ht), coherence_env);
-        }
-    }
-
-    if let Some(ref db) = m.dolt_db_name {
-        let t = db.trim();
-        if !t.is_empty() {
-            return Ok(t.to_string());
-        }
-    }
-
-    Err(
-        "connection: `.coherence/project.toml` has no catalog binding (`project_hash` from `project init`, or legacy `dolt_db_name`). \
-         Fix: run `project init`, or set `DOLT_DB`."
-            .to_string(),
-    )
-}
-
-/// `migrate` only: refuses user-scoped runs without explicit `DOLT_DB` when a manifest exists but
-/// neither **`project_hash`** nor legacy **`dolt_db_name`** is set (`project init` binds both).
-///
-/// Call this **before** [`ConnectionConfig::from_env`] so migration never targets an accidental
-/// default catalog name.
-pub fn preflight_user_scoped_migrate_binding() -> Result<(), String> {
-    if !user_scoped_dolt_from_env() {
-        return Ok(());
-    }
-    if env::var(DOLT_DB_ENV)
-        .ok()
-        .filter(|s| !s.trim().is_empty())
-        .is_some()
-    {
-        return Ok(());
-    }
-    let cwd =
-        env::current_dir().map_err(|e| format!("migrate: cannot read working directory: {e}"))?;
-    let Some(repo_root) = project_manifest::find_git_repo_root(cwd) else {
-        return Ok(());
-    };
-    let path = project_manifest::coherence_manifest_path(&repo_root);
-    if !path.is_file() {
-        return Ok(());
-    }
-    let manifest = project_manifest::read_manifest(&repo_root).map_err(|e| {
-        format!(
-            "migrate: invalid project manifest ({}): {e}",
-            path.display()
-        )
-    })?;
-    let have_binding = manifest
-        .project_hash
-        .as_ref()
-        .is_some_and(|s| !s.trim().is_empty())
-        || manifest
-            .dolt_db_name
-            .as_ref()
-            .is_some_and(|s| !s.trim().is_empty());
-    if !have_binding {
-        return Err(
-            "migrate (user-scoped Dolt): `.coherence/project.toml` exists but neither `project_hash` nor legacy `dolt_db_name` is set.\n\
-             Fix: run `cargo run -p coherence-core-db -- project init` (binds `project_hash` and writes legacy `dolt_db_name`), or set `DOLT_DB` explicitly."
-                .to_string(),
-        );
-    }
-    Ok(())
+    resolve_effective_catalog_without_explicit_dolt_override(manifest, coherence_env)
 }
 
 fn default_database_name() -> String {
@@ -401,13 +437,10 @@ mod connection_config_manifest_tests {
     use std::env;
     use std::fs;
     use std::path::{Path, PathBuf};
-    use std::sync::Mutex;
 
     use tempfile::TempDir;
 
     use super::*;
-
-    static LOCK: Mutex<()> = Mutex::new(());
 
     struct MultiEnvRestore {
         pairs: Vec<(&'static str, Option<String>)>,
@@ -472,7 +505,7 @@ mod connection_config_manifest_tests {
 
     #[test]
     fn explicit_dolt_db_env_overrides_manifest() {
-        let _lock = LOCK.lock().unwrap();
+        let _guard = crate::test_world_guard::lock_test_env();
         let _restore = MultiEnvRestore::snapshot(ENV_FOR_CONNECTION_TESTS);
         env::remove_var("COHERENCE_PROJECT_SLUG");
         env::remove_var("COHERENCE_USE_USER_SCOPED_DOLT");
@@ -490,7 +523,7 @@ mod connection_config_manifest_tests {
 
     #[test]
     fn nested_cwd_resolves_manifest_database_name() {
-        let _lock = LOCK.lock().unwrap();
+        let _guard = crate::test_world_guard::lock_test_env();
         let _restore = MultiEnvRestore::snapshot(ENV_FOR_CONNECTION_TESTS);
         env::remove_var("DOLT_DB");
         env::remove_var("COHERENCE_PROJECT_SLUG");
@@ -508,7 +541,7 @@ mod connection_config_manifest_tests {
 
     #[test]
     fn from_env_sets_coherence_project_slug_from_manifest_when_unset() {
-        let _lock = LOCK.lock().unwrap();
+        let _guard = crate::test_world_guard::lock_test_env();
         let _restore = MultiEnvRestore::snapshot(ENV_FOR_CONNECTION_TESTS);
         env::remove_var("DOLT_DB");
         env::remove_var("COHERENCE_PROJECT_SLUG");
@@ -524,7 +557,7 @@ mod connection_config_manifest_tests {
 
     #[test]
     fn project_hash_dominates_legacy_dolt_db_name() {
-        let _lock = LOCK.lock().unwrap();
+        let _guard = crate::test_world_guard::lock_test_env();
         let _restore = MultiEnvRestore::snapshot(ENV_FOR_CONNECTION_TESTS);
         env::remove_var("DOLT_DB");
         env::remove_var("COHERENCE_PROJECT_SLUG");
@@ -549,7 +582,7 @@ dolt_db_name = "legacy_only_ignored"
 
     #[test]
     fn coherence_env_selects_distinct_effective_catalog() {
-        let _lock = LOCK.lock().unwrap();
+        let _guard = crate::test_world_guard::lock_test_env();
         let _restore = MultiEnvRestore::snapshot(ENV_FOR_CONNECTION_TESTS);
         env::remove_var("DOLT_DB");
         env::remove_var("COHERENCE_PROJECT_SLUG");
@@ -579,7 +612,7 @@ project_hash = "cafe"
 
     #[test]
     fn manifest_without_catalog_binding_errors() {
-        let _lock = LOCK.lock().unwrap();
+        let _guard = crate::test_world_guard::lock_test_env();
         let _restore = MultiEnvRestore::snapshot(ENV_FOR_CONNECTION_TESTS);
         env::remove_var("DOLT_DB");
         env::remove_var("COHERENCE_PROJECT_SLUG");
@@ -598,7 +631,7 @@ project_hash = "cafe"
 
     #[test]
     fn invalid_coherence_env_errors_before_manifest_resolution() {
-        let _lock = LOCK.lock().unwrap();
+        let _guard = crate::test_world_guard::lock_test_env();
         let _restore = MultiEnvRestore::snapshot(ENV_FOR_CONNECTION_TESTS);
         env::remove_var("DOLT_DB");
         env::remove_var("COHERENCE_PROJECT_SLUG");
@@ -614,7 +647,7 @@ project_hash = "cafe"
 
     #[test]
     fn outside_git_worktree_uses_directory_basename_for_database() {
-        let _lock = LOCK.lock().unwrap();
+        let _guard = crate::test_world_guard::lock_test_env();
         let _restore = MultiEnvRestore::snapshot(ENV_FOR_CONNECTION_TESTS);
         env::remove_var("DOLT_DB");
         env::remove_var("COHERENCE_PROJECT_SLUG");
@@ -634,32 +667,33 @@ project_hash = "cafe"
     }
 
     #[test]
-    fn preflight_migrate_errors_when_user_scoped_and_manifest_without_catalog_binding() {
-        let _lock = LOCK.lock().unwrap();
+    fn manifest_catalog_preflight_errors_manifest_without_catalog_binding_in_git_repo() {
+        let _guard = crate::test_world_guard::lock_test_env();
         let _restore = MultiEnvRestore::snapshot(ENV_FOR_CONNECTION_TESTS);
         env::remove_var("DOLT_DB");
         env::remove_var("COHERENCE_PROJECT_SLUG");
+        env::remove_var("COHERENCE_USE_USER_SCOPED_DOLT");
         env::remove_var("COHERENCE_ENV");
-        env::set_var("COHERENCE_USE_USER_SCOPED_DOLT", "1");
 
         let tmp = tmp_git_repo();
         write_manifest(tmp.path(), "");
         let _cwd = SaveCwd::chdir(tmp.path());
-        let err = preflight_user_scoped_migrate_binding().unwrap_err();
+        let err = manifest_catalog_preflight_for_connect("migrate").unwrap_err();
+        assert!(err.starts_with("migrate:"), "{err}");
         assert!(
-            err.contains("project_hash") && err.contains("project init"),
+            err.contains("project init") || err.contains("dolt_db_name"),
             "{err}"
         );
     }
 
     #[test]
-    fn preflight_migrate_ok_when_only_project_hash_bound() {
-        let _lock = LOCK.lock().unwrap();
+    fn manifest_catalog_preflight_ok_when_only_project_hash_bound() {
+        let _guard = crate::test_world_guard::lock_test_env();
         let _restore = MultiEnvRestore::snapshot(ENV_FOR_CONNECTION_TESTS);
         env::remove_var("DOLT_DB");
         env::remove_var("COHERENCE_PROJECT_SLUG");
+        env::remove_var("COHERENCE_USE_USER_SCOPED_DOLT");
         env::remove_var("COHERENCE_ENV");
-        env::set_var("COHERENCE_USE_USER_SCOPED_DOLT", "1");
 
         let tmp = tmp_git_repo();
         fs::create_dir_all(tmp.path().join(".coherence")).unwrap();
@@ -672,12 +706,12 @@ project_hash = "cafe"
         )
         .unwrap();
         let _cwd = SaveCwd::chdir(tmp.path());
-        preflight_user_scoped_migrate_binding().expect("preflight");
+        manifest_catalog_preflight_for_connect("migrate").expect("preflight");
     }
 
     #[test]
-    fn preflight_migrate_ok_when_dolt_db_explicit_under_user_scoped() {
-        let _lock = LOCK.lock().unwrap();
+    fn manifest_catalog_preflight_skips_manifest_when_explicit_dolt_db() {
+        let _guard = crate::test_world_guard::lock_test_env();
         let _restore = MultiEnvRestore::snapshot(ENV_FOR_CONNECTION_TESTS);
         env::remove_var("COHERENCE_PROJECT_SLUG");
         env::remove_var("COHERENCE_ENV");
@@ -687,6 +721,59 @@ project_hash = "cafe"
         let tmp = tmp_git_repo();
         write_manifest(tmp.path(), "");
         let _cwd = SaveCwd::chdir(tmp.path());
-        preflight_user_scoped_migrate_binding().unwrap();
+        manifest_catalog_preflight_for_connect("migrate").unwrap();
+    }
+
+    #[test]
+    fn manifest_catalog_preflight_errors_git_repo_without_manifest_file() {
+        let _guard = crate::test_world_guard::lock_test_env();
+        let _restore = MultiEnvRestore::snapshot(ENV_FOR_CONNECTION_TESTS);
+        env::remove_var("DOLT_DB");
+        env::remove_var("COHERENCE_PROJECT_SLUG");
+        env::remove_var("COHERENCE_USE_USER_SCOPED_DOLT");
+        env::remove_var("COHERENCE_ENV");
+
+        let tmp = tmp_git_repo();
+        let _cwd = SaveCwd::chdir(tmp.path());
+        let err = manifest_catalog_preflight_for_connect("db-ping").unwrap_err();
+        assert!(err.starts_with("db-ping:"), "{err}");
+        assert!(
+            err.contains("missing project manifest") || err.contains(".coherence"),
+            "{err}"
+        );
+        assert!(
+            err.contains("project init") || err.contains("--slug"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn manifest_catalog_preflight_errors_not_inside_git_when_dolt_db_unset() {
+        let _guard = crate::test_world_guard::lock_test_env();
+        let _restore = MultiEnvRestore::snapshot(ENV_FOR_CONNECTION_TESTS);
+        env::remove_var("DOLT_DB");
+        env::remove_var("COHERENCE_PROJECT_SLUG");
+        env::remove_var("COHERENCE_USE_USER_SCOPED_DOLT");
+        env::remove_var("COHERENCE_ENV");
+
+        let tmp = TempDir::new().unwrap();
+        let _cwd = SaveCwd::chdir(tmp.path());
+        let err = manifest_catalog_preflight_for_connect("db-ping").unwrap_err();
+        assert!(err.contains("git work tree"), "{err}");
+    }
+
+    #[test]
+    fn manifest_catalog_preflight_ok_legacy_dolt_db_name_only() {
+        let _guard = crate::test_world_guard::lock_test_env();
+        let _restore = MultiEnvRestore::snapshot(ENV_FOR_CONNECTION_TESTS);
+        env::remove_var("DOLT_DB");
+        env::remove_var("COHERENCE_PROJECT_SLUG");
+        env::remove_var("COHERENCE_USE_USER_SCOPED_DOLT");
+        env::remove_var("COHERENCE_ENV");
+
+        let tmp = tmp_git_repo();
+        write_manifest(tmp.path(), "dolt_db_name = \"frozen_legacy\"\n");
+        let _cwd = SaveCwd::chdir(tmp.path());
+        manifest_catalog_preflight_for_connect("migrate").unwrap();
     }
 }
