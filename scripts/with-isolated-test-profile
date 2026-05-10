@@ -2,7 +2,9 @@
 # Run a command with the isolated test-world DB profile (ADR-0004).
 # When COHERENCE_USE_USER_SCOPED_DOLT is set (ADR-0006), assigns a fresh disposable DOLT_DB
 # (coherence_test_<uuid> by default) for the child process and drops it on success unless
-# COHERENCE_KEEP_TEST_WORLD is set.
+# COHERENCE_KEEP_TEST_WORLD is set. On failure+keep, prints COHERENCE_PRESERVED_TEST_WORLD lines.
+# COHERENCE_ISOLATED_TEST_VERBOSE=1: log chosen DOLT_DB at start; print identity block on success+keep.
+# COHERENCE_ISOLATED_TEST_RUN_ID: optional correlation id included in the identity block.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -40,10 +42,33 @@ invoke_drop_isolated_test_db() {
   DOLT_DB="${1}" "${bin_cmd[@]}"
 }
 
+# stderr identity block for operators (ADR-0004 / COREDB-44l). Never prints secrets (e.g. DOLT_PASSWORD).
+coherence_print_preserved_test_world_block() {
+  local reason socket
+  reason="${1:-unknown}"
+  socket="$(coherence_user_scoped_socket_path)"
+  printf '%s\n' "COHERENCE_PRESERVED_TEST_WORLD: v1" >&2
+  printf '%s\n' "COHERENCE_PRESERVED_TEST_WORLD: DOLT_SOCKET=${socket}" >&2
+  printf '%s\n' "COHERENCE_PRESERVED_TEST_WORLD: DOLT_DB=${DOLT_DB:-}" >&2
+  if [ -n "${COHERENCE_ISOLATED_TEST_RUN_ID:-}" ]; then
+    printf '%s\n' "COHERENCE_PRESERVED_TEST_WORLD: RUN_ID=${COHERENCE_ISOLATED_TEST_RUN_ID}" >&2
+  fi
+  printf '%s\n' "COHERENCE_PRESERVED_TEST_WORLD: reason=${reason}" >&2
+}
+
+coherence_isolated_test_verbose() {
+  case "${COHERENCE_ISOLATED_TEST_VERBOSE:-}" in
+  1 | true | TRUE | yes | YES) return 0 ;;
+  *) return 1 ;;
+  esac
+}
+
 COHERENCE_ISOLATED_TEST_DB="$(coherence_new_test_db_name)"
 export DOLT_DB="$COHERENCE_ISOLATED_TEST_DB"
 
-echo "with-isolated-test-profile: user-scoped disposable DB DOLT_DB=$DOLT_DB" >&2
+if coherence_isolated_test_verbose; then
+  echo "with-isolated-test-profile: user-scoped disposable DB DOLT_DB=$DOLT_DB" >&2
+fi
 
 set +e
 "$@"
@@ -52,13 +77,15 @@ set -e
 
 if [ "$exit_code" -ne 0 ]; then
   if [ -n "${COHERENCE_KEEP_TEST_WORLD:-}" ]; then
-    echo "with-isolated-test-profile: failed (exit $exit_code); preserved DOLT_DB=$DOLT_DB (COHERENCE_KEEP_TEST_WORLD)" >&2
+    coherence_print_preserved_test_world_block "child_failed exit=${exit_code}"
   fi
   exit "$exit_code"
 fi
 
 if [ -n "${COHERENCE_KEEP_TEST_WORLD:-}" ]; then
-  echo "with-isolated-test-profile: success; kept DOLT_DB=$DOLT_DB (COHERENCE_KEEP_TEST_WORLD)" >&2
+  if coherence_isolated_test_verbose; then
+    coherence_print_preserved_test_world_block "success_keep"
+  fi
   exit 0
 fi
 

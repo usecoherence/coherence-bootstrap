@@ -42,7 +42,7 @@ ADR-0006 (optional user-scoped shared server):
   Select project DB with DOLT_DB=<slug>. Embedded migrations still connect via loopback TCP; internal port defaults to 33306 (override COHERENCE_DOLT_TCP_PORT).
   Repo-local .dolt sql-server remains the default when COHERENCE_USE_USER_SCOPED_DOLT is unset (CI/agents).
   Scripted verification: ./scripts/user-scoped-dolt-smoke.sh
-  Isolated tests (make test-isolated, make tool run) under user-scoped: ./scripts/with-isolated-test-profile exports a fresh DOLT_DB=coherence_test_<uuid> (override prefix with COHERENCE_TEST_DB_PREFIX), then coherence-core-db drop-isolated-test-db after a successful run. Set COHERENCE_KEEP_TEST_WORLD to skip dropping (inspect the DB manually). Teardown only drops names matching that prefix.
+  Isolated tests (make test-isolated, make tool run) under user-scoped: ./scripts/with-isolated-test-profile exports a fresh DOLT_DB=coherence_test_<uuid> (override prefix with COHERENCE_TEST_DB_PREFIX), then coherence-core-db drop-isolated-test-db after a successful run. Set COHERENCE_KEEP_TEST_WORLD (non-empty) to skip dropping after failure or success; on child failure with keep, stderr prints a COHERENCE_PRESERVED_TEST_WORLD block (DOLT_SOCKET, DOLT_DB, optional COHERENCE_ISOLATED_TEST_RUN_ID). Quiet success does not print that block; set COHERENCE_ISOLATED_TEST_VERBOSE=1 for allocation logging and for the block after success+keep. Teardown only drops names matching that prefix.
 
 Canonical repository database policy (ADR-0004):
   this checkout's Dolt catalog is curated reasoning state — do not mutate it from tests
