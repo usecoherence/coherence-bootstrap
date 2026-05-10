@@ -1,17 +1,41 @@
 #!/usr/bin/env bash
-# Incremental build so ./target/debug/coherence-core-db matches the tree you
-# just committed. Does not update a copy on PATH (use make install-local-force).
+# After each commit: refresh the CLI binary.
+# Default: incremental cargo build -> target/debug/...
+# Optional: install to ~/.local/bin via make install-local-force (slower).
 set -euo pipefail
 if [[ -n "${GIT_HOOK_SKIP_COHERENCE_BUILD:-}" ]]; then
   exit 0
 fi
+
+_truthy() {
+  case "${1:-}" in
+  1 | true | TRUE | yes | YES | on | ON) return 0 ;;
+  *) return 1 ;;
+  esac
+}
+
+want_install_local=false
+cfg="$(git config --get coherence.postCommitInstallLocal 2>/dev/null || true)"
+if _truthy "$cfg" || _truthy "${COHERENCE_POST_COMMIT_INSTALL_LOCAL:-}"; then
+  want_install_local=true
+fi
+
 root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 [[ -n "$root" ]] || exit 0
 cd "$root"
 [[ -f Cargo.toml && -d crates/coherence-core-db ]] || exit 0
-if cargo build -p coherence-core-db --locked -q; then
-  :
+
+if $want_install_local; then
+  if make install-local-force; then
+    :
+  else
+    echo "post-commit: make install-local-force failed (~/.local/bin copy may be stale)." >&2
+  fi
 else
-  echo "post-commit: cargo build -p coherence-core-db failed (debug binary may be stale)." >&2
+  if cargo build -p coherence-core-db --locked -q; then
+    :
+  else
+    echo "post-commit: cargo build -p coherence-core-db failed (debug binary may be stale)." >&2
+  fi
 fi
 exit 0

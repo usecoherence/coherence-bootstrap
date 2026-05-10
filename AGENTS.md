@@ -30,17 +30,22 @@ The goal is to reduce boilerplate and keep every Coherence CLI tool homogeneous:
 
 ## Optional dev Git hook (rebuild CLI after commit)
 
-If you run an installed `coherence-core-db` from `PATH` and keep forgetting to rebuild after edits, two layers help:
+Enable once per clone:
 
-1. **Debug binary (fast):** enable the repo’s hooks once per clone so each **`git commit`** runs an incremental `cargo build -p coherence-core-db` (updates **`target/debug/coherence-core-db`** only):
+```bash
+git config core.hooksPath .githooks
+```
 
-   ```bash
-   git config core.hooksPath .githooks
-   ```
+Skip for a single commit: `GIT_HOOK_SKIP_COHERENCE_BUILD=1 git commit ...`
 
-   Skip for a single commit: `GIT_HOOK_SKIP_COHERENCE_BUILD=1 git commit ...`
+**What runs after `git commit`**
 
-2. **Installed copy under `~/.local/bin`:** the hook does not run `make install-local-force` (too slow for every commit). After a batch of commits, run **`make install-local-force`** when you rely on the PATH binary.
+| Mode | Configure | Effect |
+|------|-----------|--------|
+| **Debug (default)** | nothing else | `cargo build -p coherence-core-db` → **`target/debug/coherence-core-db`** |
+| **Install to `~/.local/bin`** | `git config --local coherence.postCommitInstallLocal true` | `make install-local-force` (same as manual install; slower per commit) |
+
+Override for one shell session only: `export COHERENCE_POST_COMMIT_INSTALL_LOCAL=1` (truthy: `1`, `true`, `yes`, `on`).
 
 ## Repository rules
 
