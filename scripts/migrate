@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+
+# shellcheck source=dolt-layout.sh
+source "$(dirname "${BASH_SOURCE[0]}")/dolt-layout.sh"
+
 if ! command -v dolt >/dev/null 2>&1; then
   echo "migrate: dolt is missing" >&2
   exit 1
@@ -9,9 +15,13 @@ fi
 echo "migrate: run module migrations via refinement library"
 echo "migrate: core-db owns migration orchestration; library owns migration mechanics"
 
-if [ ! -d .dolt ]; then
-  echo "migrate: .dolt missing; run make tool dolt-start or dolt init first" >&2
-  exit 1
+if coherence_use_user_scoped_dolt; then
+  echo "migrate: profile=user_scoped (COHERENCE_USE_USER_SCOPED_DOLT=1); skipping repo-local .dolt guard"
+else
+  if [ ! -d .dolt ]; then
+    echo "migrate: .dolt missing; run make tool dolt-start or dolt init first" >&2
+    exit 1
+  fi
 fi
 
 cargo run -p coherence-core-db -- migrate

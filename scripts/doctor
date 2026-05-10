@@ -1,9 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+
 strict=0
 if [ "${1:-}" = "--strict" ]; then strict=1; fi
 status=0
+
+user_scoped_dolt=0
+case "${COHERENCE_USE_USER_SCOPED_DOLT:-}" in
+1 | true | TRUE | yes | YES) user_scoped_dolt=1 ;;
+*) ;;
+esac
 
 check() {
   local label="$1" cmd="$2" required="${3:-required}"
@@ -30,6 +39,11 @@ check workgate workgate optional
 echo
 ./scripts/check-policy || status=1
 
+if [ "$user_scoped_dolt" -eq 1 ]; then
+  # shellcheck source=dolt-layout.sh
+  source "$(dirname "${BASH_SOURCE[0]}")/dolt-layout.sh"
+fi
+
 echo
 printf "%-32s %s\n" "workflow_backend" "local_stub"
 printf "%-32s %s\n" "orchestration_owner" "external"
@@ -43,20 +57,42 @@ printf "%-32s %s\n" "local_proto_defs" "false"
 printf "%-32s %s\n" "coherence_db_owner" "local_repo"
 printf "%-32s %s\n" "cross_repo_writes" "forbidden"
 printf "%-32s %s\n" "core_db_role" "shared_conventions_and_indexes"
-printf "%-32s %s\n" "dolt_socket_desired" ".dolt/dolt.sock"
+if [ "$user_scoped_dolt" -eq 1 ]; then
+  printf "%-32s %s\n" "dolt_mode" "user_scoped_ADR-0006"
+  printf "%-32s %s\n" "dolt_data_dir_desired" "$(coherence_dolt_data_dir)"
+  printf "%-32s %s\n" "dolt_socket_desired" "$(coherence_user_scoped_socket_path)"
+else
+  printf "%-32s %s\n" "dolt_mode" "repo_local_fallback"
+  printf "%-32s %s\n" "dolt_socket_desired" ".dolt/dolt.sock"
+fi
 printf "%-32s %s\n" "task_seed" "tasks/beads-tasks.ndjson"
 printf "%-32s %s\n" "task_bootstrap" "make tool bootstrap-tasks"
 
-if [ -S ".dolt/dolt.sock" ]; then
-  printf "%-32s ok\n" "dolt_socket"
+if [ "$user_scoped_dolt" -eq 1 ]; then
+  sock="$(coherence_user_scoped_socket_path)"
+  if [ -S "$sock" ]; then
+    printf "%-32s ok (%s)\n" "dolt_socket" "$sock"
+  else
+    printf "%-32s missing/degraded (%s)\n" "dolt_socket" "$sock"
+  fi
+  rt="$(coherence_dolt_runtime_dir)"
+  if [ -f "${rt}/dolt.pid" ]; then
+    printf "%-32s %s\n" "dolt_pid_file" "present (${rt}/dolt.pid)"
+  else
+    printf "%-32s %s\n" "dolt_pid_file" "missing"
+  fi
 else
-  printf "%-32s missing/degraded\n" "dolt_socket"
-fi
+  if [ -S ".dolt/dolt.sock" ]; then
+    printf "%-32s ok\n" "dolt_socket"
+  else
+    printf "%-32s missing/degraded\n" "dolt_socket"
+  fi
 
-if [ -f ".coherence/run/dolt.pid" ]; then
-  printf "%-32s %s\n" "dolt_pid_file" "present"
-else
-  printf "%-32s %s\n" "dolt_pid_file" "missing"
+  if [ -f ".coherence/run/dolt.pid" ]; then
+    printf "%-32s %s\n" "dolt_pid_file" "present"
+  else
+    printf "%-32s %s\n" "dolt_pid_file" "missing"
+  fi
 fi
 
 echo

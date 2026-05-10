@@ -24,6 +24,8 @@ mod codeintel_module {
 const CODEINTEL_MIGRATION_TABLE: &str = "refinery_schema_history_codeintel";
 
 pub fn apply_all(config: &ConnectionConfig) -> Result<usize, String> {
+    crate::db::ensure_project_database(config)?;
+
     // SQL migrations are embedded at compile time via refinery.
     let mut refinery_config = refinery::config::Config::new(ConfigDbType::Mysql)
         .set_db_name(&config.database)

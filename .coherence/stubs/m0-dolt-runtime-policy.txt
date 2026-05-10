@@ -12,7 +12,10 @@ Prerequisite:
 Startup:
 - Start repo-local application Dolt SQL server:
     ./scripts/dolt-start
-- The script initializes .dolt for this repository if missing.
+- Optional ADR-0006 shared server on this machine:
+    export COHERENCE_USE_USER_SCOPED_DOLT=1 && ./scripts/dolt-start
+  See AGENTS.md → “User-scoped shared Dolt”.
+- Repo-local mode initializes .dolt for this repository if missing.
 - Global `dolt config --global` is NOT required for M0 startup.
 
 Dolt init identity source order:
@@ -33,7 +36,7 @@ Expected success evidence:
 
 Connection policy:
 - Socket preferred:
-  DOLT_SOCKET (default: .dolt/dolt.sock)
+  DOLT_SOCKET (default: .dolt/dolt.sock in repo-local mode; ADR-0006 defaults under XDG — see AGENTS.md)
 - TCP fallback allowed:
   DOLT_HOST (default: 127.0.0.1)
   DOLT_PORT (default: 3306)

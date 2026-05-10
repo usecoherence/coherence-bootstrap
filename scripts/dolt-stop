@@ -1,16 +1,35 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ ! -f .coherence/run/dolt.pid ]; then
-  echo "dolt-stop: no pid file"
-  exit 0
-fi
+# shellcheck source=dolt-layout.sh
+source "$(dirname "${BASH_SOURCE[0]}")/dolt-layout.sh"
 
-pid="$(cat .coherence/run/dolt.pid)"
-if kill -0 "$pid" 2>/dev/null; then
-  kill "$pid"
-  echo "stopped dolt sql-server pid $pid"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+
+stop_pidfile() {
+  local pidfile="$1"
+  if [ ! -f "$pidfile" ]; then
+    return 0
+  fi
+  local pid
+  pid="$(cat "$pidfile")"
+  if kill -0 "$pid" 2>/dev/null; then
+    kill "$pid"
+    echo "stopped dolt sql-server pid $pid"
+  else
+    echo "dolt pid was stale: $pid"
+  fi
+  rm -f "$pidfile"
+}
+
+if coherence_use_user_scoped_dolt; then
+  rt="$(coherence_dolt_runtime_dir)"
+  stop_pidfile "${rt}/dolt.pid"
 else
-  echo "dolt pid was stale: $pid"
+  if [ ! -f .coherence/run/dolt.pid ]; then
+    echo "dolt-stop: no pid file"
+    exit 0
+  fi
+  stop_pidfile .coherence/run/dolt.pid
 fi
-rm -f .coherence/run/dolt.pid

@@ -60,13 +60,23 @@ The Dolt catalog configured for this checkout (paths and env from `make tool hel
 4. **Destroy**: `make tool dolt-stop` then `make test-world-reset` removes the repository’s `.dolt` directory when you intend to discard disposable state.
 5. **Keep-on-fail**: after a failed test or smoke run, skip `make test-world-reset` if you need to inspect tables, logs, or socket paths; wipe when finished.
 
+### User-scoped shared Dolt (ADR-0006, optional)
+
+With **`COHERENCE_USE_USER_SCOPED_DOLT=1`**, `make tool dolt-start` runs **one** `dolt sql-server` backed by a user-wide **`--data-dir`** (default **`${XDG_DATA_HOME:-$HOME/.local/share}/coherence/db`**). Private launcher state (pid, log, internal TCP port hint) lives under **`${COHERENCE_DOLT_RUNTIME_DIR:-$XDG_RUNTIME_DIR/coherence}`**, falling back to **`$HOME/.cache/coherence/run`** when **`XDG_RUNTIME_DIR`** is unset. The Unix listener defaults to **`<runtime-dir>/dolt.sock`** (override **`DOLT_SOCKET`**).
+
+Operators select the logical catalog with **`DOLT_DB=<project_slug>`**. **`ConnectionConfig::from_env()`** applies matching defaults when **`COHERENCE_USE_USER_SCOPED_DOLT`** is set (socket path above + internal TCP port **33306** for Refinery unless **`DOLT_PORT`** / **`COHERENCE_DOLT_TCP_PORT`** override). CLI connections still prefer **`DOLT_SOCKET`**; TCP remains an implementation detail for embedded migrations.
+
+**Repo-local `.dolt`** remains the default when **`COHERENCE_USE_USER_SCOPED_DOLT`** is unset (disposable CI/agent setups).
+
+Verification helper: **`./scripts/user-scoped-dolt-smoke.sh`** (isolated **`/tmp`** unless **`COHERENCE_USER_SCOPED_SMOKE_ROOT`** overrides).
+
 Interactive commands that **curate** the database (`migrate`, `spec add`, `ac add`, …) are for intentional work on the canonical catalog and are not gated by the test-world profile—the guard applies to automated tests and mutating smoke only.
 
 ## M1 module ownership (one physical DB, two logical slices)
 
 Scope here is documentation for the Milestone‑1 slice in this CLI: persisted specs/criteria/codeintel linkage and deterministic shell verification—not beads/deliverables/workflow backends, Temporal, docs export, or “full SCIP”.
 
-Physical layout: **one repository-local Dolt (MySQL-protocol) database** hosts every table. Paths and connection settings follow `make tool help` → Dolt/make targets; migrations run against that single catalog.
+Physical layout: **one MySQL-protocol Dolt catalog per Coherence project**: either a repository-local server (`.dolt`) or a **logical database name** (`DOLT_DB`) on the optional user-scoped shared server (ADR-0006). Paths and connection settings follow `make tool help` → Dolt/make targets; migrations run against that catalog.
 
 Logical owners (who designs and evolves which tables—not separate servers):
 

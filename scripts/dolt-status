@@ -1,23 +1,57 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# shellcheck source=dolt-layout.sh
+source "$(dirname "${BASH_SOURCE[0]}")/dolt-layout.sh"
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+
 echo "dolt status"
 echo "  owner: local_repo"
 echo "  cross_repo_writes: forbidden"
-if [ -f .coherence/run/dolt.pid ]; then
-  pid="$(cat .coherence/run/dolt.pid)"
-  if kill -0 "$pid" 2>/dev/null; then
-    echo "  server: running"
-    echo "  pid:    $pid"
+
+if coherence_use_user_scoped_dolt; then
+  rt="$(coherence_dolt_runtime_dir)"
+  sock="$(coherence_user_scoped_socket_path)"
+  echo "  mode: user_scoped (ADR-0006)"
+  echo "  data-dir: $(coherence_dolt_data_dir)"
+  echo "  runtime-dir: $rt"
+  echo "  socket path: $sock"
+  echo "  tcp (internal): 127.0.0.1:$(coherence_user_scoped_tcp_port)"
+  if [ -f "${rt}/dolt.pid" ]; then
+    pid="$(cat "${rt}/dolt.pid")"
+    if kill -0 "$pid" 2>/dev/null; then
+      echo "  server: running"
+      echo "  pid:    $pid"
+    else
+      echo "  server: stale pid"
+    fi
   else
-    echo "  server: stale pid"
+    echo "  server: no pid file"
+  fi
+  if [ -S "$sock" ]; then
+    echo "  socket: ok"
+  else
+    echo "  socket: missing/degraded"
   fi
 else
-  echo "  server: no pid file"
-fi
+  echo "  mode: repo_local (.dolt fallback)"
+  if [ -f .coherence/run/dolt.pid ]; then
+    pid="$(cat .coherence/run/dolt.pid)"
+    if kill -0 "$pid" 2>/dev/null; then
+      echo "  server: running"
+      echo "  pid:    $pid"
+    else
+      echo "  server: stale pid"
+    fi
+  else
+    echo "  server: no pid file"
+  fi
 
-if [ -S .dolt/dolt.sock ]; then
-  echo "  socket: ok .dolt/dolt.sock"
-else
-  echo "  socket: missing/degraded"
+  if [ -S .dolt/dolt.sock ]; then
+    echo "  socket: ok .dolt/dolt.sock"
+  else
+    echo "  socket: missing/degraded"
+  fi
 fi

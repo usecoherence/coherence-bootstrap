@@ -6,54 +6,147 @@ if ! command -v dolt >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "dolt-start: repo-local Coherence DB"
-echo "  owner: this repository"
-echo "  boundary: do not write dependency/vendor repos' Dolt DBs"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=dolt-layout.sh
+source "$(dirname "${BASH_SOURCE[0]}")/dolt-layout.sh"
 
-if [ ! -d .dolt ]; then
-  author_name="${DOLT_AUTHOR_NAME:-}"
-  author_email="${DOLT_AUTHOR_EMAIL:-}"
-  identity_source="env"
-
-  if [ -z "$author_name" ]; then
-    author_name="$(git config user.name 2>/dev/null || true)"
-  fi
-  if [ -z "$author_email" ]; then
-    author_email="$(git config user.email 2>/dev/null || true)"
-  fi
-  if [ -n "$author_name" ] && [ -n "$author_email" ]; then
-    identity_source="git-config"
+db_ping() {
+  local socket="$1" port="$2"
+  # Always invoke the workspace binary via cargo — a stale coherence-core-db on PATH breaks readiness.
+  if [ -n "${COHERENCE_CORE_DB_BIN:-}" ]; then
+    DOLT_SOCKET="$socket" DOLT_HOST=127.0.0.1 DOLT_PORT="$port" DOLT_USER="${DOLT_USER:-root}" \
+      "${COHERENCE_CORE_DB_BIN}" db-ping
   else
-    author_name="${author_name:-Coherence Local Dev}"
-    author_email="${author_email:-coherence-local-dev@localhost.invalid}"
-    identity_source="fallback"
+    DOLT_SOCKET="$socket" DOLT_HOST=127.0.0.1 DOLT_PORT="$port" DOLT_USER="${DOLT_USER:-root}" \
+      cargo run --manifest-path "${ROOT}/Cargo.toml" -p coherence-core-db --quiet -- db-ping
+  fi
+}
+
+wait_for_socket_mysql() {
+  local socket="$1" port="$2"
+  local attempts="${3:-300}"
+  local i=1
+  while [ "$i" -le "$attempts" ]; do
+    if [ -S "$socket" ] && db_ping "$socket" "$port"; then
+      return 0
+    fi
+    sleep 0.5
+    i=$((i + 1))
+  done
+  echo "dolt-start: timed out waiting for MySQL protocol readiness on socket $socket" >&2
+  return 1
+}
+
+start_user_scoped() {
+  local data_dir runtime_dir socket tcp_port pidfile logfile
+  data_dir="$(coherence_dolt_data_dir)"
+  runtime_dir="$(coherence_dolt_runtime_dir)"
+  socket="$(coherence_user_scoped_socket_path)"
+  tcp_port="$(coherence_user_scoped_tcp_port)"
+  pidfile="${runtime_dir}/dolt.pid"
+  logfile="${runtime_dir}/dolt.log"
+
+  mkdir -p "$data_dir" "$runtime_dir"
+
+  if [ -f "$pidfile" ] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
+    if [ -S "$socket" ] && db_ping "$socket" "$tcp_port"; then
+      echo "dolt-start: user-scoped dolt sql-server already running (pid $(cat "$pidfile"))"
+      echo "  socket: $socket"
+      echo "  data-dir: $data_dir"
+      return 0
+    fi
+    echo "dolt-start: stale pid at $pidfile; replacing server"
+    kill "$(cat "$pidfile")" 2>/dev/null || true
+    rm -f "$pidfile"
   fi
 
-  echo "dolt init identity"
-  echo "  source: $identity_source"
-  echo "  name:   $author_name"
-  echo "  email:  $author_email"
-  dolt init --name "$author_name" --email "$author_email"
+  echo "dolt-start: user-scoped Coherence DB (ADR-0006)"
+  echo "  data-dir:    $data_dir"
+  echo "  runtime-dir: $runtime_dir"
+  echo "  socket:      $socket"
+  echo "  tcp (internal/refinery): 127.0.0.1:$tcp_port"
+
+  nohup dolt sql-server \
+    --data-dir "$data_dir" \
+    --host 127.0.0.1 \
+    --port "$tcp_port" \
+    --socket "$socket" \
+    >>"$logfile" 2>&1 &
+  echo "$!" >"$pidfile"
+  echo "$tcp_port" >"${runtime_dir}/dolt.tcp_port"
+
+  echo "dolt sql-server starting"
+  echo "  pid:    $(cat "$pidfile")"
+  echo "  log:    $logfile"
+
+  wait_for_socket_mysql "$socket" "$tcp_port"
+
+  echo
+  echo "Operator env (example):"
+  echo "  export COHERENCE_USE_USER_SCOPED_DOLT=1"
+  echo "  export DOLT_SOCKET=$socket"
+  echo "  export DOLT_DB=<project_slug>"
+  echo "(Internal TCP for Refinery defaults to 127.0.0.1:$tcp_port when DOLT_PORT is unset — same as COHERENCE_DOLT_TCP_PORT.)"
+}
+
+start_repo_local() {
+  echo "dolt-start: repo-local Coherence DB (secondary dev fallback)"
+  echo "  owner: this repository"
+  echo "  boundary: do not write dependency/vendor repos' Dolt DBs"
+
+  if [ ! -d .dolt ]; then
+    author_name="${DOLT_AUTHOR_NAME:-}"
+    author_email="${DOLT_AUTHOR_EMAIL:-}"
+    identity_source="env"
+
+    if [ -z "$author_name" ]; then
+      author_name="$(git config user.name 2>/dev/null || true)"
+    fi
+    if [ -z "$author_email" ]; then
+      author_email="$(git config user.email 2>/dev/null || true)"
+    fi
+    if [ -n "$author_name" ] && [ -n "$author_email" ]; then
+      identity_source="git-config"
+    else
+      author_name="${author_name:-Coherence Local Dev}"
+      author_email="${author_email:-coherence-local-dev@localhost.invalid}"
+      identity_source="fallback"
+    fi
+
+    echo "dolt init identity"
+    echo "  source: $identity_source"
+    echo "  name:   $author_name"
+    echo "  email:  $author_email"
+    dolt init --name "$author_name" --email "$author_email"
+  fi
+
+  mkdir -p .coherence/run
+  if [ -f .coherence/run/dolt.pid ] && kill -0 "$(cat .coherence/run/dolt.pid)" 2>/dev/null; then
+    echo "dolt sql-server already running: pid $(cat .coherence/run/dolt.pid)"
+    exit 0
+  fi
+
+  port="${DOLT_PORT:-3306}"
+  socket=".dolt/dolt.sock"
+
+  nohup dolt sql-server --host 127.0.0.1 --port "$port" --socket "$socket" \
+    >.coherence/run/dolt.log 2>&1 &
+  echo "$!" >.coherence/run/dolt.pid
+
+  echo "dolt sql-server starting"
+  echo "  pid:    $(cat .coherence/run/dolt.pid)"
+  echo "  host:   127.0.0.1"
+  echo "  port:   $port"
+  echo "  socket: $socket"
+  echo "  log:    .coherence/run/dolt.log"
+
+  wait_for_socket_mysql "$(pwd)/$socket" "$port"
+}
+
+cd "$ROOT"
+
+if coherence_use_user_scoped_dolt; then
+  start_user_scoped
+else
+  start_repo_local
 fi
-
-mkdir -p .coherence/run
-if [ -f .coherence/run/dolt.pid ] && kill -0 "$(cat .coherence/run/dolt.pid)" 2>/dev/null; then
-  echo "dolt sql-server already running: pid $(cat .coherence/run/dolt.pid)"
-  exit 0
-fi
-
-port="${DOLT_PORT:-3306}"
-socket=".dolt/dolt.sock"
-
-# Dolt socket support exists, but beads/socket-only support may vary by version.
-# Keep TCP fallback enabled until the full integration is verified.
-nohup dolt sql-server --host 127.0.0.1 --port "$port" --socket "$socket" \
-  > .coherence/run/dolt.log 2>&1 &
-echo "$!" > .coherence/run/dolt.pid
-
-echo "dolt sql-server starting"
-echo "  pid:    $(cat .coherence/run/dolt.pid)"
-echo "  host:   127.0.0.1"
-echo "  port:   $port"
-echo "  socket: $socket"
-echo "  log:    .coherence/run/dolt.log"

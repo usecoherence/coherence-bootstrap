@@ -31,6 +31,18 @@ Dolt:
   make tool dolt-stop
   make tool migrate
 
+ADR-0006 (optional user-scoped shared server):
+  export COHERENCE_USE_USER_SCOPED_DOLT=1
+  then make tool dolt-start / dolt-stop / dolt-status (same commands).
+  Layout:
+    • data-dir:      ${COHERENCE_DOLT_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/coherence/db}
+    • runtime-dir:   ${COHERENCE_DOLT_RUNTIME_DIR:-$XDG_RUNTIME_DIR/coherence}
+                       (when XDG_RUNTIME_DIR is unset: ${HOME}/.cache/coherence/run)
+    • socket:        ${DOLT_SOCKET:-<runtime-dir>/dolt.sock}
+  Select project DB with DOLT_DB=<slug>. Embedded migrations still connect via loopback TCP; internal port defaults to 33306 (override COHERENCE_DOLT_TCP_PORT).
+  Repo-local .dolt sql-server remains the default when COHERENCE_USE_USER_SCOPED_DOLT is unset (CI/agents).
+  Scripted verification: ./scripts/user-scoped-dolt-smoke.sh
+
 Canonical repository database policy (ADR-0004):
   this checkout's Dolt catalog is curated reasoning state — do not mutate it from tests
   workspace tests require COHERENCE_DB_PROFILE=test and a disposable Dolt target (make test-isolated, make tool run)
@@ -39,8 +51,9 @@ Canonical repository database policy (ADR-0004):
   full operator lifecycle: AGENTS.md
 
 Coherence DB ownership:
-  one repository = one local Coherence DB
-  preferred local socket: .dolt/dolt.sock
+  one repository = one logical Coherence DB catalog (repo-local .dolt server by default)
+  preferred local socket when repo-local: .dolt/dolt.sock
+  optional shared server socket when ADR-0006: see COHERENCE_USE_USER_SCOPED_DOLT above
   cross-repo coordination uses links/contracts/commits/versions, not shared writes
   consumer repos must not write into dependency/vendor repos' Dolt DBs
   core-db owns shared conventions and future workspace indexing, not this repo's truth

@@ -1,5 +1,6 @@
 pub mod ac_cmd;
 pub mod cli_parse;
+pub mod db_ping;
 pub mod doctor;
 pub mod evidence_sample_cmd;
 pub mod m0_smoke;
