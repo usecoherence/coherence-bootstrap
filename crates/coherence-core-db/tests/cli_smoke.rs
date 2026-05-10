@@ -112,6 +112,10 @@ fn project_init_writes_manifest_once_and_force_rebind() {
     assert!(raw.contains("project_slug = \"myapp\""));
     assert!(raw.contains("dolt_db_name = \"myapp_"));
     assert!(raw.contains("frozen_git_toplevel = "));
+    assert!(
+        raw.contains("project_hash = \""),
+        "first init should persist project_hash; got:\n{raw}"
+    );
 
     let canon = tmp.path().canonicalize().unwrap();
     let path_str = canon.to_str().expect("utf8 path");
@@ -126,13 +130,14 @@ fn project_init_writes_manifest_once_and_force_rebind() {
         .output()
         .expect("second init");
     assert!(
-        !again.status.success(),
-        "second init without --force-rebind should fail"
+        again.status.success(),
+        "second init should be idempotent; stderr: {}",
+        String::from_utf8_lossy(&again.stderr)
     );
-    let err = String::from_utf8_lossy(&again.stderr);
-    assert!(
-        err.contains("dolt_db_name") && err.contains("force-rebind"),
-        "stderr: {err}"
+    let again_raw = std::fs::read_to_string(&manifest_path).expect("manifest after second init");
+    assert_eq!(
+        again_raw, raw,
+        "idempotent project init must not rewrite manifest"
     );
 
     let force = Command::new(bin)
@@ -144,5 +149,107 @@ fn project_init_writes_manifest_once_and_force_rebind() {
         force.status.success(),
         "stderr: {}",
         String::from_utf8_lossy(&force.stderr)
+    );
+    let after_force = std::fs::read_to_string(&manifest_path).expect("manifest after force");
+    assert!(
+        after_force.contains("project_hash = \""),
+        "--force-rebind should keep a bound project_hash; got:\n{after_force}"
+    );
+}
+
+#[test]
+fn project_init_migrates_legacy_manifest_with_dolt_and_frozen_but_no_hash() {
+    if !git_available() {
+        eprintln!(
+            "skip project_init_migrates_legacy_manifest_with_dolt_and_frozen_but_no_hash: git not available"
+        );
+        return;
+    }
+
+    let tmp = TempDir::new().unwrap();
+    assert!(Command::new("git")
+        .args(["init"])
+        .current_dir(tmp.path())
+        .status()
+        .expect("git init")
+        .success());
+
+    let canon = tmp.path().canonicalize().unwrap();
+    let path_str = canon.to_str().expect("utf8 path");
+
+    let coherence_dir = tmp.path().join(".coherence");
+    std::fs::create_dir_all(&coherence_dir).unwrap();
+    let manifest_path = coherence_dir.join("project.toml");
+    std::fs::write(
+        &manifest_path,
+        format!(
+            r#"version = 1
+project_slug = "legacyapp"
+dolt_db_name = "legacyapp_deadbeef"
+frozen_git_toplevel = "{path_str}"
+"#,
+            path_str = path_str.replace('\\', "\\\\").replace('"', "\\\"")
+        ),
+    )
+    .expect("write legacy manifest");
+
+    let bin = env!("CARGO_BIN_EXE_coherence-core-db");
+    let out = Command::new(bin)
+        .args(["project", "init"])
+        .current_dir(tmp.path())
+        .output()
+        .expect("project init");
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let raw = std::fs::read_to_string(&manifest_path).expect("manifest");
+    assert!(
+        raw.contains("project_hash = \""),
+        "migration should add project_hash; got:\n{raw}"
+    );
+}
+
+#[test]
+fn project_init_errors_when_legacy_dolt_without_frozen_or_hash() {
+    if !git_available() {
+        eprintln!(
+            "skip project_init_errors_when_legacy_dolt_without_frozen_or_hash: git not available"
+        );
+        return;
+    }
+
+    let tmp = TempDir::new().unwrap();
+    assert!(Command::new("git")
+        .args(["init"])
+        .current_dir(tmp.path())
+        .status()
+        .expect("git init")
+        .success());
+
+    let coherence_dir = tmp.path().join(".coherence");
+    std::fs::create_dir_all(&coherence_dir).unwrap();
+    let manifest_path = coherence_dir.join("project.toml");
+    std::fs::write(
+        &manifest_path,
+        r#"version = 1
+project_slug = "orphan"
+dolt_db_name = "orphan_abcd"
+"#,
+    )
+    .expect("write broken legacy manifest");
+
+    let bin = env!("CARGO_BIN_EXE_coherence-core-db");
+    let out = Command::new(bin)
+        .args(["project", "init"])
+        .current_dir(tmp.path())
+        .output()
+        .expect("project init");
+    assert!(!out.status.success());
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        err.contains("frozen_git_toplevel") && err.contains("force-rebind"),
+        "expected migration error; stderr: {err}"
     );
 }

@@ -4,7 +4,7 @@ pub fn run(args: &[String]) -> i32 {
         None => {
             eprintln!("usage: coherence-core-db project init [OPTIONS]");
             eprintln!(
-                "project init records dolt_db_name in .coherence/project.toml after project_slug is set — see AGENTS.md (Project identity and manifest lifecycle)."
+                "project init binds project_hash (and derived legacy dolt_db_name) in .coherence/project.toml after project_slug is set — see AGENTS.md (Project identity and manifest lifecycle)."
             );
             eprintln!("run: coherence-core-db help");
             return 64;
