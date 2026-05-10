@@ -30,6 +30,8 @@ pub struct AcVerifyLinkRunRecord {
     pub command: String,
     pub status: AcVerifyLinkStatus,
     pub output_summary: String,
+    /// Merged stdout/stderr (capped) for ADR-0005 artifact capture; empty when the shell was not run.
+    pub captured_output: String,
 }
 
 /// Per-AC aggregate status (`verify-ac` / `verify-spec`).
@@ -218,6 +220,7 @@ fn eval_verified_link(
                 ),
             },
             output_summary: String::new(),
+            captured_output: String::new(),
         });
     }
 
@@ -232,11 +235,12 @@ fn eval_verified_link(
                     reason: "missing test_command on code location".to_string(),
                 },
                 output_summary: String::new(),
+                captured_output: String::new(),
             });
         }
     };
 
-    let (code, summary) = run_shell_command(&cmd_str, loc)?;
+    let (code, summary, captured) = run_shell_command(&cmd_str, loc)?;
     let status = if code == 0 {
         AcVerifyLinkStatus::Passed
     } else {
@@ -249,6 +253,7 @@ fn eval_verified_link(
         command: cmd_str,
         status,
         output_summary: summary,
+        captured_output: captured,
     })
 }
 
@@ -267,7 +272,7 @@ fn resolve_working_dir(loc: &CodeLocation) -> Option<PathBuf> {
         .filter(|joined| joined.exists())
 }
 
-fn run_shell_command(cmd: &str, loc: &CodeLocation) -> Result<(i32, String), String> {
+fn run_shell_command(cmd: &str, loc: &CodeLocation) -> Result<(i32, String, String), String> {
     let mut c = Command::new("sh");
     c.arg("-c").arg(cmd);
     c.stdin(Stdio::null());
@@ -291,8 +296,14 @@ fn run_shell_command(cmd: &str, loc: &CodeLocation) -> Result<(i32, String), Str
         }
         merged.push_str(&String::from_utf8_lossy(&out.stderr));
     }
-    let summary = summarize_output(&merged);
-    Ok((code, summary))
+    const CAP: usize = 512 * 1024;
+    let mut captured = merged;
+    if captured.len() > CAP {
+        captured.truncate(CAP);
+        captured.push_str("\n… [truncated]");
+    }
+    let summary = summarize_output(&captured);
+    Ok((code, summary, captured))
 }
 
 fn summarize_output(raw: &str) -> String {

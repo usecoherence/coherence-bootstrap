@@ -1,20 +1,25 @@
 //! Managed per-run evidence store layout (ADR-0005).
 //!
 //! Run-scoped evidence lives under `.coherence/runs/<run-id>/` (see [`RunLayout`]) — not in the curated
-//! canonical Dolt catalog. Heavy bytes stay on disk under `artifacts/`; metadata is JSON.
+//! canonical Dolt catalog. Heavy bytes stay on disk under `artifacts/`; metadata JSON under
+//! `metadata/`.
 //!
 //! # Canonical database boundary
 //!
 //! M1 `spec` / `codeintel` migrations do **not** add evidence tables. The canonical catalog must
 //! never store large payload blobs for evidence — only pointer-style metadata (run id, relative
 //! paths, hashes, summaries) when a future migration wires [`CanonicalEvidencePointer`] into SQL.
-//! Until then, [`write_canonical_pointer_stub`] writes the same shape next to the run for demos
+//! Until then, [`write_canonical_pointer_stub`] writes the same shape under `metadata/` for demos
 //! and tests (retrieval path without coupling to a runtime DB backend).
+//!
+//! TODO (`evidence_pointers`): a future migration may add a small SQL table for
+//! [`CanonicalEvidencePointer`]-shaped rows; M0 stays file-only.
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 /// `.coherence` at the workspace root.
@@ -24,7 +29,9 @@ pub const RUNS_ROOT_SEGMENT: &str = "runs";
 
 /// Subdirectory of a run root for content-addressed or named artifact files (large payloads).
 pub const ARTIFACTS_SEGMENT: &str = "artifacts";
-/// Subdirectory for per-observation JSON records.
+/// JSON metadata (manifest, envelopes, canonical-pointer stub).
+pub const METADATA_SEGMENT: &str = "metadata";
+/// Per-envelope JSON files under [`RunLayout::observations_dir`].
 pub const OBSERVATIONS_SEGMENT: &str = "observations";
 
 pub const RUN_MANIFEST_FILE: &str = "run.json";
@@ -58,21 +65,27 @@ impl RunLayout {
         self.run_root().join(ARTIFACTS_SEGMENT)
     }
 
+    /// `metadata/` — manifests, snapshot envelopes, future indexes.
+    pub fn metadata_dir(&self) -> PathBuf {
+        self.run_root().join(METADATA_SEGMENT)
+    }
+
+    /// `metadata/observations/<observation_id>.json`
     pub fn observations_dir(&self) -> PathBuf {
-        self.run_root().join(OBSERVATIONS_SEGMENT)
+        self.metadata_dir().join(OBSERVATIONS_SEGMENT)
     }
 
     pub fn run_manifest_path(&self) -> PathBuf {
-        self.run_root().join(RUN_MANIFEST_FILE)
+        self.metadata_dir().join(RUN_MANIFEST_FILE)
     }
 
     pub fn canonical_pointer_stub_path(&self) -> PathBuf {
-        self.run_root().join(CANONICAL_POINTER_STUB_FILE)
+        self.metadata_dir().join(CANONICAL_POINTER_STUB_FILE)
     }
 }
 
 /// Top-level metadata for a run directory.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RunManifest {
     pub schema_version: u32,
     pub run_id: String,
@@ -80,33 +93,28 @@ pub struct RunManifest {
     pub created_at: String,
 }
 
-/// Pointer to a large payload kept outside any tabular / canonical row payload column.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PayloadPointer {
-    pub summary: String,
-    pub sha256_hex: String,
-    /// Path relative to the run root (e.g. `artifacts/large.bin`).
-    pub artifact_relpath: String,
-}
-
-/// Typed envelope for a single observation (JSON on disk; future adapter contract).
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ObservationRecord {
+/// Minimal snapshot envelope (ADR-0005 M0): stable identity, structured payload, content hash.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SnapshotEnvelope {
     pub run_id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub plan_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub ac_id: Option<String>,
     pub observation_id: String,
     pub object_kind: String,
     pub object_id: String,
-    pub payload: PayloadPointer,
+    /// Structured payload (summary, nested fields); keep large bytes in [`SnapshotEnvelope::stdout_artifact_relpath`].
+    pub payload: Value,
+    /// SHA-256 hex of the canonical payload (artifact file if `stdout_artifact_relpath` is set, else `payload` JSON bytes).
+    pub content_hash: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ac_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub redaction_policy_id: Option<String>,
+    /// Path relative to the run root for captured process output (e.g. `artifacts/verify-ac/…/stdout.txt`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stdout_artifact_relpath: Option<String>,
 }
 
 /// Metadata only — the shape intended for a future canonical row; **no inline blob field**.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CanonicalEvidencePointer {
     pub run_id: String,
     /// Relative to workspace root, POSIX-style for logs (e.g. `.coherence/runs/abc`).
@@ -118,7 +126,7 @@ pub struct CanonicalEvidencePointer {
     pub payload_summary: String,
 }
 
-/// Ensure run root, `artifacts/`, and `observations/` exist.
+/// Ensure run root, `artifacts/`, and `metadata/` (+ `metadata/observations/`) exist.
 pub fn ensure_run_directories(layout: &RunLayout) -> Result<(), String> {
     fs::create_dir_all(layout.artifacts_dir()).map_err(|e| format!("create artifacts dir: {e}"))?;
     fs::create_dir_all(layout.observations_dir())
@@ -127,7 +135,7 @@ pub fn ensure_run_directories(layout: &RunLayout) -> Result<(), String> {
 }
 
 pub fn write_run_manifest(layout: &RunLayout, manifest: &RunManifest) -> Result<(), String> {
-    fs::create_dir_all(layout.run_root()).map_err(|e| format!("create run root: {e}"))?;
+    fs::create_dir_all(layout.metadata_dir()).map_err(|e| format!("create metadata dir: {e}"))?;
     let json = serde_json::to_string_pretty(manifest)
         .map_err(|e| format!("serialize run manifest: {e}"))?;
     fs::write(layout.run_manifest_path(), json).map_err(|e| format!("write run.json: {e}"))?;
@@ -148,22 +156,38 @@ pub fn write_bytes_under_artifacts(
     Ok(sha256_hex(bytes))
 }
 
-pub fn write_observation(layout: &RunLayout, record: &ObservationRecord) -> Result<(), String> {
+pub fn write_snapshot_envelope(
+    layout: &RunLayout,
+    envelope: &SnapshotEnvelope,
+) -> Result<(), String> {
     ensure_run_directories(layout)?;
     let path = layout
         .observations_dir()
-        .join(format!("{}.json", record.observation_id));
+        .join(format!("{}.json", envelope.observation_id));
     let json =
-        serde_json::to_string_pretty(record).map_err(|e| format!("serialize observation: {e}"))?;
-    fs::write(path, json).map_err(|e| format!("write observation: {e}"))?;
+        serde_json::to_string_pretty(envelope).map_err(|e| format!("serialize envelope: {e}"))?;
+    fs::write(path, json).map_err(|e| format!("write envelope: {e}"))?;
     Ok(())
+}
+
+/// Read a [`SnapshotEnvelope`] written under `metadata/observations/`.
+#[allow(dead_code)] // Read-side API for tests and future tooling; writer paths use this module first.
+pub fn read_snapshot_envelope(
+    layout: &RunLayout,
+    observation_id: &str,
+) -> Result<SnapshotEnvelope, String> {
+    let path = layout
+        .observations_dir()
+        .join(format!("{observation_id}.json"));
+    let raw = fs::read_to_string(&path).map_err(|e| format!("read envelope: {e}"))?;
+    serde_json::from_str(&raw).map_err(|e| format!("parse envelope: {e}"))
 }
 
 pub fn write_canonical_pointer_stub(
     layout: &RunLayout,
     pointer: &CanonicalEvidencePointer,
 ) -> Result<(), String> {
-    fs::create_dir_all(layout.run_root()).map_err(|e| format!("create run root: {e}"))?;
+    fs::create_dir_all(layout.metadata_dir()).map_err(|e| format!("create metadata dir: {e}"))?;
     let json = serde_json::to_string_pretty(pointer)
         .map_err(|e| format!("serialize canonical pointer: {e}"))?;
     fs::write(layout.canonical_pointer_stub_path(), json)
@@ -184,7 +208,28 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", hasher.finalize())
 }
 
-/// End-to-end sample: manifest, multi-byte artifact outside DB, observation envelope, canonical stub.
+/// Hash used for [`SnapshotEnvelope::content_hash`] when the payload is inline JSON only.
+pub fn snapshot_payload_content_hash(payload: &Value) -> Result<String, String> {
+    let bytes =
+        serde_json::to_vec(payload).map_err(|e| format!("serialize payload for hash: {e}"))?;
+    Ok(sha256_hex(&bytes))
+}
+
+/// Ensure [`RunManifest`] exists when absent (e.g. first `verify-ac` observation in a run).
+pub fn ensure_run_initialized(layout: &RunLayout) -> Result<(), String> {
+    ensure_run_directories(layout)?;
+    if layout.run_manifest_path().exists() {
+        return Ok(());
+    }
+    let manifest = RunManifest {
+        schema_version: 1,
+        run_id: layout.run_id.clone(),
+        created_at: created_at_label(),
+    };
+    write_run_manifest(layout, &manifest)
+}
+
+/// End-to-end sample: manifest, multi-byte artifact outside DB, snapshot envelope, canonical stub.
 pub fn bootstrap_sample_run(
     workspace_root: impl AsRef<Path>,
     run_id: impl AsRef<str>,
@@ -214,21 +259,25 @@ pub fn bootstrap_sample_run(
         .replace('\\', "/");
 
     let observation_id = "obs-sample-001".to_string();
-    let obs = ObservationRecord {
+    let payload = serde_json::json!({
+        "summary": "Large JSON blob redacted/truncated; full body in artifact",
+        "plan_id": "plan-demo",
+        "artifact_relpath_from_run_root": artifact_relpath_from_run_root,
+    });
+    let content_hash = snapshot_payload_content_hash(&payload)?;
+
+    let envelope = SnapshotEnvelope {
         run_id: layout.run_id.clone(),
-        plan_id: Some("plan-demo".to_owned()),
-        ac_id: Some("AC-DEMO".to_owned()),
         observation_id: observation_id.clone(),
         object_kind: "http_response".to_owned(),
         object_id: "/api/users?page=1".to_owned(),
-        payload: PayloadPointer {
-            summary: "Large JSON blob redacted/truncated; full body in artifact".to_owned(),
-            sha256_hex: hash.clone(),
-            artifact_relpath: artifact_relpath_from_run_root.clone(),
-        },
+        payload,
+        content_hash: content_hash.clone(),
+        ac_id: Some("AC-DEMO".to_owned()),
         redaction_policy_id: Some("redact-email-v1".to_owned()),
+        stdout_artifact_relpath: None,
     };
-    write_observation(&layout, &obs)?;
+    write_snapshot_envelope(&layout, &envelope)?;
 
     let evidence_root_relpath = compute_evidence_root_relpath(&layout)?;
 
@@ -238,7 +287,12 @@ pub fn bootstrap_sample_run(
         observation_id,
         artifact_relpath_from_run_root: artifact_relpath_from_run_root.clone(),
         payload_sha256_hex: hash,
-        payload_summary: obs.payload.summary.clone(),
+        payload_summary: envelope
+            .payload
+            .get("summary")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_owned(),
     };
 
     write_canonical_pointer_stub(&layout, &pointer)?;
@@ -271,6 +325,31 @@ mod tests {
     use super::*;
 
     #[test]
+    fn snapshot_envelope_round_trip_under_temp_run() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let layout = RunLayout::new(tmp.path(), "run-env-roundtrip");
+        let payload = serde_json::json!({"summary": "hello", "n": 42});
+        let content_hash = snapshot_payload_content_hash(&payload).expect("hash");
+        let envelope = SnapshotEnvelope {
+            run_id: layout.run_id.clone(),
+            observation_id: "obs-001".to_string(),
+            object_kind: "process.output".to_string(),
+            object_id: "LOC-x".to_string(),
+            payload,
+            content_hash,
+            ac_id: Some("AC-1".to_string()),
+            redaction_policy_id: Some("none".to_string()),
+            stdout_artifact_relpath: Some("artifacts/stdout/obs-001.txt".to_string()),
+        };
+        ensure_run_initialized(&layout).expect("init");
+        write_snapshot_envelope(&layout, &envelope).expect("write");
+        let got = read_snapshot_envelope(&layout, "obs-001").expect("read");
+        assert_eq!(got, envelope);
+        assert!(layout.metadata_dir().is_dir());
+        assert!(layout.artifacts_dir().is_dir());
+    }
+
+    #[test]
     fn bootstrap_sample_keeps_payload_on_disk_and_pointer_has_no_blob() {
         let tmp = tempfile::tempdir().expect("tempdir");
         let run_id = "run-test-1";
@@ -283,8 +362,9 @@ mod tests {
 
         let stub_raw = fs::read_to_string(
             tmp.path()
-                .join(ptr.evidence_root_relpath)
-                .join("canonical-pointer.json"),
+                .join(&ptr.evidence_root_relpath)
+                .join(METADATA_SEGMENT)
+                .join(CANONICAL_POINTER_STUB_FILE),
         )
         .expect("read stub");
         assert!(

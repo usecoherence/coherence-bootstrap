@@ -34,17 +34,18 @@ fn evidence_sample_cli_end_to_end() {
         .join(".coherence")
         .join("runs")
         .join("run-cli-e2e");
-    assert!(run_root.join("run.json").is_file());
-    assert!(run_root.join("canonical-pointer.json").is_file());
-    let obs = run_root.join("observations").join("obs-sample-001.json");
+    let meta = run_root.join("metadata");
+    assert!(meta.join("run.json").is_file());
+    assert!(meta.join("canonical-pointer.json").is_file());
+    let obs = meta.join("observations").join("obs-sample-001.json");
     assert!(obs.is_file());
     let obs_raw = fs::read_to_string(&obs).expect("read observation");
     assert!(
         obs_raw.contains("plan-demo") && obs_raw.contains("AC-DEMO"),
-        "observation should carry optional plan/ac ids: {obs_raw}"
+        "observation should carry optional plan/ac ids in payload: {obs_raw}"
     );
 
-    let ptr_path = run_root.join("canonical-pointer.json");
+    let ptr_path = meta.join("canonical-pointer.json");
     let ptr_raw = fs::read_to_string(&ptr_path).expect("read pointer stub");
     assert!(
         ptr_raw.len() < 2_000,
