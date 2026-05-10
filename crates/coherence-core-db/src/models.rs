@@ -184,6 +184,8 @@ impl Spec {
 pub struct AcceptanceCriterion {
     pub id: String,
     pub spec_id: String,
+    /// Filesystem-oriented segment; default mirrors `id` via [`slug_from_id`].
+    pub slug: String,
     pub title: String,
     pub intent: String,
     pub review_mode: ReviewMode,
@@ -200,8 +202,10 @@ impl AcceptanceCriterion {
         spec_id: impl Into<String>,
         title: impl Into<String>,
     ) -> Self {
+        let id = id.into();
         Self {
-            id: id.into(),
+            slug: slug_from_id(&id),
+            id,
             spec_id: spec_id.into(),
             title: title.into(),
             intent: String::new(),
@@ -242,7 +246,7 @@ impl SpecRelation {
     }
 }
 
-fn slug_from_id(id: &str) -> String {
+pub(crate) fn slug_from_id(id: &str) -> String {
     id.to_ascii_lowercase().replace('_', "-")
 }
 
@@ -398,6 +402,7 @@ mod tests {
         let ac = AcceptanceCriterion::new("AC-1", "SPEC-1", "AC title");
         assert_eq!(ac.id, "AC-1");
         assert_eq!(ac.spec_id, "SPEC-1");
+        assert_eq!(ac.slug, "ac-1");
         assert_eq!(ac.title, "AC title");
         assert_eq!(ac.intent, "");
         assert_eq!(ac.review_mode, ReviewMode::Manual);
@@ -405,6 +410,19 @@ mod tests {
         assert_eq!(ac.concerns, Vec::<ConcernKind>::new());
         assert_eq!(ac.created_at, "");
         assert_eq!(ac.updated_at, "");
+    }
+
+    #[test]
+    fn acceptance_criterion_slug_from_id_normalizes_underscores() {
+        let ac = AcceptanceCriterion::new("AC_SMOKE_CASE", "SPEC-1", "t");
+        assert_eq!(ac.slug, "ac-smoke-case");
+    }
+
+    #[test]
+    fn acceptance_criterion_explicit_slug_uses_slug_from_id_rules() {
+        let mut ac = AcceptanceCriterion::new("AC-1", "SPEC-1", "t");
+        ac.slug = super::slug_from_id("MY_CUSTOM_Slug");
+        assert_eq!(ac.slug, "my-custom-slug");
     }
 
     #[test]

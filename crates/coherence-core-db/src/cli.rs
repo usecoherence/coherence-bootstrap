@@ -42,7 +42,7 @@ fn print_help() {
            m0-smoke       Run minimal Rust -> Dolt DB vertical slice\n\
            m1-spec-smoke  Run M1 spec store smoke (Spec / AC / SpecRelation)\n\
            spec           Manage spec records (add, list, show)\n\
-           ac             Manage acceptance criteria (add, list)\n\
+           ac             Manage acceptance criteria (add, list, show); each AC has a per-spec slug (default from id)\n\
            verify-ac      Run verified_by linked test commands for one AC\n\
            verify-spec    Aggregate verify-ac across all ACs for one spec\n\
            evidence-sample  Create a demo run under .coherence/runs/<run-id>/ (ADR-0005 skeleton)\n\

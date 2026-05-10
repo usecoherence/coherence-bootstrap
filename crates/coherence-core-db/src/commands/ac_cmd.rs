@@ -1,7 +1,7 @@
 use crate::commands::cli_parse::{parse_args, ParsedArgs};
 use crate::db::{connect, ConnectionConfig};
 use crate::migrations;
-use crate::models::{AcceptanceCriterion, ConcernKind, ReviewMode, RiskLevel};
+use crate::models::{slug_from_id, AcceptanceCriterion, ConcernKind, ReviewMode, RiskLevel};
 use crate::spec_store;
 
 pub fn run(args: &[String]) -> i32 {
@@ -18,13 +18,14 @@ fn run_impl(args: &[String]) -> Result<(), String> {
     let sub = args
         .first()
         .map(|s| s.as_str())
-        .ok_or_else(|| "usage: coherence-core-db ac <add|list> ...".to_string())?;
+        .ok_or_else(|| "usage: coherence-core-db ac <add|list|show> ...".to_string())?;
     let tail = &args[1..];
     match sub {
         "add" => ac_add(tail),
         "list" => ac_list(tail),
+        "show" => ac_show(tail),
         other => Err(format!(
-            "unknown ac subcommand: {other} (expected add, list)"
+            "unknown ac subcommand: {other} (expected add, list, show)"
         )),
     }
 }
@@ -82,6 +83,7 @@ fn ac_add(args: &[String]) -> Result<(), String> {
         Some(id) => id.to_string(),
         None => gen_ac_id(),
     };
+    let slug_flag = p.single_flag("slug")?;
 
     let review_mode = ReviewMode::from_db_str(review_str)
         .ok_or_else(|| format!("unknown --review-mode {review_str:?} (manual|automated|hybrid)"))?;
@@ -96,6 +98,13 @@ fn ac_add(args: &[String]) -> Result<(), String> {
 
     let ts = utc_stamp()?;
     let mut ac = AcceptanceCriterion::new(id.clone(), spec_id, title);
+    if let Some(s) = slug_flag {
+        let slug = s.trim();
+        if slug.is_empty() {
+            return Err("--slug must not be empty when provided".to_string());
+        }
+        ac.slug = slug_from_id(slug);
+    }
     ac.intent = intent.to_string();
     ac.review_mode = review_mode;
     ac.risk_level = risk_level;
@@ -107,6 +116,7 @@ fn ac_add(args: &[String]) -> Result<(), String> {
 
     println!("ac_id: {}", ac.id);
     println!("spec_id: {}", ac.spec_id);
+    println!("slug: {}", ac.slug);
     Ok(())
 }
 
@@ -125,18 +135,54 @@ fn ac_list(args: &[String]) -> Result<(), String> {
     let mut conn = connect_migrated()?;
     let acs = spec_store::list_acceptance_criteria_for_spec(&mut conn, spec_id)?;
 
-    println!("id\tspec_id\ttitle\treview_mode\trisk_level\tconcerns");
+    println!("id\tspec_id\tslug\ttitle\treview_mode\trisk_level\tconcerns");
     for ac in acs {
         let concerns: Vec<&str> = ac.concerns.iter().map(|k| k.as_db_str()).collect();
         println!(
-            "{}\t{}\t{}\t{}\t{}\t{}",
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}",
             ac.id,
             ac.spec_id,
+            ac.slug,
             ac.title.replace('\t', " ").replace('\n', " "),
             ac.review_mode.as_db_str(),
             ac.risk_level.as_db_str(),
             concerns.join(","),
         );
     }
+    Ok(())
+}
+
+fn ac_show(args: &[String]) -> Result<(), String> {
+    let p = parse_args(args)?;
+    if p.positionals.len() > 1 {
+        return Err("ac show: expected at most one AC_ID positional".into());
+    }
+    let id_flag = p.single_flag("id")?;
+    let id = match (id_flag, p.positionals.first()) {
+        (Some(a), Some(b)) if a != b.as_str() => {
+            return Err("ac show: --id and positional AC_ID disagree".into());
+        }
+        (Some(a), Some(_)) | (Some(a), None) => a.to_string(),
+        (None, Some(b)) => b.clone(),
+        (None, None) => {
+            return Err("ac show requires <AC_ID> or --id <AC_ID>".into());
+        }
+    };
+
+    let mut conn = connect_migrated()?;
+    let ac = spec_store::get_acceptance_criterion(&mut conn, &id)?
+        .ok_or_else(|| format!("acceptance criterion not found: {id}"))?;
+
+    println!("id: {}", ac.id);
+    println!("spec_id: {}", ac.spec_id);
+    println!("slug: {}", ac.slug);
+    println!("title: {}", ac.title);
+    println!("intent: {}", ac.intent);
+    println!("review_mode: {}", ac.review_mode.as_db_str());
+    println!("risk_level: {}", ac.risk_level.as_db_str());
+    let concerns: Vec<&str> = ac.concerns.iter().map(|k| k.as_db_str()).collect();
+    println!("concerns: {}", concerns.join(","));
+    println!("created_at: {}", ac.created_at);
+    println!("updated_at: {}", ac.updated_at);
     Ok(())
 }

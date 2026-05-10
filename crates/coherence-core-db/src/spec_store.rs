@@ -96,10 +96,36 @@ pub fn list_specs(conn: &mut Conn) -> Result<Vec<Spec>, String> {
 }
 
 pub fn put_acceptance_criterion(conn: &mut Conn, ac: &AcceptanceCriterion) -> Result<(), String> {
+    if ac.slug.is_empty() {
+        return Err(format!(
+            "acceptance criterion {}: slug must not be empty",
+            ac.id
+        ));
+    }
+
+    let clash: Option<String> = conn
+        .exec_first(
+            r"SELECT id FROM acceptance_criteria
+              WHERE spec_id = :spec_id AND slug = :slug AND id <> :id",
+            params! {
+                "spec_id" => ac.spec_id.as_str(),
+                "slug" => ac.slug.as_str(),
+                "id" => ac.id.as_str(),
+            },
+        )
+        .map_err(|err| format!("failed to check slug uniqueness for {}: {err}", ac.id))?;
+    if let Some(other_id) = clash {
+        return Err(format!(
+            "acceptance criterion slug {:?} is already used in spec {} by {}",
+            ac.slug, ac.spec_id, other_id
+        ));
+    }
+
     conn.exec_drop(
         r"INSERT INTO acceptance_criteria (
             id,
             spec_id,
+            slug,
             title,
             intent,
             review_mode,
@@ -109,6 +135,7 @@ pub fn put_acceptance_criterion(conn: &mut Conn, ac: &AcceptanceCriterion) -> Re
           ) VALUES (
             :id,
             :spec_id,
+            :slug,
             :title,
             :intent,
             :review_mode,
@@ -118,6 +145,7 @@ pub fn put_acceptance_criterion(conn: &mut Conn, ac: &AcceptanceCriterion) -> Re
           )
           ON DUPLICATE KEY UPDATE
             spec_id = VALUES(spec_id),
+            slug = VALUES(slug),
             title = VALUES(title),
             intent = VALUES(intent),
             review_mode = VALUES(review_mode),
@@ -126,6 +154,7 @@ pub fn put_acceptance_criterion(conn: &mut Conn, ac: &AcceptanceCriterion) -> Re
         params! {
             "id" => ac.id.as_str(),
             "spec_id" => ac.spec_id.as_str(),
+            "slug" => ac.slug.as_str(),
             "title" => ac.title.as_str(),
             "intent" => ac.intent.as_str(),
             "review_mode" => ac.review_mode.as_db_str(),
@@ -158,6 +187,38 @@ pub fn put_acceptance_criterion(conn: &mut Conn, ac: &AcceptanceCriterion) -> Re
     Ok(())
 }
 
+pub fn get_acceptance_criterion(
+    conn: &mut Conn,
+    ac_id: &str,
+) -> Result<Option<AcceptanceCriterion>, String> {
+    let row: Option<(
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+    )> = conn
+        .exec_first(
+            r"SELECT id, spec_id, slug, title, intent, review_mode, risk_level, created_at, updated_at
+              FROM acceptance_criteria
+              WHERE id = :id",
+            params! {
+                "id" => ac_id,
+            },
+        )
+        .map_err(|err| format!("failed to get acceptance criterion {}: {err}", ac_id))?;
+    let Some(row) = row else {
+        return Ok(None);
+    };
+    let mut ac = acceptance_criterion_from_row(row)?;
+    ac.concerns = concerns_for_ac(conn, &ac.id)?;
+    Ok(Some(ac))
+}
+
 pub fn list_acceptance_criteria_for_spec(
     conn: &mut Conn,
     spec_id: &str,
@@ -171,9 +232,10 @@ pub fn list_acceptance_criteria_for_spec(
         String,
         String,
         String,
+        String,
     )> = conn
         .exec(
-            r"SELECT id, spec_id, title, intent, review_mode, risk_level, created_at, updated_at
+            r"SELECT id, spec_id, slug, title, intent, review_mode, risk_level, created_at, updated_at
               FROM acceptance_criteria
               WHERE spec_id = :spec_id
               ORDER BY id",
@@ -320,9 +382,10 @@ fn acceptance_criterion_from_row(
         String,
         String,
         String,
+        String,
     ),
 ) -> Result<AcceptanceCriterion, String> {
-    let (id, spec_id, title, intent, review_mode, risk_level, created_at, updated_at) = row;
+    let (id, spec_id, slug, title, intent, review_mode, risk_level, created_at, updated_at) = row;
     let review_mode = ReviewMode::from_db_str(&review_mode)
         .ok_or_else(|| format!("unknown review mode: {review_mode}"))?;
     let risk_level = RiskLevel::from_db_str(&risk_level)
@@ -330,6 +393,7 @@ fn acceptance_criterion_from_row(
     Ok(AcceptanceCriterion {
         id,
         spec_id,
+        slug,
         title,
         intent,
         review_mode,
@@ -408,6 +472,40 @@ mod tests {
         assert_eq!(
             ac_loaded.concerns,
             vec![ConcernKind::Performance, ConcernKind::Security]
+        );
+        assert_eq!(ac_loaded.slug, "ac-store-1");
+    }
+
+    #[test]
+    fn put_acceptance_criterion_rejects_duplicate_slug_in_same_spec() {
+        let Some(mut conn) = maybe_conn() else {
+            return;
+        };
+
+        let mut spec = Spec::new("SPEC-DUP-SLUG", "Dup slug owner");
+        spec.description = "owner spec".to_string();
+        spec.created_at = "t1".to_string();
+        spec.updated_at = "t1".to_string();
+        spec_store::put_spec(&mut conn, &spec).expect("put_spec");
+
+        let mut first = AcceptanceCriterion::new("AC-DUP-A", "SPEC-DUP-SLUG", "First");
+        first.slug = "shared-slug".to_string();
+        first.intent = "i".to_string();
+        first.created_at = "t1".to_string();
+        first.updated_at = "t1".to_string();
+        spec_store::put_acceptance_criterion(&mut conn, &first).expect("first put");
+
+        let mut second = AcceptanceCriterion::new("AC-DUP-B", "SPEC-DUP-SLUG", "Second");
+        second.slug = "shared-slug".to_string();
+        second.intent = "i".to_string();
+        second.created_at = "t1".to_string();
+        second.updated_at = "t1".to_string();
+
+        let err =
+            spec_store::put_acceptance_criterion(&mut conn, &second).expect_err("duplicate slug");
+        assert!(
+            err.contains("shared-slug") && err.contains("AC-DUP-A"),
+            "unexpected err: {err}"
         );
     }
 

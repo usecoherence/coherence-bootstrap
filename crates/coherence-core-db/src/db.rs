@@ -247,6 +247,9 @@ pub fn insert_acceptance_criterion(
     ac: &AcceptanceCriterion,
 ) -> Result<(), String> {
     let mut normalized = ac.clone();
+    if normalized.slug.is_empty() {
+        normalized.slug = crate::models::slug_from_id(&normalized.id);
+    }
     if normalized.intent.is_empty() {
         normalized.intent = "m0-smoke intent".to_string();
     }
