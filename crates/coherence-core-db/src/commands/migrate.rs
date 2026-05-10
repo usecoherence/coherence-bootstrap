@@ -1,7 +1,12 @@
-use crate::db::ConnectionConfig;
+use crate::db::{self, ConnectionConfig};
 use crate::migrations;
 
 pub fn run() -> i32 {
+    if let Err(err) = db::preflight_user_scoped_migrate_binding() {
+        eprintln!("migrate: failed");
+        eprintln!("{err}");
+        return 1;
+    }
     let config = ConnectionConfig::from_env();
     match migrations::apply_all(&config) {
         Ok(applied) => {

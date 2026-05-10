@@ -75,6 +75,24 @@ fn manifest_path(repo_root: impl AsRef<Path>) -> PathBuf {
     repo_root.as_ref().join(MANIFEST_REL_PATH)
 }
 
+/// Absolute path to `.coherence/project.toml` under a repository root.
+#[must_use]
+pub fn coherence_manifest_path(repo_root: impl AsRef<Path>) -> PathBuf {
+    manifest_path(repo_root)
+}
+
+/// Best-effort manifest: git root of [`std::env::current_dir`], then read `.coherence/project.toml`.
+///
+/// Returns `None` when cwd is not inside a git work tree, the manifest is missing, or parsing fails.
+/// Callers that need to distinguish a corrupt manifest from a missing file should use
+/// [`coherence_manifest_path`] and [`read_manifest`] directly.
+#[must_use]
+pub fn try_read_project_manifest_from_cwd() -> Option<ProjectManifest> {
+    let cwd = std::env::current_dir().ok()?;
+    let root = find_git_repo_root(cwd)?;
+    read_manifest(&root).ok()
+}
+
 fn validate_manifest(manifest: &ProjectManifest) -> Result<(), String> {
     if manifest.project_slug.trim().is_empty() {
         return Err("project_slug must be non-empty".to_string());

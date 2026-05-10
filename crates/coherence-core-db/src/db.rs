@@ -6,7 +6,13 @@ use mysql::prelude::Queryable;
 use mysql::{Conn, OptsBuilder};
 
 use crate::models::{AcceptanceCriterion, Spec};
+use crate::project_manifest;
 use crate::spec_store;
+
+/// Environment variable holding the logical MySQL/Dolt database name.
+const DOLT_DB_ENV: &str = "DOLT_DB";
+/// Populated from `.coherence/project.toml` when unset so ADR-0004 isolation checks align with manifest identity.
+const COHERENCE_PROJECT_SLUG_ENV: &str = "COHERENCE_PROJECT_SLUG";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConnectionMode {
@@ -65,6 +71,15 @@ impl ConnectionConfig {
     pub fn from_env() -> Self {
         let user_scoped = user_scoped_dolt_from_env();
 
+        let manifest = project_manifest::try_read_project_manifest_from_cwd();
+        if let Some(ref m) = manifest {
+            if env::var_os(COHERENCE_PROJECT_SLUG_ENV).is_none()
+                && !m.project_slug.trim().is_empty()
+            {
+                env::set_var(COHERENCE_PROJECT_SLUG_ENV, m.project_slug.trim());
+            }
+        }
+
         let socket_path = env::var("DOLT_SOCKET")
             .map(PathBuf::from)
             .unwrap_or_else(|_| {
@@ -93,7 +108,7 @@ impl ConnectionConfig {
 
         let user = env::var("DOLT_USER").unwrap_or_else(|_| "root".to_string());
         let password = env::var("DOLT_PASSWORD").ok();
-        let database = env::var("DOLT_DB").unwrap_or_else(|_| default_database_name());
+        let database = resolve_database_name_with_manifest(manifest.as_ref());
 
         Self {
             socket_path,
@@ -104,6 +119,67 @@ impl ConnectionConfig {
             database,
         }
     }
+}
+
+/// Non-empty `DOLT_DB` wins; else `.coherence/project.toml` (`dolt_db_name`) at the git root of cwd; else [`default_database_name`].
+fn resolve_database_name_with_manifest(
+    manifest: Option<&project_manifest::ProjectManifest>,
+) -> String {
+    if let Ok(db) = env::var(DOLT_DB_ENV) {
+        if !db.trim().is_empty() {
+            return db;
+        }
+    }
+    manifest
+        .and_then(|m| m.dolt_db_name.as_ref())
+        .filter(|s| !s.trim().is_empty())
+        .map(std::string::ToString::to_string)
+        .unwrap_or_else(default_database_name)
+}
+
+/// `migrate` only: refuses user-scoped runs without explicit `DOLT_DB` when a manifest exists but
+/// `dolt_db_name` was never frozen (`project init`).
+///
+/// Call this **before** [`ConnectionConfig::from_env`] so the process never picks a stale default
+/// catalog name for migration.
+pub fn preflight_user_scoped_migrate_binding() -> Result<(), String> {
+    if !user_scoped_dolt_from_env() {
+        return Ok(());
+    }
+    if env::var(DOLT_DB_ENV)
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .is_some()
+    {
+        return Ok(());
+    }
+    let cwd =
+        env::current_dir().map_err(|e| format!("migrate: cannot read working directory: {e}"))?;
+    let Some(repo_root) = project_manifest::find_git_repo_root(cwd) else {
+        return Ok(());
+    };
+    let path = project_manifest::coherence_manifest_path(&repo_root);
+    if !path.is_file() {
+        return Ok(());
+    }
+    let manifest = project_manifest::read_manifest(&repo_root).map_err(|e| {
+        format!(
+            "migrate: invalid project manifest ({}): {e}",
+            path.display()
+        )
+    })?;
+    let have_name = manifest
+        .dolt_db_name
+        .as_ref()
+        .is_some_and(|s| !s.trim().is_empty());
+    if !have_name {
+        return Err(
+            "migrate (user-scoped Dolt): `.coherence/project.toml` exists but `dolt_db_name` is not set.\n\
+             Fix: run `cargo run -p coherence-core-db -- project init` (or set `DOLT_DB` explicitly)."
+                .to_string(),
+        );
+    }
+    Ok(())
 }
 
 fn default_database_name() -> String {
@@ -280,5 +356,173 @@ mod tests {
     fn mysql_quote_identifier_escapes_backticks() {
         assert_eq!(mysql_quote_identifier("a"), "`a`");
         assert_eq!(mysql_quote_identifier("a`b"), "`a``b`");
+    }
+}
+
+#[cfg(test)]
+mod connection_config_manifest_tests {
+    use std::env;
+    use std::fs;
+    use std::path::{Path, PathBuf};
+    use std::sync::Mutex;
+
+    use tempfile::TempDir;
+
+    use super::*;
+
+    static LOCK: Mutex<()> = Mutex::new(());
+
+    struct MultiEnvRestore {
+        pairs: Vec<(&'static str, Option<String>)>,
+    }
+
+    impl MultiEnvRestore {
+        fn snapshot(keys: &[&'static str]) -> Self {
+            Self {
+                pairs: keys.iter().map(|&k| (k, env::var(k).ok())).collect(),
+            }
+        }
+    }
+
+    impl Drop for MultiEnvRestore {
+        fn drop(&mut self) {
+            for (k, v) in &self.pairs {
+                match v {
+                    Some(val) => env::set_var(k, val),
+                    None => env::remove_var(k),
+                }
+            }
+        }
+    }
+
+    struct SaveCwd(PathBuf);
+
+    impl SaveCwd {
+        fn chdir(path: &Path) -> Self {
+            let prev = env::current_dir().expect("cwd");
+            env::set_current_dir(path).expect("chdir");
+            Self(prev)
+        }
+    }
+
+    impl Drop for SaveCwd {
+        fn drop(&mut self) {
+            let _ = env::set_current_dir(&self.0);
+        }
+    }
+
+    fn write_manifest(repo: &Path, dolt_db_line: &str) {
+        fs::create_dir_all(repo.join(".coherence")).unwrap();
+        fs::write(
+            repo.join(".coherence/project.toml"),
+            format!("version = 1\nproject_slug = \"myproj\"\n{dolt_db_line}",),
+        )
+        .unwrap();
+    }
+
+    fn tmp_git_repo() -> TempDir {
+        let tmp = TempDir::new().unwrap();
+        fs::create_dir_all(tmp.path().join(".git")).unwrap();
+        tmp
+    }
+
+    #[test]
+    fn explicit_dolt_db_env_overrides_manifest() {
+        let _lock = LOCK.lock().unwrap();
+        let _restore = MultiEnvRestore::snapshot(&[
+            "DOLT_DB",
+            "COHERENCE_PROJECT_SLUG",
+            "COHERENCE_USE_USER_SCOPED_DOLT",
+        ]);
+        env::remove_var("COHERENCE_PROJECT_SLUG");
+        env::remove_var("COHERENCE_USE_USER_SCOPED_DOLT");
+
+        let tmp = tmp_git_repo();
+        write_manifest(tmp.path(), "dolt_db_name = \"from_manifest\"\n");
+        let nested = tmp.path().join("deep/nested");
+        fs::create_dir_all(&nested).unwrap();
+        let _cwd = SaveCwd::chdir(&nested);
+        env::set_var("DOLT_DB", "from_env");
+        let cfg = ConnectionConfig::from_env();
+        assert_eq!(cfg.database, "from_env");
+    }
+
+    #[test]
+    fn nested_cwd_resolves_manifest_database_name() {
+        let _lock = LOCK.lock().unwrap();
+        let _restore = MultiEnvRestore::snapshot(&[
+            "DOLT_DB",
+            "COHERENCE_PROJECT_SLUG",
+            "COHERENCE_USE_USER_SCOPED_DOLT",
+        ]);
+        env::remove_var("DOLT_DB");
+        env::remove_var("COHERENCE_PROJECT_SLUG");
+        env::remove_var("COHERENCE_USE_USER_SCOPED_DOLT");
+
+        let tmp = tmp_git_repo();
+        write_manifest(tmp.path(), "dolt_db_name = \"frozen_catalog_abc1\"\n");
+        let nested = tmp.path().join("deep/nested");
+        fs::create_dir_all(&nested).unwrap();
+        let _cwd = SaveCwd::chdir(&nested);
+        let cfg = ConnectionConfig::from_env();
+        assert_eq!(cfg.database, "frozen_catalog_abc1");
+    }
+
+    #[test]
+    fn from_env_sets_coherence_project_slug_from_manifest_when_unset() {
+        let _lock = LOCK.lock().unwrap();
+        let _restore = MultiEnvRestore::snapshot(&[
+            "DOLT_DB",
+            "COHERENCE_PROJECT_SLUG",
+            "COHERENCE_USE_USER_SCOPED_DOLT",
+        ]);
+        env::remove_var("DOLT_DB");
+        env::remove_var("COHERENCE_PROJECT_SLUG");
+        env::remove_var("COHERENCE_USE_USER_SCOPED_DOLT");
+
+        let tmp = tmp_git_repo();
+        write_manifest(tmp.path(), "dolt_db_name = \"x\"\n");
+        let _cwd = SaveCwd::chdir(tmp.path());
+        let _cfg = ConnectionConfig::from_env();
+        assert_eq!(env::var("COHERENCE_PROJECT_SLUG").unwrap(), "myproj");
+    }
+
+    #[test]
+    fn preflight_migrate_errors_when_user_scoped_and_manifest_without_dolt_db_name() {
+        let _lock = LOCK.lock().unwrap();
+        let _restore = MultiEnvRestore::snapshot(&[
+            "DOLT_DB",
+            "COHERENCE_PROJECT_SLUG",
+            "COHERENCE_USE_USER_SCOPED_DOLT",
+        ]);
+        env::remove_var("DOLT_DB");
+        env::remove_var("COHERENCE_PROJECT_SLUG");
+        env::set_var("COHERENCE_USE_USER_SCOPED_DOLT", "1");
+
+        let tmp = tmp_git_repo();
+        write_manifest(tmp.path(), "");
+        let _cwd = SaveCwd::chdir(tmp.path());
+        let err = preflight_user_scoped_migrate_binding().unwrap_err();
+        assert!(
+            err.contains("dolt_db_name") && err.contains("project init"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn preflight_migrate_ok_when_dolt_db_explicit_under_user_scoped() {
+        let _lock = LOCK.lock().unwrap();
+        let _restore = MultiEnvRestore::snapshot(&[
+            "DOLT_DB",
+            "COHERENCE_PROJECT_SLUG",
+            "COHERENCE_USE_USER_SCOPED_DOLT",
+        ]);
+        env::set_var("COHERENCE_USE_USER_SCOPED_DOLT", "1");
+        env::set_var("DOLT_DB", "explicit_db");
+
+        let tmp = tmp_git_repo();
+        write_manifest(tmp.path(), "");
+        let _cwd = SaveCwd::chdir(tmp.path());
+        preflight_user_scoped_migrate_binding().unwrap();
     }
 }

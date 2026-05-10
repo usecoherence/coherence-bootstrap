@@ -64,12 +64,14 @@ Normative wording lives in the **Coherence ADR pack** (`coherence-spec-beads-age
 | Variable | Role |
 |----------|------|
 | `DOLT_SOCKET` | Unix socket for CLI connections (repo-local defaults under `.dolt/`; user-scoped defaults under runtime dir — see below). |
-| `DOLT_DB` | Logical database **name** on the server (canonical project slug vs disposable `coherence_test_*` for isolation). |
+| `DOLT_DB` | Logical database **name** on the server. Resolution: non-empty `DOLT_DB` wins; else `dolt_db_name` from `.coherence/project.toml` at the git root of cwd (if present); else the cwd’s final directory segment (or `dolt`). Disposable catalogs use the `coherence_test_*` prefix under isolation (ADR-0004). |
 | `COHERENCE_DB_PROFILE` | Must be **`test`** for workspace tests and mutating smoke writes; refusal messages cite ADR-0004. |
-| `COHERENCE_PROJECT_SLUG` | Canonical catalog identity on user-scoped Dolt; when set, the guard refuses writes when resolved `DOLT_DB` matches this slug under the test profile. |
+| `COHERENCE_PROJECT_SLUG` | Canonical catalog identity on user-scoped Dolt; when set, the guard refuses writes when resolved `DOLT_DB` matches this slug under the test profile. When **unset**, `ConnectionConfig::from_env()` may set this from `project_slug` in `.coherence/project.toml` (manifest read only; no `git` subprocess) so isolation checks align with the on-disk manifest. |
 | `COHERENCE_KEEP_TEST_WORLD` | Any non-empty value preserves disposable DBs across runs and triggers **`COHERENCE_PRESERVED_TEST_WORLD`** identity logging on failure (user-scoped path); see test-world lifecycle below. |
 
 Related (optional layouts): **`COHERENCE_USE_USER_SCOPED_DOLT=1`** opts into ADR-0006 defaults; **`COHERENCE_TEST_DB_PREFIX`**, **`COHERENCE_TEST_WORLD_DB_ALLOWLIST`**, and **`COHERENCE_ISOLATED_TEST_VERBOSE`** refine isolation and logging.
+
+With **`COHERENCE_USE_USER_SCOPED_DOLT`** enabled and **without** explicit `DOLT_DB`, **`migrate`** refuses to run if `.coherence/project.toml` exists but `dolt_db_name` is still unset (run **`project init`** or set `DOLT_DB` manually) so migrations never target an accidental default catalog name.
 
 ## Canonical repository database policy (ADR-0004)
 
@@ -89,7 +91,7 @@ The Dolt catalog configured for this checkout (paths and env from `make tool hel
 
 With **`COHERENCE_USE_USER_SCOPED_DOLT=1`**, `make tool dolt-start` runs **one** `dolt sql-server` backed by a user-wide **`--data-dir`** (default **`${XDG_DATA_HOME:-$HOME/.local/share}/coherence/db`**). Private launcher state (pid, log, internal TCP port hint) lives under **`${COHERENCE_DOLT_RUNTIME_DIR:-$XDG_RUNTIME_DIR/coherence}`**, falling back to **`$HOME/.cache/coherence/run`** when **`XDG_RUNTIME_DIR`** is unset. The Unix listener defaults to **`<runtime-dir>/dolt.sock`** (override **`DOLT_SOCKET`**).
 
-Operators select the logical catalog with **`DOLT_DB=<project_slug>`**. **`ConnectionConfig::from_env()`** applies matching defaults when **`COHERENCE_USE_USER_SCOPED_DOLT`** is set (socket path above + internal TCP port **33306** for Refinery unless **`DOLT_PORT`** / **`COHERENCE_DOLT_TCP_PORT`** override). CLI connections still prefer **`DOLT_SOCKET`**; TCP remains an implementation detail for embedded migrations.
+Operators select the logical catalog with **`DOLT_DB`** (or rely on **`dolt_db_name`** from `.coherence/project.toml` when `DOLT_DB` is unset — see the env table above). **`ConnectionConfig::from_env()`** applies matching defaults when **`COHERENCE_USE_USER_SCOPED_DOLT`** is set (socket path above + internal TCP port **33306** for Refinery unless **`DOLT_PORT`** / **`COHERENCE_DOLT_TCP_PORT`** override). CLI connections still prefer **`DOLT_SOCKET`**; TCP remains an implementation detail for embedded migrations.
 
 **Repo-local `.dolt`** remains the default when **`COHERENCE_USE_USER_SCOPED_DOLT`** is unset (disposable CI/agent setups).
 
