@@ -1,0 +1,34 @@
+COREDB-15 / COREDB-23m — SQLx vs TinyORM vs manual mysql repos (spike decision)
+
+Scope: evaluation only. No production adoption of SQLx or TinyORM in M1.
+
+Current approach (baseline)
+- Crate: `mysql` + `refinery` (refinery feature `mysql`).
+- Repos: hand-written SQL (`exec_drop`, `exec_first`, `query`) and tuple/row mappers in `spec_store.rs` (~430 LOC) and `ac_code_link_store.rs` (~375 LOC), ~800 LOC total for M1 persistence.
+- Migrations stay in `sql/modules/…` and are owned by Coherence; an ORM/query toolkit does not replace that.
+
+SQLx (mysql)
+- Pros: async-first ecosystem, optional compile-time checked queries (`query!`) when a DB (or `SQLX_OFFLINE`/prepare data) is available; strong typing story for mapped rows; large community.
+- Cons: adoption means new connection/pool API, error types, and often async ergonomics across the CLI; compile-time checking adds CI or developer setup cost; would be a cross-cutting change vs incremental M1 work.
+- Dolt: speaks the MySQL wire/protocol; SQLx `MySql` driver is expected to work the same in practice as the existing `mysql` crate for typical CRUD (parity still needs integration tests if adopted later).
+
+TinyORM (`tiny-orm` on crates.io)
+- Built on SQLx; macro/derive CRUD helpers for simple tables.
+- Cons for this repo today: MSRV on recent releases is **1.80+**; workspace `rust-version` is **1.76**, so TinyORM is not a drop-in without raising MSRV. Adds another abstraction on top of SQLx with smaller ecosystem surface than, e.g., SeaORM—still not “free” when joins/upserts/custom SQL dominate (as in current `ON DUPLICATE KEY UPDATE` patterns).
+- Recommendation: not a first step; if we ever move to SQLx, compare derive-CRUD helpers vs plain SQLx + mappers for these tables before adopting TinyORM specifically.
+
+Migration impact
+- **Refinery**: unchanged either way; only the application query layer would change.
+- **Risk**: rewriting both stores to SQLx is a large mechanical + behavioral regression-testing effort, not justified while M1 boundaries and schemas are still settling.
+
+Explicit recommendation
+1. **Stay manual** with `mysql` + explicit SQL for M1 and near-term core-db work.
+2. **Defer SQLx** until there is a concrete driver (e.g. need async, stronger row typing at scale, or team standardization)—then pilot on **one module** behind the same Dolt/MySQL config.
+3. **Do not adopt TinyORM** as the next step; it implies SQLx + MSRV bump and does not solve upsert-heavy, join-heavy patterns without falling back to raw SQL anyway.
+
+Revisit criteria
+- Reopen ORM/SQLx when: MSRV can move to ≥1.80 if TinyORM is ever in play; schema churn slows; or integration/async requirements push off the sync `mysql` `Conn` API.
+- Likely follow-up task shape (file when ready): e.g. “Pilot `sqlx` + `mysql` against local Dolt for `codeintel` store only” with parity tests and no migration runner changes.
+
+Verification
+- This note is the deliverable; no code spike in-tree. Repo health: `make tool run`.
