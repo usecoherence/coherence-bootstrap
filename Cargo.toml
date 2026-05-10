@@ -16,3 +16,6 @@ all = "warn"
 pedantic = "warn"
 unwrap_used = "warn"
 expect_used = "warn"
+
+[workspace.dependencies]
+toml = "0.8.19"
