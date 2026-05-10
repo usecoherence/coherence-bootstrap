@@ -9,6 +9,7 @@ fn help_prints_workflow_entrypoint() {
     assert!(stdout.contains("make tool help"));
     assert!(stdout.contains("verify-ac"));
     assert!(stdout.contains("verify-spec"));
+    assert!(stdout.contains("ac-tests"));
     assert!(stdout.contains("evidence-sample"));
     assert!(
         stdout.contains("COHERENCE_DB_PROFILE=test"),

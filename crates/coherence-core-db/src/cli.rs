@@ -15,6 +15,7 @@ pub fn run(args: Vec<String>) -> i32 {
         "m1-spec-smoke" => commands::m1_spec_smoke::run(),
         "spec" => commands::spec_cmd::run(&args[2..]),
         "ac" => commands::ac_cmd::run(&args[2..]),
+        "ac-tests" => commands::ac_tests_cmd::run(&args[2..]),
         "verify-ac" => commands::verify_ac_cmd::run(&args[2..]),
         "verify-spec" => commands::verify_spec_cmd::run(&args[2..]),
         "evidence-sample" => commands::evidence_sample_cmd::run(&args[2..]),
@@ -43,6 +44,7 @@ fn print_help() {
            m1-spec-smoke  Run M1 spec store smoke (Spec / AC / SpecRelation)\n\
            spec           Manage spec records (add, list, show)\n\
            ac             Manage acceptance criteria (add, list, show); each AC has a per-spec slug (default from id)\n\
+           ac-tests       AC test file helpers (materialize-rust: create missing tests/ac/*.rs from DB graph)\n\
            verify-ac      Run verified_by linked test commands for one AC\n\
            verify-spec    Aggregate verify-ac across all ACs for one spec\n\
            evidence-sample  Create a demo run under .coherence/runs/<run-id>/ (ADR-0005 skeleton)\n\

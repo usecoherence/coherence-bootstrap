@@ -1,4 +1,5 @@
 pub mod ac_cmd;
+pub mod ac_tests_cmd;
 pub mod cli_parse;
 pub mod db_ping;
 pub mod doctor;

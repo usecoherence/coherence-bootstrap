@@ -97,6 +97,8 @@ Verification helper: **`./scripts/user-scoped-dolt-smoke.sh`** (isolated **`/tmp
 
 Interactive commands that **curate** the database (`migrate`, `spec add`, `ac add`, …) are for intentional work on the canonical catalog and are not gated by the test-world profile—the guard applies to automated tests and mutating smoke only.
 
+- `ac-tests materialize-rust` loads the spec graph using normal `DOLT_SOCKET` / `DOLT_DB` (and runs migrations like `spec list` so the schema is current). It only creates **missing** files under `<workspace>/tests/ac/` and never overwrites. **`COHERENCE_DB_PROFILE=test` is not required**: the command does not invoke the isolated test-world guard (no smoke/test writes to the catalog); filesystem output stays under `tests/ac/` by construction.
+
 ## Per-run evidence (ADR-0005)
 
 Managed **verification and adapter-runtime evidence** is stored **outside** canonical Dolt rows: primarily under **`.coherence/runs/<run-id>/`** (artifacts, metadata JSON, content hashes). The canonical catalog may later hold **pointers** to evidence, not large stdout blobs or raw payloads in spec tables. CLI exploration: `evidence-sample`; implementation: `evidence_store` / `ac_verify` in the Rust crate. See ADR-0005 in the ADR pack for the full contract.
@@ -126,6 +128,7 @@ Implemented **command flow** (names match CLI—subcommands spelled as users typ
 4. Populate **code locations** and AC↔code **links** (e.g. `verified_by`) via the **`codeintel_repo`** APIs in Rust (`put_code_location`, `put_ac_code_link`). There is **no** dedicated `coherence-core-db …` CLI subcommand for these writes yet; smoke/tests use the APIs directly.
 5. `verify-ac <AC_ID>` — run linked shell commands for that AC (`sh -c` on `test_command` from eligible links).
 6. `verify-spec <SPEC_ID>` — aggregate `verify-ac` across every AC belonging to that spec.
+7. `ac-tests materialize-rust` — create missing Rust `todo!` skeletons under `tests/ac/...` from the live DB graph (`--workspace` optional; default: current dir or nearest ancestor with `AGENTS.md`).
 
 **Explicit non-goals for M1**: full SCIP/code intelligence ingestion; exporting human docs from specs (`docs/` generation is not wired here yet); Temporal or other external orchestrators; artifact/file stores; arbitrary graph query UX; finalized “spec CLI” product ergonomics—these are deliberately not required to recognize value from the DB + verification loop above.
 
