@@ -6,8 +6,8 @@ use mysql::prelude::Queryable;
 use mysql::{params, Conn};
 
 use crate::models::{
-    AcceptanceCriterion, ConcernKind, ReviewMode, RiskLevel, Spec, SpecLevel, SpecRelation,
-    SpecStatus,
+    AcceptanceCriterion, ConcernKind, ReviewMode, RiskLevel, Spec, SpecGraph, SpecLevel,
+    SpecRelation, SpecStatus,
 };
 
 pub fn put_spec(conn: &mut Conn, spec: &Spec) -> Result<(), String> {
@@ -93,6 +93,59 @@ pub fn list_specs(conn: &mut Conn) -> Result<Vec<Spec>, String> {
         )
         .map_err(|err| format!("failed to list specs: {err}"))?;
     rows.into_iter().map(spec_from_row).collect()
+}
+
+/// Loads every row from `specs`, `acceptance_criteria`, and `spec_relations` (three full-table
+/// scans). See [`SpecGraph`] for MVP semantics (no integrity checks; AC concerns not populated).
+#[allow(dead_code)] // Public bulk loader for embedders (COREDB-xah).
+pub fn load_spec_graph(conn: &mut Conn) -> Result<SpecGraph, String> {
+    let specs = list_specs(conn)?;
+
+    let ac_rows: Vec<(
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+    )> = conn
+        .query(
+            r"SELECT id, spec_id, slug, title, intent, review_mode, risk_level, created_at, updated_at
+              FROM acceptance_criteria
+              ORDER BY id",
+        )
+        .map_err(|err| format!("failed to list acceptance criteria for spec graph: {err}"))?;
+
+    let mut acceptance_criteria = Vec::with_capacity(ac_rows.len());
+    for row in ac_rows {
+        acceptance_criteria.push(acceptance_criterion_from_row(row)?);
+    }
+
+    let relation_rows: Vec<(String, String, String, String, String)> = conn
+        .query(
+            r"SELECT id, source_spec_id, target_spec_id, relation_kind, note
+              FROM spec_relations
+              ORDER BY id",
+        )
+        .map_err(|err| format!("failed to list spec relations for spec graph: {err}"))?;
+
+    let spec_relations = relation_rows
+        .into_iter()
+        .map(
+            |(id, source_spec_id, target_spec_id, relation_kind, note)| SpecRelation {
+                id,
+                source_spec_id,
+                target_spec_id,
+                relation_kind,
+                note,
+            },
+        )
+        .collect();
+
+    Ok(SpecGraph::new(specs, acceptance_criteria, spec_relations))
 }
 
 pub fn put_acceptance_criterion(conn: &mut Conn, ac: &AcceptanceCriterion) -> Result<(), String> {
@@ -527,5 +580,60 @@ mod tests {
         let relations = spec_store::list_spec_relations_for_spec(&mut conn, "SPEC-STORE-1")
             .expect("list relations");
         assert!(relations.iter().any(|item| item.id == "REL-STORE-1"));
+    }
+
+    #[test]
+    fn load_spec_graph_sees_specs_acs_and_relations_including_slug() {
+        let Some(mut conn) = maybe_conn() else {
+            return;
+        };
+
+        let mut spec_a = Spec::new("SPEC-GRAPH-A", "graph a");
+        spec_a.description = "ga".to_string();
+        spec_a.created_at = "t1".to_string();
+        spec_a.updated_at = "t1".to_string();
+        spec_store::put_spec(&mut conn, &spec_a).expect("put_spec a");
+
+        let mut spec_b = Spec::new("SPEC-GRAPH-B", "graph b");
+        spec_b.description = "gb".to_string();
+        spec_b.created_at = "t1".to_string();
+        spec_b.updated_at = "t1".to_string();
+        spec_store::put_spec(&mut conn, &spec_b).expect("put_spec b");
+
+        let mut ac = AcceptanceCriterion::new("AC-GRAPH-1", "SPEC-GRAPH-A", "ac");
+        ac.slug = "layout-slug".to_string();
+        ac.intent = "i".to_string();
+        ac.created_at = "t1".to_string();
+        ac.updated_at = "t1".to_string();
+        spec_store::put_acceptance_criterion(&mut conn, &ac).expect("put_ac");
+
+        let relation = SpecRelation::new(
+            "REL-GRAPH-1",
+            "SPEC-GRAPH-A",
+            "SPEC-GRAPH-B",
+            "depends_on",
+            "note",
+        );
+        spec_store::put_spec_relation(&mut conn, &relation).expect("put_spec_relation");
+
+        let graph = spec_store::load_spec_graph(&mut conn).expect("load_spec_graph");
+        assert!(
+            graph.specs.iter().any(|s| s.id == "SPEC-GRAPH-A"),
+            "spec A present"
+        );
+        let ac_loaded = graph
+            .acceptance_criteria
+            .iter()
+            .find(|row| row.id == "AC-GRAPH-1")
+            .expect("ac in graph");
+        assert_eq!(ac_loaded.slug, "layout-slug");
+        assert!(
+            ac_loaded.concerns.is_empty(),
+            "MVP load_spec_graph leaves concerns empty"
+        );
+        assert!(
+            graph.spec_relations.iter().any(|r| r.id == "REL-GRAPH-1"),
+            "relation in graph"
+        );
     }
 }

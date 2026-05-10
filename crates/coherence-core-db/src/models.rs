@@ -246,6 +246,37 @@ impl SpecRelation {
     }
 }
 
+/// Full spec-module row snapshot for layout tooling and other bulk consumers.
+///
+/// **MVP:** [`crate::spec_store::load_spec_graph`] does not validate graph consistency (orphan
+/// [`SpecRelation`] rows, missing specs on edges, dangling [`AcceptanceCriterion::spec_id`], etc.).
+/// **`AcceptanceCriterion.concerns`** are left empty in this snapshot path (three-table load only);
+/// use [`crate::spec_store::get_acceptance_criterion`] or
+/// [`crate::spec_store::list_acceptance_criteria_for_spec`] when concern rows matter.
+#[allow(dead_code)] // Bulk snapshot surface for embedders / layout tooling (not CLI-wired yet).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SpecGraph {
+    pub specs: Vec<Spec>,
+    pub acceptance_criteria: Vec<AcceptanceCriterion>,
+    pub spec_relations: Vec<SpecRelation>,
+}
+
+#[allow(dead_code)]
+impl SpecGraph {
+    #[must_use]
+    pub fn new(
+        specs: Vec<Spec>,
+        acceptance_criteria: Vec<AcceptanceCriterion>,
+        spec_relations: Vec<SpecRelation>,
+    ) -> Self {
+        Self {
+            specs,
+            acceptance_criteria,
+            spec_relations,
+        }
+    }
+}
+
 pub(crate) fn slug_from_id(id: &str) -> String {
     id.to_ascii_lowercase().replace('_', "-")
 }
@@ -380,8 +411,8 @@ pub struct AcCodeLinkWithLocation {
 #[cfg(test)]
 mod tests {
     use super::{
-        AcceptanceCriterion, ConcernKind, ReviewMode, RiskLevel, Spec, SpecLevel, SpecRelation,
-        SpecStatus,
+        AcceptanceCriterion, ConcernKind, ReviewMode, RiskLevel, Spec, SpecGraph, SpecLevel,
+        SpecRelation, SpecStatus,
     };
 
     #[test]
@@ -439,5 +470,25 @@ mod tests {
         assert_eq!(relation.target_spec_id, "SPEC-2");
         assert_eq!(relation.relation_kind, "depends_on");
         assert_eq!(relation.note, "spec 1 depends on spec 2");
+    }
+
+    #[test]
+    fn spec_graph_new_holds_vectors() {
+        let specs = vec![Spec::new("SPEC-A", "a"), Spec::new("SPEC-B", "b")];
+        let acs = vec![
+            AcceptanceCriterion::new("AC-1", "SPEC-A", "ac"),
+            AcceptanceCriterion::new("AC-2", "SPEC-B", "ac2"),
+        ];
+        let rels = vec![SpecRelation::new(
+            "REL-1",
+            "SPEC-A",
+            "SPEC-B",
+            "depends_on",
+            "",
+        )];
+        let g = SpecGraph::new(specs.clone(), acs.clone(), rels.clone());
+        assert_eq!(g.specs, specs);
+        assert_eq!(g.acceptance_criteria, acs);
+        assert_eq!(g.spec_relations, rels);
     }
 }
