@@ -4,6 +4,8 @@
 //! ownership — do not duplicate that essay here; module comments summarize slice boundaries only.
 //!
 mod ac_code_link_store;
+#[allow(dead_code)] // MVP layout API for `expected_rust_ac_test_files` (CLI not wired yet).
+mod ac_test_layout;
 mod ac_verify;
 mod cli;
 mod commands;

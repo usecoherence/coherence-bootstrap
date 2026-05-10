@@ -186,15 +186,92 @@ pub fn panic_unless_isolated_test_world_for_writes(context: &str, config: &Conne
     }
 }
 
+/// Serialize `std::env` access for unit tests: [`lock_test_env`] must bracket guard scenarios and
+/// any test that reads [`ConnectionConfig::from_env`] against a real Dolt catalog.
+#[cfg(test)]
+static TEST_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// Hold for the duration of any test that calls [`ConnectionConfig::from_env`] against a real Dolt
+/// target so guard tests cannot transient `remove_var`/`set_var` between load and connect.
+#[cfg(test)]
+pub(crate) fn lock_test_env() -> std::sync::MutexGuard<'static, ()> {
+    TEST_ENV_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+#[cfg(test)]
+pub(crate) struct EnvConnLock<T> {
+    pub(crate) _lock: std::sync::MutexGuard<'static, ()>,
+    pub(crate) inner: T,
+}
+
+#[cfg(test)]
+impl<T> std::ops::Deref for EnvConnLock<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+#[cfg(test)]
+impl<T> std::ops::DerefMut for EnvConnLock<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::expect_used, clippy::unwrap_used)]
 
     use super::*;
     use std::path::PathBuf;
-    use std::sync::Mutex;
 
-    static ENV_LOCK: Mutex<()> = Mutex::new(());
+    /// Keys touched by [`clear_guard_env`] or guard scenarios that must be restored so parallel
+    /// workspace tests see the `with-isolated-test-profile` session again after each guard case.
+    const SNAPSHOT_KEYS: &[&str] = &[
+        PROFILE_ENV_VAR,
+        PROJECT_SLUG_ENV_VAR,
+        TEST_WORLD_ALLOWLIST_ENV_VAR,
+        TEST_WORLD_EXPECTED_DB_ENV_VAR,
+        "COHERENCE_TEST_DB_PREFIX",
+        "DOLT_DB",
+        "COHERENCE_USE_USER_SCOPED_DOLT",
+        "DOLT_SOCKET",
+        "DOLT_HOST",
+        "DOLT_PORT",
+        "COHERENCE_DOLT_TCP_PORT",
+        "DOLT_USER",
+        "DOLT_PASSWORD",
+        "COHERENCE_DOLT_RUNTIME_DIR",
+    ];
+
+    struct SavedTestEnv {
+        pairs: Vec<(String, Option<String>)>,
+    }
+
+    impl SavedTestEnv {
+        fn snapshot(keys: &[&str]) -> Self {
+            let pairs = keys
+                .iter()
+                .map(|k| (k.to_string(), env::var(k).ok()))
+                .collect();
+            Self { pairs }
+        }
+    }
+
+    impl Drop for SavedTestEnv {
+        fn drop(&mut self) {
+            for (k, v) in &self.pairs {
+                match v {
+                    Some(val) => env::set_var(k, val),
+                    None => env::remove_var(k),
+                }
+            }
+        }
+    }
 
     fn dummy_config(database: impl Into<String>) -> ConnectionConfig {
         ConnectionConfig {
@@ -219,7 +296,8 @@ mod tests {
 
     #[test]
     fn refusal_includes_stable_next_targets_when_unset() {
-        let _g = ENV_LOCK.lock().unwrap();
+        let _lock = lock_test_env();
+        let _restore = SavedTestEnv::snapshot(SNAPSHOT_KEYS);
         clear_guard_env();
         let config = dummy_config("irrelevant");
         let msg = require_isolated_test_world_for_writes("test_ctx", &config).unwrap_err();
@@ -240,7 +318,8 @@ mod tests {
 
     #[test]
     fn ok_when_profile_test_and_disposable_db() {
-        let _g = ENV_LOCK.lock().unwrap();
+        let _lock = lock_test_env();
+        let _restore = SavedTestEnv::snapshot(SNAPSHOT_KEYS);
         clear_guard_env();
         env::set_var(PROFILE_ENV_VAR, "test");
         env::set_var("COHERENCE_USE_USER_SCOPED_DOLT", "1");
@@ -251,7 +330,8 @@ mod tests {
 
     #[test]
     fn ok_repo_local_catalog_name_when_user_scoped_dolt_disabled() {
-        let _g = ENV_LOCK.lock().unwrap();
+        let _lock = lock_test_env();
+        let _restore = SavedTestEnv::snapshot(SNAPSHOT_KEYS);
         clear_guard_env();
         env::set_var(PROFILE_ENV_VAR, "test");
         let config = dummy_config("coherence-core-db");
@@ -260,7 +340,8 @@ mod tests {
 
     #[test]
     fn refusal_when_profile_non_test() {
-        let _g = ENV_LOCK.lock().unwrap();
+        let _lock = lock_test_env();
+        let _restore = SavedTestEnv::snapshot(SNAPSHOT_KEYS);
         clear_guard_env();
         env::set_var(PROFILE_ENV_VAR, "canonical");
         let config = dummy_config("coherence_test_x");
@@ -270,7 +351,8 @@ mod tests {
 
     #[test]
     fn refuse_when_slug_set_and_database_equals_canonical_even_if_profile_test() {
-        let _g = ENV_LOCK.lock().unwrap();
+        let _lock = lock_test_env();
+        let _restore = SavedTestEnv::snapshot(SNAPSHOT_KEYS);
         clear_guard_env();
         env::set_var("COHERENCE_USE_USER_SCOPED_DOLT", "1");
         env::set_var(PROFILE_ENV_VAR, "test");
@@ -289,7 +371,8 @@ mod tests {
 
     #[test]
     fn allow_when_slug_set_but_database_differs_even_without_prefix() {
-        let _g = ENV_LOCK.lock().unwrap();
+        let _lock = lock_test_env();
+        let _restore = SavedTestEnv::snapshot(SNAPSHOT_KEYS);
         clear_guard_env();
         env::set_var("COHERENCE_USE_USER_SCOPED_DOLT", "1");
         env::set_var(PROFILE_ENV_VAR, "test");
@@ -300,7 +383,8 @@ mod tests {
 
     #[test]
     fn refuse_when_slug_unset_and_db_not_disposable() {
-        let _g = ENV_LOCK.lock().unwrap();
+        let _lock = lock_test_env();
+        let _restore = SavedTestEnv::snapshot(SNAPSHOT_KEYS);
         clear_guard_env();
         env::set_var("COHERENCE_USE_USER_SCOPED_DOLT", "1");
         env::set_var(PROFILE_ENV_VAR, "test");
@@ -314,7 +398,8 @@ mod tests {
 
     #[test]
     fn allow_via_allowlist_when_slug_unset() {
-        let _g = ENV_LOCK.lock().unwrap();
+        let _lock = lock_test_env();
+        let _restore = SavedTestEnv::snapshot(SNAPSHOT_KEYS);
         clear_guard_env();
         env::set_var("COHERENCE_USE_USER_SCOPED_DOLT", "1");
         env::set_var(PROFILE_ENV_VAR, "test");
@@ -325,7 +410,8 @@ mod tests {
 
     #[test]
     fn coherence_test_world_mismatch_errors() {
-        let _g = ENV_LOCK.lock().unwrap();
+        let _lock = lock_test_env();
+        let _restore = SavedTestEnv::snapshot(SNAPSHOT_KEYS);
         clear_guard_env();
         env::set_var(PROFILE_ENV_VAR, "test");
         env::set_var(TEST_WORLD_EXPECTED_DB_ENV_VAR, "coherence_test_expected");

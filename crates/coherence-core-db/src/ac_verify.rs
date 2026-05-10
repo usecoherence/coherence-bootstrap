@@ -337,11 +337,16 @@ mod tests {
     use crate::spec_store;
     use crate::test_world_guard;
 
-    fn maybe_conn() -> Option<Conn> {
+    fn maybe_conn() -> Option<test_world_guard::EnvConnLock<Conn>> {
+        let lock = test_world_guard::lock_test_env();
         let config = ConnectionConfig::from_env();
         test_world_guard::panic_unless_isolated_test_world_for_writes("ac_verify::tests", &config);
-        let _ = migrations::apply_all(&config).ok()?;
-        db::connect(&config).ok().map(|(conn, _)| conn)
+        migrations::apply_all(&config).ok()?;
+        let (conn, _) = db::connect(&config).ok()?;
+        Some(test_world_guard::EnvConnLock {
+            _lock: lock,
+            inner: conn,
+        })
     }
 
     fn unique_label(prefix: &str) -> String {
