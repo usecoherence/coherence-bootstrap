@@ -11,6 +11,7 @@ if [ "$#" -eq 0 ]; then
   echo "  workflow backend: local_stub"
   echo "  orchestration owner: external"
   echo "  event/signal hooks: NOT_IMPLEMENTED"
+  echo "  canonical DB policy: curated Dolt catalog — tests/smoke require COHERENCE_DB_PROFILE=test (AGENTS.md, coherence-core-db help)"
   exit 0
 fi
 

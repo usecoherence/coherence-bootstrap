@@ -31,6 +31,13 @@ Dolt:
   make tool dolt-stop
   make tool migrate
 
+Canonical repository database policy (ADR-0004):
+  this checkout's Dolt catalog is curated reasoning state — do not mutate it from tests
+  workspace tests require COHERENCE_DB_PROFILE=test and a disposable Dolt target (make test-isolated, make tool run)
+  mutating smoke (writes fixtures) uses the same profile — use make smoke from repo root, not raw m*-smoke without env
+  optional teardown of a disposable catalog: make tool dolt-stop then make test-world-reset (omit reset after a failure if you need forensics)
+  full operator lifecycle: AGENTS.md
+
 Coherence DB ownership:
   one repository = one local Coherence DB
   preferred local socket: .dolt/dolt.sock

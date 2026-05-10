@@ -46,6 +46,22 @@ The goal is to reduce boilerplate and keep every Coherence CLI tool homogeneous:
 - Do not mix `CGC-RUST-*` proposals into local beads backlog (`bd list` scope).
 - Do not implement upstream proposals here unless the same change is required locally.
 
+## Canonical repository database policy (ADR-0004)
+
+The Dolt catalog configured for this checkout (paths and env from `make tool help` / Dolt targets) holds **curated reasoning state**. Treat it as the canonical record for human-driven work, not as a throwaway fixture store.
+
+**Tests and mutating smoke never write that catalog unless an isolated profile is active.** Workspace `cargo test` and commands such as `m0-smoke` / `m1-spec-smoke` require `COHERENCE_DB_PROFILE=test` and a **disposable** Dolt target (`DOLT_*` pointing at data you may discard). Curated canonical data must not receive those writes. Day-to-day entry points that enforce this: `make tool run`, `make test-isolated`, `make smoke`. If a guard refuses work, follow the printed **Cause**, **Next targets**, and **Fix** lines—they match `scripts/test-world-reset` and the Rust guard for consistency.
+
+### Test-world lifecycle (operators)
+
+1. **Create / start**: bring up repo-local Dolt (`make tool dolt-start`) or configure TCP/socket env for your disposable catalog.
+2. **Migrate**: run `make tool migrate` when preparing a catalog for normal use; smoke targets also apply migrations against the configured target.
+3. **Run**: execute `make tool run`, `make test-isolated`, or `make smoke` so the isolated profile wraps mutating workflows.
+4. **Destroy**: `make tool dolt-stop` then `make test-world-reset` removes the repository’s `.dolt` directory when you intend to discard disposable state.
+5. **Keep-on-fail**: after a failed test or smoke run, skip `make test-world-reset` if you need to inspect tables, logs, or socket paths; wipe when finished.
+
+Interactive commands that **curate** the database (`migrate`, `spec add`, `ac add`, …) are for intentional work on the canonical catalog and are not gated by the test-world profile—the guard applies to automated tests and mutating smoke only.
+
 ## M1 module ownership (one physical DB, two logical slices)
 
 Scope here is documentation for the Milestone‑1 slice in this CLI: persisted specs/criteria/codeintel linkage and deterministic shell verification—not beads/deliverables/workflow backends, Temporal, docs export, or “full SCIP”.

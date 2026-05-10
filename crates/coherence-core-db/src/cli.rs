@@ -41,6 +41,11 @@ fn print_help() {
            verify-ac      Run verified_by linked test commands for one AC\n\
            verify-spec    Aggregate verify-ac across all ACs for one spec\n\
            version        Print version\n\n\
+         Canonical repository database:\n\
+           Curated reasoning state lives in this checkout's Dolt catalog. Workspace tests never write it:\n\
+           they require COHERENCE_DB_PROFILE=test and a disposable Dolt target.\n\
+           Mutating smoke (m0-smoke / m1-spec-smoke) uses the same rule — prefer `make smoke` from repo root.\n\
+           Details: AGENTS.md (canonical DB policy / test-world lifecycle).\n\n\
          Repository workflow:\n\
            make tool help\n\
            make tool doctor\n\
