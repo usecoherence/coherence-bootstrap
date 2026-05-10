@@ -73,6 +73,20 @@ Related (optional layouts): **`COHERENCE_USE_USER_SCOPED_DOLT=1`** opts into ADR
 
 With **`COHERENCE_USE_USER_SCOPED_DOLT`** enabled and **without** explicit `DOLT_DB`, **`migrate`** refuses to run if `.coherence/project.toml` exists but `dolt_db_name` is still unset (run **`project init`** or set `DOLT_DB` manually) so migrations never target an accidental default catalog name.
 
+### Project identity and manifest lifecycle
+
+The catalog name the CLI resolves when **`DOLT_DB`** is unset is anchored on a small manifest at **`<git-worktree-root>/.coherence/project.toml`**. Typical operator flow:
+
+1. **Establish `project_slug` first.** Create **`.coherence/project.toml`** under the Git work tree root with **`project_slug`** set (letters, digits, underscores; meaning is yours). Alternatively, run **`coherence-core-db project init --slug …`** once in the repo root so the tool creates an initial manifest with **`version`** and **`project_slug`**.
+
+2. **Freeze `dolt_db_name`.** Run **`coherence-core-db project init`** from any directory inside that work tree. The command resolves the Git root, refuses if **`project_slug`** is missing or empty, and writes **`dolt_db_name`** and **`frozen_git_toplevel`** once (use **`--force-rebind`** only when you deliberately want a new name; orphan data risk). Until this step succeeds, manifests may omit **`dolt_db_name`**; user-scoped migrate then blocks as described above.
+
+3. **Connect without exporting env.** Leave **`DOLT_DB`** unset: **`ConnectionConfig::from_env()`** chooses **`dolt_db_name`** from the manifest at the cwd’s Git root when the file parses and the field is present; otherwise it falls back to the current directory basename (or **`dolt`**).
+
+4. **Override when needed.** Any **non-empty** **`DOLT_DB`** in the environment wins over the manifest; use this for disposable test catalogs, CI, or ad-hoc attaches. **`coherence-core-db doctor`** prints whether that override is active plus manifest presence and the resolved **`dolt_db_name_manifest`** line.
+
+Optional **user-scoped** **`dolt sql-server`** (ADR-0006 summary above) combines with the same manifest: logical database names remain separate **`DATABASE`** identifiers on one server instance; **`DOLT_DB`** selects which catalog to use.
+
 ## Canonical repository database policy (ADR-0004)
 
 The Dolt catalog configured for this checkout (paths and env from `make tool help` / Dolt targets) holds **curated reasoning state**. Treat it as the canonical record for human-driven work, not as a throwaway fixture store.

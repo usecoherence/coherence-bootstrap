@@ -37,6 +37,14 @@ fn help_prints_workflow_entrypoint() {
         stdout.contains("project"),
         "help should list project command: {stdout}"
     );
+    assert!(
+        stdout.contains("project init"),
+        "help should describe project init: {stdout}"
+    );
+    assert!(
+        stdout.contains("Project identity and manifest lifecycle"),
+        "help should point at AGENTS.md subsection: {stdout}"
+    );
 }
 
 #[test]
@@ -61,6 +69,14 @@ fn doctor_reports_local_stub_backend() {
     assert!(
         stdout.contains("COHERENCE_DB_PROFILE=test"),
         "doctor should name isolated profile env: {stdout}"
+    );
+    assert!(
+        stdout.contains("git_root_found:")
+            && stdout.contains("manifest_present:")
+            && stdout.contains("manifest_path:")
+            && stdout.contains("dolt_db_name_manifest:")
+            && stdout.contains("env_DOLT_DB_override_active:"),
+        "doctor should report manifest snapshot lines: {stdout}"
     );
 }
 
