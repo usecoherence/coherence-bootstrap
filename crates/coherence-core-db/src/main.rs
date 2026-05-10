@@ -8,6 +8,7 @@ mod ac_verify;
 mod cli;
 mod commands;
 mod db;
+mod evidence_store;
 mod migrations;
 mod models;
 mod spec_store;

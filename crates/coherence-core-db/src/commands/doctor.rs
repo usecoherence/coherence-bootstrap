@@ -6,5 +6,8 @@ pub fn run() -> i32 {
     println!(
         "canonical_db_policy: curated catalog only for reasoning state — tests/smoke refuse writes unless COHERENCE_DB_PROFILE=test (see coherence-core-db help, AGENTS.md)"
     );
+    println!(
+        "managed_evidence: ADR-0005 per-run files under workspace .coherence/runs/<run-id>/ — demo: coherence-core-db evidence-sample"
+    );
     0
 }

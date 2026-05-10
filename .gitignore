@@ -2,6 +2,8 @@
 # Local cursor_agent_coredb_loop.sh evidence (timestamped rounds)
 /.agent-runs/
 /.coherence/run/
+# Managed per-run evidence (ADR-0005); local / disposable — do not commit large artifacts
+/.coherence/runs/
 /.coherence/review/
 /.dolt/run/
 .DS_Store

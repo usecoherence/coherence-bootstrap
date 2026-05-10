@@ -9,6 +9,7 @@ fn help_prints_workflow_entrypoint() {
     assert!(stdout.contains("make tool help"));
     assert!(stdout.contains("verify-ac"));
     assert!(stdout.contains("verify-spec"));
+    assert!(stdout.contains("evidence-sample"));
     assert!(
         stdout.contains("COHERENCE_DB_PROFILE=test"),
         "help should describe isolated profile policy: {stdout}"
@@ -33,6 +34,10 @@ fn doctor_reports_local_stub_backend() {
     assert!(
         stdout.contains("canonical_db_policy"),
         "doctor should surface canonical DB policy: {stdout}"
+    );
+    assert!(
+        stdout.contains("managed_evidence"),
+        "doctor should mention managed evidence (ADR-0005): {stdout}"
     );
     assert!(
         stdout.contains("COHERENCE_DB_PROFILE=test"),

@@ -15,6 +15,7 @@ pub fn run(args: Vec<String>) -> i32 {
         "ac" => commands::ac_cmd::run(&args[2..]),
         "verify-ac" => commands::verify_ac_cmd::run(&args[2..]),
         "verify-spec" => commands::verify_spec_cmd::run(&args[2..]),
+        "evidence-sample" => commands::evidence_sample_cmd::run(&args[2..]),
         "version" | "--version" | "-V" => {
             println!("coherence-core-db 0.1.0");
             0
@@ -40,6 +41,7 @@ fn print_help() {
            ac             Manage acceptance criteria (add, list)\n\
            verify-ac      Run verified_by linked test commands for one AC\n\
            verify-spec    Aggregate verify-ac across all ACs for one spec\n\
+           evidence-sample  Create a demo run under .coherence/runs/<run-id>/ (ADR-0005 skeleton)\n\
            version        Print version\n\n\
          Canonical repository database:\n\
            Curated reasoning state lives in this checkout's Dolt catalog. Workspace tests never write it:\n\
