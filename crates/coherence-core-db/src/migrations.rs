@@ -28,9 +28,8 @@ const CODEINTEL_MIGRATION_TABLE: &str = "refinery_schema_history_codeintel";
 pub fn apply_all(config: &ConnectionConfig) -> Result<usize, String> {
     crate::db::ensure_project_database(config)?;
 
-    let (mut conn, _mode) = crate::db::connect(config).map_err(|e| {
-        format!("failed to open database connection for migrations: {e}")
-    })?;
+    let (mut conn, _mode) = crate::db::connect(config)
+        .map_err(|e| format!("failed to open database connection for migrations: {e}"))?;
 
     let report_spec = spec_module::migrations::runner()
         .set_grouped(false)
