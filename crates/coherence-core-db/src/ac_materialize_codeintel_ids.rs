@@ -91,7 +91,7 @@ mod tests {
     }
 
     #[test]
-    fn golden_location_and_link_ids() {
+    fn golden_location_and_link_ids_two_ac_path_pairs() {
         let loc =
             code_location_id_for_materialized_ac_test("AC-GOLD", ".", "tests/ac/golden/path.rs");
         assert_eq!(
@@ -103,5 +103,35 @@ mod tests {
             link,
             "acl-ea12800667a00040675e4e1505f68a3599e8d74d0274ccc121621589b9210ac3"
         );
+
+        let loc2 = code_location_id_for_materialized_ac_test(
+            "AC-SECOND",
+            "repo/sub",
+            "tests/ac/second/case.rs",
+        );
+        assert_eq!(
+            loc2,
+            "cl-08800b01bba85f9e4cb28c583c9f80b791a12b3f21d722ddaf121b59c40858f9"
+        );
+        let link2 = ac_link_id_for_verified_by_file("AC-SECOND", &loc2);
+        assert_eq!(
+            link2,
+            "acl-f1b689e132a1fb0e990f0753c3ea31b5a6908e3ccf2b04f962facbe3dcfa25e4"
+        );
+
+        assert_ne!(loc, loc2);
+        assert_ne!(link, link2);
+    }
+
+    /// `codeintel_*` PKs are `VARCHAR(191)`; ids are `cl-` / `acl-` plus 64 hex digits (fixed width).
+    #[test]
+    fn ids_fit_codeintel_varchar191_pk_without_truncation() {
+        let long_path = format!("tests/ac/{}/tail.rs", "x".repeat(500));
+        let loc = code_location_id_for_materialized_ac_test("AC-LONG", ".", &long_path);
+        let link = ac_link_id_for_verified_by_file("AC-LONG", &loc);
+        assert_eq!(loc.len(), 3 + 64);
+        assert_eq!(link.len(), 4 + 64);
+        assert!(loc.len() <= 191);
+        assert!(link.len() <= 191);
     }
 }
