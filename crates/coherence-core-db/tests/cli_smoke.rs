@@ -50,6 +50,10 @@ fn help_prints_workflow_entrypoint() {
         "help should mention project catalog-preflight: {stdout}"
     );
     assert!(
+        stdout.contains("project reset"),
+        "help should mention project reset repair path: {stdout}"
+    );
+    assert!(
         stdout.contains("Project identity and manifest lifecycle"),
         "help should point at AGENTS.md subsection: {stdout}"
     );
@@ -279,6 +283,40 @@ dolt_db_name = "orphan_abcd"
     assert!(
         err.contains("frozen_git_toplevel") && err.contains("force-rebind"),
         "expected migration error; stderr: {err}"
+    );
+}
+
+#[test]
+fn project_reset_errors_without_manifest_file() {
+    if !git_available() {
+        eprintln!("skip project_reset_errors_without_manifest_file: git not available");
+        return;
+    }
+
+    let tmp = TempDir::new().unwrap();
+    assert!(Command::new("git")
+        .args(["init"])
+        .current_dir(tmp.path())
+        .status()
+        .expect("git init")
+        .success());
+
+    let bin = env!("CARGO_BIN_EXE_coherence-core-db");
+    let out = Command::new(bin)
+        .args(["project", "reset"])
+        .current_dir(tmp.path())
+        .env_remove("DOLT_DB")
+        .env_remove("COHERENCE_ENV")
+        .env_remove("COHERENCE_PROJECT_SLUG")
+        .env_remove("COHERENCE_DB_PROFILE")
+        .env_remove("COHERENCE_USE_USER_SCOPED_DOLT")
+        .output()
+        .expect("project reset");
+    assert!(!out.status.success());
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        err.contains("project reset:") && err.contains(".coherence/project.toml"),
+        "expected manifest read error; stderr: {err}"
     );
 }
 

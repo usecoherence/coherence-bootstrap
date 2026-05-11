@@ -10,6 +10,7 @@ pub mod m1_spec_smoke;
 pub mod migrate;
 pub mod project_cmd;
 pub mod project_init_cmd;
+pub mod project_reset_cmd;
 pub mod spec_cmd;
 pub mod verify_ac_cmd;
 pub mod verify_spec_cmd;

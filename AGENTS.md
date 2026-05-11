@@ -124,6 +124,8 @@ The catalog name the CLI resolves when **`DOLT_DB`** is unset is anchored on a s
 
 2. **Bind `project_hash` (and legacy `dolt_db_name`).** Run **`coherence-core-db project init`** from any directory inside that work tree. The command resolves the Git root, refuses if **`project_slug`** is missing or empty, and writes **`project_hash`**, **`dolt_db_name`**, and **`frozen_git_toplevel`** once (use **`--force-rebind`** only when you deliberately want a new name; orphan data risk). Until this step succeeds, manifests may omit those fields; user-scoped migrate then blocks as described above.
 
+   **Repair:** **`coherence-core-db project reset`** keeps **`project_slug`**, runs the same bind-if-needed step as **`project init`**, then catalog preflight + logical-database ensure + embedded migrations (same as **`migrate`**). Requires Dolt already reachable (for example **`make tool dolt-start`**); does not wipe `.dolt` or beads data.
+
 3. **Connect without exporting `DOLT_DB`.** Leave **`DOLT_DB`** unset: **`ConnectionConfig::from_env()`** (fallible: invalid **`COHERENCE_ENV`**, or a manifest with **`project_slug`** but no valid binding) chooses the effective catalog from **`project_hash`** + **`COHERENCE_ENV`** when the hash is present; legacy manifests still use **`dolt_db_name`** only; otherwise it falls back to the current directory basename (or **`dolt`**).
 
 4. **Override when needed.** Any **non-empty** **`DOLT_DB`** in the environment wins over the manifest; use this for disposable test catalogs, CI, or ad-hoc attaches. **`coherence-core-db doctor`** prints whether that override is active plus manifest presence and the resolved **`dolt_db_name_manifest`** line.
