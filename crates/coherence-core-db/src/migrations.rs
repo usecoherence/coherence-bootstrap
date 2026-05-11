@@ -6,9 +6,8 @@
 //! including a distinct history table for codeintel (`CODEINTEL_MIGRATION_TABLE`) so version IDs
 //! do not collide. See `AGENTS.md` → “M1 module ownership”.
 //!
-//! Refinery connects over TCP; repo-local **`DOLT_PORT`** resolution includes
-//! **`.coherence/run/dolt.tcp_port`** (see `db.rs`) so it matches **`dolt-start`**.
-use refinery::config::ConfigDbType;
+//! Migrations run on the same [`mysql::Conn`] path as the rest of the CLI ([`crate::db::connect`]):
+//! **unix socket first**, TCP fallback second — not Refinery’s `Config` TCP-only URL builder.
 
 use crate::db::ConnectionConfig;
 
@@ -29,27 +28,19 @@ const CODEINTEL_MIGRATION_TABLE: &str = "refinery_schema_history_codeintel";
 pub fn apply_all(config: &ConnectionConfig) -> Result<usize, String> {
     crate::db::ensure_project_database(config)?;
 
-    // Refinery’s MySQL driver connects via TCP URL only (not the unix socket). `config.port` must
-    // match the `dolt sql-server --port` for this repo (see `scripts/dolt-start` →
-    // `.coherence/run/dolt.tcp_port` when `DOLT_PORT` is unset).
-    let mut refinery_config = refinery::config::Config::new(ConfigDbType::Mysql)
-        .set_db_name(&config.database)
-        .set_db_user(&config.user)
-        .set_db_host(&config.host)
-        .set_db_port(&config.port.to_string());
-    if let Some(password) = &config.password {
-        refinery_config = refinery_config.set_db_pass(password);
-    }
+    let (mut conn, _mode) = crate::db::connect(config).map_err(|e| {
+        format!("failed to open database connection for migrations: {e}")
+    })?;
 
     let report_spec = spec_module::migrations::runner()
         .set_grouped(false)
-        .run(&mut refinery_config)
+        .run(&mut conn)
         .map_err(|err| format!("failed to apply spec refinery migrations: {err}"))?;
 
     let mut codeintel_runner = codeintel_module::migrations::runner().set_grouped(false);
     codeintel_runner.set_migration_table_name(CODEINTEL_MIGRATION_TABLE);
     let report_codeintel = codeintel_runner
-        .run(&mut refinery_config)
+        .run(&mut conn)
         .map_err(|err| format!("failed to apply codeintel refinery migrations: {err}"))?;
 
     Ok(report_spec.applied_migrations().len() + report_codeintel.applied_migrations().len())
