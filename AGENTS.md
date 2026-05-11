@@ -154,7 +154,7 @@ Operators select the logical catalog with **`DOLT_DB`**, or derive it from the m
 
 **Repo-local `.dolt`** remains the default when **`COHERENCE_USE_USER_SCOPED_DOLT`** is unset (disposable CI/agent setups).
 
-**Repo-local TCP port for `migrate`:** `scripts/dolt-start` writes **`.coherence/run/dolt.tcp_port`** (ignored by git). When **`DOLT_PORT`** is unset, **`ConnectionConfig`** reads that file so Refinery (TCP-only) hits the same `dolt sql-server` as the unix socket. Export **`DOLT_PORT`** yourself if you start Dolt without that script.
+**Repo-local TCP port for `migrate`:** `scripts/dolt-start` writes **`.coherence/run/dolt.tcp_port`** (ignored by git). When **`DOLT_PORT`** is unset, **`ConnectionConfig`** reads that file so Refinery (TCP-only) hits the same `dolt sql-server` as the unix socket. If the file is missing (some older generated **`dolt-start`** scripts omit it), the CLI probes the repo-local socket with **`SELECT @@port`** once per resolution so Refinery still targets the running instance. Export **`DOLT_PORT`** yourself if you start Dolt without that script and socket probe is not applicable.
 
 **Logical catalogs per tier:** when the manifest has a bound **`project_hash`** and **`DOLT_DB`** is unset, **`migrate`** runs **`CREATE DATABASE IF NOT EXISTS`** for all three normalized tiers — **`*_dev`**, **`*_test`**, **`*_prod`** — so **`COHERENCE_ENV=test`** or disposable test worlds do not fail with `ERROR 1049` on first use. Explicit **`DOLT_DB`** still provisions only that single name.
 

@@ -85,6 +85,29 @@ fn read_repo_local_dolt_tcp_port_file() -> Option<u16> {
         .and_then(|raw| raw.trim().parse().ok())
 }
 
+/// When **`DOLT_PORT`** is unset and **`.coherence/run/dolt.tcp_port`** is missing (common for older
+/// generated **`dolt-start`** scripts), Refinery still needs the real TCP port. Repo-local
+/// **`dolt sql-server`** exposes the same instance on socket and TCP — query **`@@port`** over the
+/// socket so TCP migrations hit the same process as [`connect_without_database`].
+fn try_repo_local_tcp_port_via_socket_probe(
+    socket_path: &std::path::Path,
+    user: &str,
+    password: &Option<String>,
+) -> Option<u16> {
+    if !socket_path.exists() {
+        return None;
+    }
+    let opts = OptsBuilder::new()
+        .user(Some(user.to_string()))
+        .pass(password.clone())
+        .db_name(None::<String>)
+        .socket(Some(socket_path.to_string_lossy().to_string()));
+    let mut conn = Conn::new(opts).ok()?;
+    let raw: Option<u32> = conn.query_first("SELECT @@port").ok()?;
+    let port = raw?;
+    u16::try_from(port).ok()
+}
+
 impl ConnectionConfig {
     /// Build connection settings from environment and (when `DOLT_DB` is unset) the git-root manifest.
     ///
@@ -116,6 +139,9 @@ impl ConnectionConfig {
 
         let host = env::var("DOLT_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
 
+        let user = env::var("DOLT_USER").unwrap_or_else(|_| "root".to_string());
+        let password = env::var("DOLT_PASSWORD").ok();
+
         let port = env::var("DOLT_PORT")
             .ok()
             .and_then(|value| value.parse::<u16>().ok())
@@ -124,6 +150,13 @@ impl ConnectionConfig {
                     None
                 } else {
                     read_repo_local_dolt_tcp_port_file()
+                }
+            })
+            .or_else(|| {
+                if user_scoped {
+                    None
+                } else {
+                    try_repo_local_tcp_port_via_socket_probe(&socket_path, &user, &password)
                 }
             })
             .unwrap_or_else(|| {
@@ -136,9 +169,6 @@ impl ConnectionConfig {
                     3306
                 }
             });
-
-        let user = env::var("DOLT_USER").unwrap_or_else(|_| "root".to_string());
-        let password = env::var("DOLT_PASSWORD").ok();
         let database = resolve_effective_database_name(manifest.as_ref(), coherence_env)?;
 
         Ok(Self {
