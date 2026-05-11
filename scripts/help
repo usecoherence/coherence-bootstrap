@@ -7,6 +7,7 @@ coherence-core-db
 Coherence-compatible Rust CLI tool workflow
 
 Start:
+  make tool bootstrap    first machine: git init if needed, project init, dolt-start, migrate (see AGENTS.md)
   make tool doctor       check dependencies and repo state
   make tool context      understand why this project exists
   make tool next         fetch next task + minimal viable context

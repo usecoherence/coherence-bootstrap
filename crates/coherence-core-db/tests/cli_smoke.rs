@@ -17,6 +17,10 @@ fn help_prints_workflow_entrypoint() {
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("make tool help"));
+    assert!(
+        stdout.contains("make tool bootstrap"),
+        "help should list first-time bootstrap: {stdout}"
+    );
     assert!(stdout.contains("verify-ac"));
     assert!(stdout.contains("verify-spec"));
     assert!(stdout.contains("ac-tests"));

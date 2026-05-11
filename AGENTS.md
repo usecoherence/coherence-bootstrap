@@ -19,6 +19,8 @@ The goal is to reduce boilerplate and keep every Coherence CLI tool homogeneous:
 
 ## Normal flow
 
+**Fresh generated checkout (first time on this machine):** run **`make tool bootstrap`** once — it ensures a git work tree, runs **`project init`** (default slug: repository directory name; override with **`COHERENCE_BOOTSTRAP_SLUG`**), starts repo-local Dolt, and applies migrations. Then continue with **`doctor`** below.
+
 1. `make tool doctor`
 2. `make tool context`
 3. `make tool next`

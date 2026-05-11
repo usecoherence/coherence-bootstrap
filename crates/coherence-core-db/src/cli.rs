@@ -59,6 +59,7 @@ fn print_help() {
            Key env: DOLT_SOCKET, DOLT_DB, COHERENCE_ENV (dev|test|prod; unset/empty=dev; picks catalog tier when project_hash bound and DOLT_DB unset), COHERENCE_DB_PROFILE, COHERENCE_PROJECT_SLUG, COHERENCE_KEEP_TEST_WORLD.\n\n\
          Repository workflow:\n\
            make tool help\n\
+           make tool bootstrap\n\
            make tool doctor\n\
            make tool context\n\
            make tool next\n\

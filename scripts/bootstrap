@@ -1,5 +1,44 @@
 #!/usr/bin/env bash
+# One-shot dev setup for a fresh generated repo (or this checkout): git work tree,
+# project manifest bind, repo-local Dolt, migrations. Idempotent.
 set -euo pipefail
 
-echo "bootstrap: generated repo already bootstrapped"
-echo "next: make tool doctor && make tool context"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$ROOT"
+
+run_cli() {
+  if [ -n "${COHERENCE_CORE_DB_BIN:-}" ]; then
+    "$COHERENCE_CORE_DB_BIN" "$@"
+  else
+    cargo run --manifest-path "${ROOT}/Cargo.toml" -p coherence-core-db --quiet -- "$@"
+  fi
+}
+
+echo "bootstrap: repo root ${ROOT}"
+
+if ! git rev-parse --show-toplevel >/dev/null 2>&1; then
+  echo "bootstrap: no git work tree — git init"
+  git init
+fi
+
+manifest="${ROOT}/.coherence/project.toml"
+slug="${COHERENCE_BOOTSTRAP_SLUG:-$(basename "$ROOT")}"
+
+if [ ! -f "$manifest" ]; then
+  echo "bootstrap: project init --slug ${slug}"
+  run_cli project init --slug "$slug"
+else
+  echo "bootstrap: project init (ensure project_hash bind if needed)"
+  run_cli project init
+fi
+
+echo "bootstrap: dolt-start"
+"$SCRIPT_DIR/dolt-start"
+
+echo "bootstrap: migrate"
+"$SCRIPT_DIR/migrate"
+
+echo
+echo "bootstrap: done — try: coherence-core-db doctor"
+echo "  override slug next time: COHERENCE_BOOTSTRAP_SLUG=my-tool make tool bootstrap"
