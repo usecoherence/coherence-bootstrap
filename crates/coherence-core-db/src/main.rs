@@ -4,7 +4,10 @@
 //! ownership — do not duplicate that essay here; module comments summarize slice boundaries only.
 //!
 mod ac_code_link_store;
+mod ac_materialize_codeintel_ids;
 mod ac_test_layout;
+#[cfg(test)]
+mod ac_tests_materialize_integration;
 mod ac_verify;
 mod cli;
 mod commands;

@@ -3,12 +3,17 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::ac_code_link_store;
+use crate::ac_materialize_codeintel_ids::{
+    ac_link_id_for_verified_by_file, code_location_id_for_materialized_ac_test,
+};
 use crate::ac_test_layout::{expected_rust_ac_test_files, ExpectedAcTestFile};
 use crate::commands::cli_parse::parse_args;
 use crate::db::{connect, ConnectionConfig};
 use crate::migrations;
-use crate::models::SpecGraph;
+use crate::models::{AcCodeLink, AcCodeRelationKind, CodeLocation, SpecGraph};
 use crate::spec_store;
+use mysql::Conn;
 
 pub fn run(args: &[String]) -> i32 {
     match run_impl(args) {
@@ -140,6 +145,47 @@ fn materialize_rust_ac_tests(
     Ok((created, existing))
 }
 
+/// After filesystem materialization, upsert `codeintel_code_locations` + `codeintel_ac_links`
+/// (`verified_by`) for every **expected** AC Rust test file that exists on disk under `workspace`.
+///
+/// Product choice (COREDB-k34.2): reconcile links for all present expected files each run (not only
+/// files created in the just-finished pass) so repeated `materialize-rust` keeps the DB aligned with
+/// `tests/ac/**` and `verify-ac` remains consistent.
+fn upsert_codeintel_for_expected_ac_test_files(
+    conn: &mut Conn,
+    workspace: &Path,
+    graph: &SpecGraph,
+) -> Result<usize, String> {
+    let mut n = 0usize;
+    for file in sorted_expected_rust_ac_test_files(graph) {
+        validate_tests_ac_rel_path(&file.file_path)?;
+        let abs = workspace.join(&file.file_path);
+        if !abs.is_file() {
+            continue;
+        }
+
+        let loc_id = code_location_id_for_materialized_ac_test(
+            file.ac_id.as_str(),
+            ".",
+            file.file_path.as_str(),
+        );
+        let mut loc = CodeLocation::new(loc_id.clone(), ".", file.file_path.as_str());
+        loc.test_command = Some(file.test_command.clone());
+        ac_code_link_store::put_code_location(conn, &loc)?;
+
+        let link_id = ac_link_id_for_verified_by_file(file.ac_id.as_str(), &loc_id);
+        let link = AcCodeLink::new(
+            link_id,
+            file.ac_id.as_str(),
+            loc_id.as_str(),
+            AcCodeRelationKind::VerifiedBy,
+        );
+        ac_code_link_store::put_ac_code_link(conn, &link)?;
+        n += 1;
+    }
+    Ok(n)
+}
+
 /// Lists `(ac_id, relative file_path)` for expected Rust AC tests that are absent or not regular files.
 fn missing_rust_ac_test_files(
     workspace: &Path,
@@ -179,6 +225,7 @@ fn materialize_rust(args: &[String]) -> Result<(), String> {
     let mut conn = connect_migrated()?;
     let graph = spec_store::load_spec_graph(&mut conn)?;
     let (created, existing) = materialize_rust_ac_tests(&root, &graph)?;
+    let codeintel_n = upsert_codeintel_for_expected_ac_test_files(&mut conn, &root, &graph)?;
 
     println!("Created:");
     for p in &created {
@@ -188,6 +235,7 @@ fn materialize_rust(args: &[String]) -> Result<(), String> {
     for p in &existing {
         println!("  {p}");
     }
+    println!("codeintel: upserted {codeintel_n} verified_by test file link(s)");
     Ok(())
 }
 

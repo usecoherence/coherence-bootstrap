@@ -162,7 +162,7 @@ Verification helper: **`./scripts/user-scoped-dolt-smoke.sh`** (isolated **`/tmp
 
 Interactive commands that **curate** the database (`migrate`, `spec add`, `ac add`, …) are for intentional work on the canonical catalog and are not gated by the test-world profile—the guard applies to automated tests and mutating smoke only.
 
-- `ac-tests materialize-rust` loads the spec graph using normal `DOLT_SOCKET` / `DOLT_DB` (and runs migrations like `spec list` so the schema is current). It only creates **missing** files under `<workspace>/tests/ac/` and never overwrites. **`COHERENCE_DB_PROFILE=test` is not required**: the command does not invoke the isolated test-world guard (no smoke/test writes to the catalog); filesystem output stays under `tests/ac/` by construction.
+- `ac-tests materialize-rust` loads the spec graph using normal `DOLT_SOCKET` / `DOLT_DB` (and runs migrations like `spec list` so the schema is current). It only creates **missing** files under `<workspace>/tests/ac/` and never overwrites, then **upserts** matching `codeintel_code_locations` + `codeintel_ac_links` (`verified_by`, kind `test_file`) for every expected path that exists on disk so `verify-ac` sees the same files as the graph. **`COHERENCE_DB_PROFILE=test` is not required**: the command does not invoke the isolated test-world guard; catalog writes here are explicit product behavior (contrast with smoke/tests, which stay isolated).
 
 ## Per-run evidence (ADR-0005)
 
