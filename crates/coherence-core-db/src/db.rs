@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::env;
 use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
@@ -354,20 +355,67 @@ pub fn mysql_quote_identifier(name: &str) -> String {
     format!("`{escaped}`")
 }
 
-/// Ensures `config.database` exists on the server (`CREATE DATABASE IF NOT EXISTS`).
-///
-/// Runs for **repo-local** `.dolt` sockets as well as user-scoped Dolt (ADR-0006): after
-/// `project init`, the manifest catalog name must exist before `migrate` / Refinery connect.
-pub fn ensure_project_database(config: &ConnectionConfig) -> Result<(), String> {
-    if config.database.is_empty() {
-        return Err("logical catalog name is empty; cannot ensure database".to_string());
+fn ensure_databases_named(config: &ConnectionConfig, names: &[String]) -> Result<(), String> {
+    if names.is_empty() {
+        return Err("no logical catalog names to ensure".to_string());
     }
     let (mut conn, _) = connect_without_database(config)?;
-    let ident = mysql_quote_identifier(&config.database);
-    let stmt = format!("CREATE DATABASE IF NOT EXISTS {ident}");
-    conn.query_drop(stmt)
-        .map_err(|err| format!("failed to create database {}: {err}", config.database))?;
+    let mut seen = HashSet::<&str>::new();
+    for name in names {
+        let n = name.trim();
+        if n.is_empty() || !seen.insert(n) {
+            continue;
+        }
+        let ident = mysql_quote_identifier(n);
+        let stmt = format!("CREATE DATABASE IF NOT EXISTS {ident}");
+        conn.query_drop(stmt)
+            .map_err(|err| format!("failed to create database {n}: {err}"))?;
+    }
     Ok(())
+}
+
+/// Ensures logical MySQL/Dolt databases exist before `migrate` / Refinery.
+///
+/// - **`DOLT_DB` set:** creates only that catalog (trimmed), same as the resolved `config.database`.
+/// - **Manifest with non-empty `project_hash`:** creates **dev**, **test**, and **prod** tier
+///   catalogs via [`project_manifest::effective_dolt_catalog_name`] so switching **`COHERENCE_ENV`**
+///   or running isolated tests against the `*_test` database does not hit `ERROR 1049`.
+/// - **Otherwise:** creates only `config.database` (legacy `dolt_db_name`, cwd default, etc.).
+pub fn ensure_project_database(config: &ConnectionConfig) -> Result<(), String> {
+    if explicit_dolt_database_from_env() {
+        let name = config.database.trim();
+        if name.is_empty() {
+            return Err("DOLT_DB is empty; cannot ensure database".to_string());
+        }
+        return ensure_databases_named(config, &[name.to_string()]);
+    }
+
+    if let Some(m) = project_manifest::try_read_project_manifest_from_cwd() {
+        if let Some(ref h) = m.project_hash {
+            let ht = h.trim();
+            if !ht.is_empty() {
+                let slug = m.project_slug.trim();
+                let mut tiers = Vec::with_capacity(3);
+                for env in [
+                    project_manifest::CoherenceEnv::Dev,
+                    project_manifest::CoherenceEnv::Test,
+                    project_manifest::CoherenceEnv::Prod,
+                ] {
+                    tiers.push(project_manifest::effective_dolt_catalog_name(
+                        slug,
+                        Some(ht),
+                        env,
+                    )?);
+                }
+                return ensure_databases_named(config, &tiers);
+            }
+        }
+    }
+
+    if config.database.trim().is_empty() {
+        return Err("logical catalog name is empty; cannot ensure database".to_string());
+    }
+    ensure_databases_named(config, &[config.database.clone()])
 }
 
 pub fn connect(config: &ConnectionConfig) -> Result<(Conn, ConnectionMode), String> {
