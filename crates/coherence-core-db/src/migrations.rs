@@ -5,6 +5,9 @@
 //! table design and evolves through its migration chain. coherence-core-db runs both via Refinery,
 //! including a distinct history table for codeintel (`CODEINTEL_MIGRATION_TABLE`) so version IDs
 //! do not collide. See `AGENTS.md` → “M1 module ownership”.
+//!
+//! Refinery connects over TCP; repo-local **`DOLT_PORT`** resolution includes
+//! **`.coherence/run/dolt.tcp_port`** (see `db.rs`) so it matches **`dolt-start`**.
 use refinery::config::ConfigDbType;
 
 use crate::db::ConnectionConfig;
@@ -26,7 +29,9 @@ const CODEINTEL_MIGRATION_TABLE: &str = "refinery_schema_history_codeintel";
 pub fn apply_all(config: &ConnectionConfig) -> Result<usize, String> {
     crate::db::ensure_project_database(config)?;
 
-    // SQL migrations are embedded at compile time via refinery.
+    // Refinery’s MySQL driver connects via TCP URL only (not the unix socket). `config.port` must
+    // match the `dolt sql-server --port` for this repo (see `scripts/dolt-start` →
+    // `.coherence/run/dolt.tcp_port` when `DOLT_PORT` is unset).
     let mut refinery_config = refinery::config::Config::new(ConfigDbType::Mysql)
         .set_db_name(&config.database)
         .set_db_user(&config.user)

@@ -74,6 +74,16 @@ pub fn explicit_dolt_database_from_env() -> bool {
 
 const USER_SCOPED_INTERNAL_TCP_PORT: u16 = 33_306;
 
+/// Repo-local `dolt-start` writes the TCP port here so `migrate` (Refinery) hits the same
+/// `dolt sql-server` as the unix socket when **`DOLT_PORT`** is unset.
+const REPO_LOCAL_DOLT_TCP_PORT_FILE: &str = ".coherence/run/dolt.tcp_port";
+
+fn read_repo_local_dolt_tcp_port_file() -> Option<u16> {
+    std::fs::read_to_string(REPO_LOCAL_DOLT_TCP_PORT_FILE)
+        .ok()
+        .and_then(|raw| raw.trim().parse().ok())
+}
+
 impl ConnectionConfig {
     /// Build connection settings from environment and (when `DOLT_DB` is unset) the git-root manifest.
     ///
@@ -108,6 +118,13 @@ impl ConnectionConfig {
         let port = env::var("DOLT_PORT")
             .ok()
             .and_then(|value| value.parse::<u16>().ok())
+            .or_else(|| {
+                if user_scoped {
+                    None
+                } else {
+                    read_repo_local_dolt_tcp_port_file()
+                }
+            })
             .unwrap_or_else(|| {
                 if user_scoped {
                     env::var("COHERENCE_DOLT_TCP_PORT")

@@ -128,6 +128,7 @@ start_repo_local() {
 
   port="${DOLT_PORT:-3306}"
   socket=".dolt/dolt.sock"
+  echo "$port" >.coherence/run/dolt.tcp_port
 
   nohup dolt sql-server --host 127.0.0.1 --port "$port" --socket "$socket" \
     >.coherence/run/dolt.log 2>&1 &

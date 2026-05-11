@@ -152,6 +152,8 @@ Operators select the logical catalog with **`DOLT_DB`**, or derive it from the m
 
 **Repo-local `.dolt`** remains the default when **`COHERENCE_USE_USER_SCOPED_DOLT`** is unset (disposable CI/agent setups).
 
+**Repo-local TCP port for `migrate`:** `scripts/dolt-start` writes **`.coherence/run/dolt.tcp_port`** (ignored by git). When **`DOLT_PORT`** is unset, **`ConnectionConfig`** reads that file so Refinery (TCP-only) hits the same `dolt sql-server` as the unix socket. Export **`DOLT_PORT`** yourself if you start Dolt without that script.
+
 Verification helper: **`./scripts/user-scoped-dolt-smoke.sh`** (isolated **`/tmp`** unless **`COHERENCE_USER_SCOPED_SMOKE_ROOT`** overrides).
 
 Interactive commands that **curate** the database (`migrate`, `spec add`, `ac add`, …) are for intentional work on the canonical catalog and are not gated by the test-world profile—the guard applies to automated tests and mutating smoke only.
