@@ -19,6 +19,8 @@
 | Unknown | Fallback arm: stderr + exit **64**. |
 | Subcommand errors | Mostly **1** inside `commands::*` (per-module `eprintln!` + return). |
 
+**Catalog wording:** AC intents imported into the catalog for router behavior should stay **operator/behavioral**; file-level routing detail lives in this technical note (`cli.rs` → `commands/*`).
+
 ## Not done at router layer
 
 - No global option parsing (e.g. no `--verbose` at top level).

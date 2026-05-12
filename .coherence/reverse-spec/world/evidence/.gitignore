@@ -1,0 +1,4 @@
+# Captured harness output (per run). Keep tree in git; ignore contents.
+*
+!.gitignore
+!.gitkeep

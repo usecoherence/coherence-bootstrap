@@ -58,7 +58,7 @@ run_cli ac add \
   --id AC-CLI-SURFACE-ROUTER \
   --slug top-level-command-groups-are-routed \
   --title "Top-level commands route to command modules" \
-  --intent "Observed: cli.rs dispatches known tokens to commands/* (spec, ac, migrate, verify-ac, project, etc.); subcommands parsed inside each module." \
+  --intent "Observed: known top-level command tokens invoke their corresponding command behavior; subcommands are parsed inside command-specific handlers. Unknown top-level tokens are handled by the unknown-command contract." \
   --review-mode manual \
   --risk-level medium \
   --concern correctness

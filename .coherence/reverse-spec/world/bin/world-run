@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Run all L0 harness scripts (no Dolt required).
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export COHERENCE_WORLD_RUN_ID="${COHERENCE_WORLD_RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)-$$}"
+for ac in AC-CLI-SURFACE-HELP AC-CLI-SURFACE-VERSION AC-CLI-SURFACE-UNKNOWN; do
+  echo "world-run: --- $ac ---"
+  "$SCRIPT_DIR/run-ac" "$ac"
+done
+echo "world-run: all L0 checks passed (RUN_ID=$COHERENCE_WORLD_RUN_ID)"

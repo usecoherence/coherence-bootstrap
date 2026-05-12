@@ -28,14 +28,18 @@ export COHERENCE_CORE_DB_BIN="$PWD/target/debug/coherence-core-db"
 ./scripts/with-isolated-test-profile ./.coherence/reverse-spec/pr2-catalog-import/import-cli-command-surface.sh
 ```
 
-Re-running is safe: `spec add` / `ac add` map to SQL upserts for the same primary keys.
-
 ## Verify
 
 ```bash
 ./scripts/with-isolated-test-profile cargo run -q -p coherence-core-db -- spec show CLI-COMMAND-SURFACE-SPEC
 ./scripts/with-isolated-test-profile cargo run -q -p coherence-core-db -- ac list --spec-id CLI-COMMAND-SURFACE-SPEC
 ```
+
+## Idempotency / re-runs
+
+The shipped `spec add` / `ac add` commands map to **UPSERT**-style writes for the same primary keys (same `id`): a second run against the same catalog typically **updates** the row (e.g. timestamps) rather than failing. If you ever see a duplicate-key failure on a given CLI version, treat that catalog as dirty and use a **fresh disposable** `DOLT_DB` or reset the disposable catalog before re-import.
+
+This script does **not** delete rows first and does **not** run raw SQL cleanup — by design for reverse-spec (no production code, no manual delete harness required here).
 
 ## Canonical vs disposable
 
