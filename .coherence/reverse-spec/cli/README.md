@@ -16,4 +16,4 @@ Markdown-only reverse engineering of the **`coherence-core-db` CLI** as shipped 
 
 Behavioral claims here trace to `crates/coherence-core-db/src/cli.rs` and `src/commands/*.rs` as read-only sources.
 
-Next planned passes (not this directory alone): import selected CLI SPECs/ACs into Dolt; build container/Dagger **world harness**; then black-box verify.
+Next planned passes (not this directory alone): import selected CLI SPECs/ACs into Dolt (**`../pr2-catalog-import/`** — run `import-cli-command-surface.sh` under `with-isolated-test-profile`); then build container/Dagger **world harness**; then black-box verify.
