@@ -62,3 +62,17 @@ Store short invocations:
 The runner creates test DB, migrates, sets env, snapshots, runs inner `coherence-core-db …`, compares, writes evidence, exits 0/1.
 
 `world-run` sets **`COHERENCE_WORLD_RUN_ID`** once per batch so all L0 checks share `evidence/<run-id>/…`.
+
+## Evidence layout (per `run-ac` / per AC)
+
+After a run, expect files like:
+
+```text
+world/evidence/<run-id>/AC-CLI-SURFACE-HELP/
+  stdout.txt       # captured SUT stdout
+  stderr.txt       # captured SUT stderr
+  exit_code.txt    # numeric exit code (newline-terminated)
+  assertion.txt    # short human-readable pass reason from the AC script
+```
+
+If something fails, start with **`stderr.txt`** and **`exit_code.txt`**, then the **`verify-ac`** / `run-ac` console lines (they repeat high-signal paths).

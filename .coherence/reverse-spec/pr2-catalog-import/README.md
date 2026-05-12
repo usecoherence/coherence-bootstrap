@@ -41,6 +41,10 @@ The shipped `spec add` / `ac add` commands map to **UPSERT**-style writes for th
 
 This script does **not** delete rows first and does **not** run raw SQL cleanup — by design for reverse-spec (no production code, no manual delete harness required here).
 
+## Next: link L0 ACs to the world harness (PR-3.5)
+
+After PR-2, run **`.coherence/reverse-spec/pr3-verified-by-links/import-l0-world-links.sh`** so `verify-ac AC-CLI-SURFACE-HELP` (and VERSION / UNKNOWN) invoke `world/bin/run-ac`. See that directory’s `README.md`.
+
 ## Canonical vs disposable
 
 Under `with-isolated-test-profile`, rows land in the **disposable** `DOLT_DB` for that run. To curate the **canonical** project catalog, run the same script (or equivalent `spec add` / `ac add` sequence) against your normal dev catalog with env you intend to keep — only when you accept writing those rows there.
