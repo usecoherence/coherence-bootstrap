@@ -4,7 +4,7 @@
 
 ## `spec`
 
-**Public intent:** CRUD-style management of rows in `specs` (M1 spec module).
+**Public intent:** Create/read-style catalog management of rows in `specs` (M1 spec module): add, list, show — no update/delete subcommands in the current CLI.
 
 **Subcommands:** `add` | `list` | `show` (unknown subcommand → error string, exit via `run` → **1**).
 
@@ -24,7 +24,7 @@
 
 ## `ac`
 
-**Public intent:** CRUD-style management of `acceptance_criteria` (+ optional `acceptance_criterion_concerns` on add).
+**Public intent:** Create/read-style catalog management of `acceptance_criteria` (+ optional `acceptance_criterion_concerns` on add); add, list, show only.
 
 **Subcommands:** `add` | `list` | `show`.
 
