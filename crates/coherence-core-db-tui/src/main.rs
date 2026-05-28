@@ -1,8 +1,11 @@
+mod action;
 mod app;
+mod effects;
 mod project_discovery;
 mod tree;
+mod update;
 
-use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use ratatui::crossterm::event::{self, Event};
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
@@ -10,6 +13,8 @@ use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph, Wrap};
 use ratatui::{DefaultTerminal, Frame};
 
 use app::{AppState, Screen};
+use action::{key_to_action, AppAction};
+use update::update;
 
 struct Theme {
     title_bg: Color,
@@ -72,137 +77,18 @@ fn run(mut terminal: DefaultTerminal, app: &mut AppState) -> Result<(), String> 
         let Event::Key(key) = event::read().map_err(|e| format!("read: {e}"))? else {
             continue;
         };
-        if key.kind != KeyEventKind::Press {
+
+        let Some(action) = key_to_action(key, app) else {
             continue;
+        };
+
+        if matches!(action, AppAction::Quit) {
+            break Ok(());
         }
 
-        match app.screen {
-            Screen::ProjectPicker => match key.code {
-                KeyCode::Up => {
-                    app.selected_project = app.selected_project.saturating_sub(1);
-                }
-                KeyCode::Down => {
-                    app.selected_project =
-                        (app.selected_project + 1).min(app.projects.len() - 1);
-                }
-                KeyCode::Enter => {
-                    app.screen = Screen::EnvPicker;
-                    app.status = format!(
-                        "Select environment for {}",
-                        app.projects[app.selected_project].1
-                    );
-                }
-                KeyCode::Esc => {}
-                KeyCode::Char('q') => break,
-                _ => {}
-            },
-            Screen::EnvPicker => match key.code {
-                KeyCode::Up => {
-                    app.selected_env = app.selected_env.saturating_sub(1);
-                }
-                KeyCode::Down => {
-                    app.selected_env =
-                        (app.selected_env + 1).min(app.envs.len() - 1);
-                }
-                KeyCode::Enter => {
-                    app.load_graph();
-                    app.focus_tree = true;
-                    app.screen = Screen::Specs;
-                    app.update_preview();
-                }
-                KeyCode::Esc => {
-                    app.screen = Screen::ProjectPicker;
-                }
-                KeyCode::Char('q') => break,
-                _ => {}
-            },
-            Screen::Specs => {
-                if app.edit_mode {
-                    match key.code {
-                        KeyCode::Char('e') => app.edit_content(),
-                        KeyCode::Char('s') => app.cycle_status(),
-                        KeyCode::Char('l') => app.cycle_level(),
-                        KeyCode::Char('r') => app.cycle_review_mode(),
-                        KeyCode::Char('k') => app.cycle_risk_level(),
-                        KeyCode::Esc => {
-                            app.edit_mode = false;
-                            app.status = "Edit mode closed".into();
-                        }
-                        _ => {}
-                    }
-                } else {
-                    match key.code {
-                        KeyCode::Up if app.focus_tree => {
-                    app.selected_tree = app.selected_tree.saturating_sub(1);
-                    app.update_preview();
-                }
-                KeyCode::Down if app.focus_tree => {
-                    app.selected_tree = (app.selected_tree + 1)
-                        .min(app.tree_items.len().saturating_sub(1));
-                    app.update_preview();
-                }
-                KeyCode::Enter if app.focus_tree => {
-                    let item = &app.tree_items[app.selected_tree];
-                    if item.has_children {
-                        app.toggle_expand();
-                    } else {
-                        app.focus_tree = false;
-                    }
-                }
-                KeyCode::Up if !app.focus_tree => {
-                    app.detail_scroll = app.detail_scroll.saturating_sub(1);
-                }
-                KeyCode::Down if !app.focus_tree => {
-                    app.detail_scroll = app.detail_scroll.saturating_add(1);
-                }
-                KeyCode::Enter if !app.focus_tree => {
-                    app.focus_tree = true;
-                }
-                KeyCode::Esc if !app.focus_tree => {
-                    app.focus_tree = true;
-                }
-                KeyCode::Esc if app.focus_tree => {
-                    app.screen = Screen::EnvPicker;
-                    app.status = format!(
-                        "Select environment for {}",
-                        app.projects[app.selected_project].1
-                    );
-                }
-                KeyCode::Left if app.focus_tree => {
-                    if app.tree_items[app.selected_tree].indent > 0 {
-                        let cur_indent = app.tree_items[app.selected_tree].indent;
-                        for i in (0..app.selected_tree).rev() {
-                            if app.tree_items[i].indent < cur_indent {
-                                app.selected_tree = i;
-                                app.update_preview();
-                                break;
-                            }
-                        }
-                    }
-                }
-                KeyCode::Char('e') => {
-                    app.edit_mode = true;
-                    app.status = "Edit mode: [s] status  [l] level  [r] review  [k] risk  [e] content  [Esc] exit".into();
-                }
-                KeyCode::Char('p') => {
-                    app.screen = Screen::ProjectPicker;
-                    app.status = "Select a project".into();
-                }
-                KeyCode::Char('d') => {
-                    app.screen = Screen::EnvPicker;
-                    app.status = format!(
-                        "Select environment for {}",
-                        app.projects[app.selected_project].1
-                    );
-                }
-                KeyCode::Char('q') => break,
-                _ => {}
-            }
-        }
+        let effects = update(app, action);
+        effects::execute_effects(app, effects);
     }
-}
-}
-    Ok(())
 }
 
 fn title_line(app: &AppState) -> Line<'static> {
