@@ -1,4 +1,5 @@
-use std::collections::HashMap;
+mod tree;
+
 use std::env;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -13,6 +14,8 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph, Wrap};
 use ratatui::{DefaultTerminal, Frame};
+
+use tree::TreeItem;
 
 struct Theme {
     title_bg: Color,
@@ -100,17 +103,6 @@ struct AppState {
     detail_ac_id: Option<String>,
 
     status: String,
-}
-
-#[derive(Clone)]
-struct TreeItem {
-    indent: usize,
-    label: String,
-    id: String,
-    is_spec: bool,
-    expanded: bool,
-    has_children: bool,
-    parent_spec_id: Option<String>,
 }
 
 impl AppState {
@@ -405,165 +397,26 @@ impl AppState {
     }
 
     fn update_preview(&mut self) {
-        if self.selected_tree >= self.tree_items.len() {
-            return;
-        }
-        let item = &self.tree_items[self.selected_tree];
-        if item.is_spec {
-            self.detail_spec_id = Some(item.id.clone());
-            self.detail_ac_id = None;
-        } else if item.parent_spec_id.is_some() {
-            self.detail_ac_id = Some(item.id.clone());
-            self.detail_spec_id = None;
-        } else {
-            // level header — don't change preview
-        }
+        let (sid, aid) = tree::update_preview(&self.tree_items, self.selected_tree);
+        self.detail_spec_id = sid;
+        self.detail_ac_id = aid;
         self.detail_scroll = 0;
     }
 
     fn build_tree(&mut self) {
-        self.tree_items.clear();
         self.selected_tree = 0;
-        let Some(ref graph) = self.graph else {
+        let Some(ref graph) = self.graph.clone() else {
+            self.tree_items.clear();
             return;
         };
-
-        let mut has_product = false;
-        let mut has_system = false;
-        let mut has_module = false;
-
-        for spec in &graph.specs {
-            match spec.level {
-                coherence_core_db::models::SpecLevel::Product => has_product = true,
-                coherence_core_db::models::SpecLevel::System => has_system = true,
-                coherence_core_db::models::SpecLevel::Module => has_module = true,
-            }
-        }
-
-        for (level_name, has) in [
-            ("Product", has_product),
-            ("System", has_system),
-            ("Module", has_module),
-        ] {
-            if !has {
-                continue;
-            }
-            self.tree_items.push(TreeItem {
-                indent: 0,
-                label: level_name.to_string(),
-                id: String::new(),
-                is_spec: false,
-                expanded: false,
-                has_children: true,
-                parent_spec_id: None,
-            });
-        }
+        tree::build_tree(&mut self.tree_items, &graph);
     }
 
     fn toggle_expand(&mut self) {
-        if self.selected_tree >= self.tree_items.len() {
+        let Some(ref graph) = self.graph.clone() else {
             return;
-        }
-        let idx = self.selected_tree;
-        let has_children = self.tree_items[idx].has_children;
-        if !has_children {
-            return;
-        }
-
-        let is_expanded = self.tree_items[idx].expanded;
-        let indent = self.tree_items[idx].indent;
-
-        if is_expanded {
-            let mut to_remove = Vec::new();
-            for (i, ti) in self.tree_items.iter().enumerate().skip(idx + 1) {
-                if ti.indent <= indent {
-                    break;
-                }
-                to_remove.push(i);
-            }
-            for i in to_remove.into_iter().rev() {
-                self.tree_items.remove(i);
-            }
-            self.tree_items[idx].expanded = false;
-        } else {
-            let Some(ref graph) = self.graph.clone() else {
-                return;
-            };
-            let insert_at = idx + 1;
-
-            match indent {
-                0 => {
-                    let level_name = self.tree_items[idx].label.clone();
-                    let target_level = match level_name.as_str() {
-                        "Product" => coherence_core_db::models::SpecLevel::Product,
-                        "System" => coherence_core_db::models::SpecLevel::System,
-                        _ => coherence_core_db::models::SpecLevel::Module,
-                    };
-                    let acs_by_spec: HashMap<&str, usize> = graph
-                        .acceptance_criteria
-                        .iter()
-                        .fold(HashMap::new(), |mut acc, ac| {
-                            *acc.entry(ac.spec_id.as_str()).or_insert(0) += 1;
-                            acc
-                        });
-
-                    let mut pos = insert_at;
-                    for spec in &graph.specs {
-                        if spec.level != target_level {
-                            continue;
-                        }
-                        let ac_count = acs_by_spec.get(spec.id.as_str()).copied().unwrap_or(0);
-                        let label = format!(
-                            "{}  {}",
-                            spec.slug,
-                            if ac_count > 0 {
-                                format!("({})", ac_count)
-                            } else {
-                                String::new()
-                            },
-                        );
-                        self.tree_items.insert(
-                            pos,
-                            TreeItem {
-                                indent: 1,
-                                label,
-                                id: spec.id.clone(),
-                                is_spec: true,
-                                expanded: false,
-                                has_children: ac_count > 0,
-                                parent_spec_id: None,
-                            },
-                        );
-                        pos += 1;
-                    }
-                }
-                1 => {
-                    let spec_id = self.tree_items[idx].id.clone();
-                    let mut pos = insert_at;
-                    for ac in &graph.acceptance_criteria {
-                        if ac.spec_id != spec_id {
-                            continue;
-                        }
-                        let label = format!("  {}", ac.slug);
-                        self.tree_items.insert(
-                            pos,
-                            TreeItem {
-                                indent: 2,
-                                label,
-                                id: ac.id.clone(),
-                                is_spec: false,
-                                expanded: false,
-                                has_children: false,
-                                parent_spec_id: Some(ac.spec_id.clone()),
-                            },
-                        );
-                        pos += 1;
-                    }
-                }
-                _ => {}
-            }
-            self.tree_items[idx].expanded = true;
-        }
+        };
+        tree::toggle_expand(&mut self.tree_items, self.selected_tree, &graph);
     }
 }
 
