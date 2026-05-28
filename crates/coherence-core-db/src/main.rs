@@ -25,6 +25,6 @@ pub mod codeintel_repo {
 }
 
 fn main() {
-    let code = cli::run(std::env::args().collect());
+    let code = cli::run(&std::env::args().collect::<Vec<_>>());
     std::process::exit(code);
 }

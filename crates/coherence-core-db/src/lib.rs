@@ -1,3 +1,9 @@
+#![allow(
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::type_complexity
+)]
+
 pub mod ac_code_link_store;
 pub mod ac_materialize_codeintel_ids;
 pub mod ac_test_layout;

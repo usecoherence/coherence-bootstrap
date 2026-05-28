@@ -30,8 +30,7 @@ pub fn run() -> i32 {
     let prefix = configured_test_db_prefix();
     if !db_name.starts_with(&prefix) {
         eprintln!(
-            "drop-isolated-test-db: refused — database name must start with prefix {:?} (got {:?})",
-            prefix, db_name
+            "drop-isolated-test-db: refused — database name must start with prefix {prefix:?} (got {db_name:?})",
         );
         return 2;
     }
@@ -49,7 +48,7 @@ pub fn run() -> i32 {
             eprintln!("drop-isolated-test-db: {e}");
             1
         },
-        |_| {
+        |()| {
             eprintln!("drop-isolated-test-db: dropped `{db_name}`");
             0
         },

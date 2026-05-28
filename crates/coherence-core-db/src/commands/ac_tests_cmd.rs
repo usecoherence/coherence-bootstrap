@@ -262,6 +262,7 @@ fn check_rust(args: &[String]) -> Result<i32, String> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::expect_used, clippy::unwrap_used)]
     use super::*;
     use coherence_core_db::models::{AcceptanceCriterion, Spec, SpecGraph};
 
@@ -309,8 +310,7 @@ mod tests {
         assert_eq!(created.len(), 2);
         assert!(
             created[0] < created[1],
-            "paths should be sorted: {:?}",
-            created
+            "paths should be sorted: {created:?}",
         );
         assert!(created[0].contains("/ac-a."));
         assert!(created[1].contains("/ac-z."));

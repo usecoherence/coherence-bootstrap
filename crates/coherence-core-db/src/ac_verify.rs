@@ -133,9 +133,8 @@ impl VerifySpecRunResult {
 ///
 /// Returns [`Err`] when the spec id is unknown, listing fails, or verification fails internally.
 pub fn verify_spec(conn: &mut Conn, spec_id: &str) -> Result<VerifySpecRunResult, String> {
-    match spec_store::get_spec(conn, spec_id)? {
-        None => return Err(format!("spec not found: {spec_id}")),
-        Some(_) => {}
+    if spec_store::get_spec(conn, spec_id)?.is_none() {
+        return Err(format!("spec not found: {spec_id}"));
     }
 
     let ac_rows = spec_store::list_acceptance_criteria_for_spec(conn, spec_id)?;
@@ -273,6 +272,7 @@ fn resolve_working_dir(loc: &CodeLocation) -> Option<PathBuf> {
 }
 
 fn run_shell_command(cmd: &str, loc: &CodeLocation) -> Result<(i32, String, String), String> {
+    const CAP: usize = 512 * 1024;
     let mut c = Command::new("sh");
     c.arg("-c").arg(cmd);
     c.stdin(Stdio::null());
@@ -296,7 +296,6 @@ fn run_shell_command(cmd: &str, loc: &CodeLocation) -> Result<(i32, String, Stri
         }
         merged.push_str(&String::from_utf8_lossy(&out.stderr));
     }
-    const CAP: usize = 512 * 1024;
     let mut captured = merged;
     if captured.len() > CAP {
         captured.truncate(CAP);
@@ -323,7 +322,7 @@ fn summarize_output(raw: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::expect_used)]
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
 
     use mysql::Conn;
 
@@ -353,8 +352,7 @@ mod tests {
         use std::time::{SystemTime, UNIX_EPOCH};
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_nanos())
-            .unwrap_or(0);
+            .map_or(0, |d| d.as_nanos());
         format!("{prefix}-{nanos}-{}", std::process::id())
     }
 
@@ -608,7 +606,7 @@ mod tests {
             (&ac_skip, "Skipped runner"),
             (&ac_pass, "Passing runner"),
         ] {
-            let mut ac = AcceptanceCriterion::new((*id).to_string(), spec_id.clone(), title);
+            let mut ac = AcceptanceCriterion::new((*id).clone(), spec_id.clone(), title);
             ac.intent = "verify-spec counts".to_string();
             ac.created_at = "ta".to_string();
             ac.updated_at = "ta".to_string();

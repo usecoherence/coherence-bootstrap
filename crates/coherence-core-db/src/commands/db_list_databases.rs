@@ -7,8 +7,7 @@ use coherence_core_db::db::{self, ConnectionConfig};
 
 fn resolve_config() -> ConnectionConfig {
     let socket_path = env::var("DOLT_SOCKET")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| db::user_scoped_socket_default_path());
+        .map_or_else(|_| db::user_scoped_socket_default_path(), PathBuf::from);
     let host = env::var("DOLT_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
     let user = env::var("DOLT_USER").unwrap_or_else(|_| "root".to_string());
     let password = env::var("DOLT_PASSWORD").ok();

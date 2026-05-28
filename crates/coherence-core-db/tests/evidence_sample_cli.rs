@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::redundant_closure)]
+
 use std::fs;
 use std::process::Command;
 

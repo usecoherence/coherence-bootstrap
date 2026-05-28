@@ -1,20 +1,17 @@
 pub fn run(args: &[String]) -> i32 {
-    let sub = match args.first().map(|s| s.as_str()) {
-        Some(s) => s,
-        None => {
-            eprintln!("usage: coherence-core-db project <subcommand>");
-            eprintln!(
-                "project catalog-preflight  verify git root + `.coherence/project.toml` slug/hash binding before db-ping/dolt-start (shared with doctor)"
-            );
-            eprintln!(
-                "project init binds project_hash (and derived legacy dolt_db_name) in .coherence/project.toml after project_slug is set — see AGENTS.md (\"Project identity and manifest lifecycle\")."
-            );
-            eprintln!(
-                "project reset  idempotent repair: keeps project_slug, runs init bind-if-needed, then migrate (Dolt must be up)"
-            );
-            eprintln!("run: coherence-core-db help");
-            return 64;
-        }
+    let Some(sub) = args.first().map(String::as_str) else {
+        eprintln!("usage: coherence-core-db project <subcommand>");
+        eprintln!(
+            "project catalog-preflight  verify git root + `.coherence/project.toml` slug/hash binding before db-ping/dolt-start (shared with doctor)"
+        );
+        eprintln!(
+            "project init binds project_hash (and derived legacy dolt_db_name) in .coherence/project.toml after project_slug is set — see AGENTS.md (\"Project identity and manifest lifecycle\")."
+        );
+        eprintln!(
+            "project reset  idempotent repair: keeps project_slug, runs init bind-if-needed, then migrate (Dolt must be up)"
+        );
+        eprintln!("run: coherence-core-db help");
+        return 64;
     };
     let tail = &args[1..];
     match sub {

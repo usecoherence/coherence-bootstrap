@@ -37,7 +37,7 @@
 //! [`sanitize_dolt_db_segment`] produces a **MySQL-style identifier segment**: lowercase ASCII
 //! letters, digits, and underscores only, with runs of invalid characters collapsed to a single
 //! underscore; leading/trailing underscores are trimmed. Output is capped at 64 bytes (common
-//! MySQL identifier limit). Callers should treat an empty result as “nothing usable” and pick a
+//! `MySQL` identifier limit). Callers should treat an empty result as “nothing usable” and pick a
 //! fallback.
 
 use std::fs;
@@ -133,6 +133,7 @@ pub struct ProjectManifest {
 }
 
 /// Walk `start` and ancestors until a `.git` file or directory is found; return that directory.
+#[must_use]
 pub fn find_git_repo_root(start: PathBuf) -> Option<PathBuf> {
     let mut dir = start;
     loop {
@@ -209,6 +210,7 @@ fn validate_manifest(manifest: &ProjectManifest) -> Result<(), String> {
 }
 
 /// Map arbitrary input to a lowercase ASCII `a-z0-9_` segment, max [`DOLT_DB_NAME_MAX_LEN`].
+#[must_use]
 pub fn sanitize_dolt_db_segment(input: &str) -> String {
     let mut out = String::new();
     for ch in input.chars() {
@@ -249,6 +251,7 @@ pub fn sanitize_dolt_db_segment(input: &str) -> String {
 
 /// First four lowercase hex digits of SHA-256 over UTF-8 bytes of `path_for_hash`
 /// (use the same string you persist as `frozen_git_toplevel`, after trimming).
+#[must_use]
 pub fn short_hash_frozen_git_path(path_for_hash: &str) -> String {
     let trimmed = path_for_hash.trim();
     let mut hasher = Sha256::new();
@@ -362,6 +365,7 @@ pub fn effective_dolt_catalog_name(
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
     use super::*;
     use std::fs::File;
     use std::io::Write;
@@ -452,7 +456,7 @@ mod tests {
     fn dolt_db_name_for_bind_formula_matches_slug_and_path_hash() {
         let n = dolt_db_name_for_bind("My-Project", "/workspace/foo").unwrap();
         let h = short_hash_frozen_git_path("/workspace/foo");
-        assert_eq!(n, format!("my_project_{}", h));
+        assert_eq!(n, format!("my_project_{h}"));
         assert!(n.len() <= DOLT_DB_NAME_MAX_LEN);
     }
 

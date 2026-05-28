@@ -277,6 +277,7 @@ impl SpecGraph {
     }
 }
 
+#[must_use]
 pub fn slug_from_id(id: &str) -> String {
     id.to_ascii_lowercase().replace('_', "-")
 }

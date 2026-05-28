@@ -54,6 +54,7 @@ impl RunLayout {
     }
 
     /// `.coherence/runs/<run-id>/`
+    #[must_use]
     pub fn run_root(&self) -> PathBuf {
         self.workspace_root
             .join(COHERENCE_DIR)
@@ -61,24 +62,29 @@ impl RunLayout {
             .join(&self.run_id)
     }
 
+    #[must_use]
     pub fn artifacts_dir(&self) -> PathBuf {
         self.run_root().join(ARTIFACTS_SEGMENT)
     }
 
     /// `metadata/` — manifests, snapshot envelopes, future indexes.
+    #[must_use]
     pub fn metadata_dir(&self) -> PathBuf {
         self.run_root().join(METADATA_SEGMENT)
     }
 
     /// `metadata/observations/<observation_id>.json`
+    #[must_use]
     pub fn observations_dir(&self) -> PathBuf {
         self.metadata_dir().join(OBSERVATIONS_SEGMENT)
     }
 
+    #[must_use]
     pub fn run_manifest_path(&self) -> PathBuf {
         self.metadata_dir().join(RUN_MANIFEST_FILE)
     }
 
+    #[must_use]
     pub fn canonical_pointer_stub_path(&self) -> PathBuf {
         self.metadata_dir().join(CANONICAL_POINTER_STUB_FILE)
     }
@@ -196,12 +202,14 @@ pub fn write_canonical_pointer_stub(
 }
 
 /// Resolve filesystem path for the artifact referenced by canonical metadata (and observation).
+#[must_use]
 pub fn resolve_artifact_path(workspace: &Path, pointer: &CanonicalEvidencePointer) -> PathBuf {
     workspace
         .join(&pointer.evidence_root_relpath)
         .join(&pointer.artifact_relpath_from_run_root)
 }
 
+#[must_use]
 pub fn sha256_hex(bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(bytes);
@@ -320,7 +328,7 @@ fn created_at_label() -> String {
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 

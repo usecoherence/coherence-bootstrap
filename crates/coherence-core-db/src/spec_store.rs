@@ -49,7 +49,7 @@ pub fn put_spec(conn: &mut Conn, spec: &Spec) -> Result<(), String> {
             "updated_at" => spec.updated_at.as_str(),
         },
     )
-    .map_err(|err| format!("failed to put spec {}: {err}", spec.id))
+        .map_err(|err| format!("failed to put spec {}: {err}", spec.id))
 }
 
 pub fn get_spec(conn: &mut Conn, spec_id: &str) -> Result<Option<Spec>, String> {
@@ -71,7 +71,7 @@ pub fn get_spec(conn: &mut Conn, spec_id: &str) -> Result<Option<Spec>, String> 
                 "id" => spec_id,
             },
         )
-        .map_err(|err| format!("failed to get spec {}: {err}", spec_id))?;
+        .map_err(|err| format!("failed to get spec {spec_id}: {err}"))?;
     row.map(spec_from_row).transpose()
 }
 
@@ -263,7 +263,7 @@ pub fn get_acceptance_criterion(
                 "id" => ac_id,
             },
         )
-        .map_err(|err| format!("failed to get acceptance criterion {}: {err}", ac_id))?;
+        .map_err(|err| format!("failed to get acceptance criterion {ac_id}: {err}"))?;
     let Some(row) = row else {
         return Ok(None);
     };
@@ -296,7 +296,7 @@ pub fn list_acceptance_criteria_for_spec(
                 "spec_id" => spec_id,
             },
         )
-        .map_err(|err| format!("failed to list ACs for {}: {err}", spec_id))?;
+        .map_err(|err| format!("failed to list ACs for {spec_id}: {err}"))?;
 
     let mut result = Vec::with_capacity(rows.len());
     for row in rows {
@@ -359,7 +359,7 @@ pub fn list_spec_relations_for_spec(
                 "spec_id" => spec_id,
             },
         )
-        .map_err(|err| format!("failed to list relations for {}: {err}", spec_id))?;
+        .map_err(|err| format!("failed to list relations for {spec_id}: {err}"))?;
     Ok(rows
         .into_iter()
         .map(
@@ -385,7 +385,7 @@ fn concerns_for_ac(conn: &mut Conn, ac_id: &str) -> Result<Vec<ConcernKind>, Str
                 "ac_id" => ac_id,
             },
         )
-        .map_err(|err| format!("failed to list concerns for {}: {err}", ac_id))?;
+        .map_err(|err| format!("failed to list concerns for {ac_id}: {err}"))?;
 
     concerns
         .into_iter()
@@ -459,6 +459,7 @@ fn acceptance_criterion_from_row(
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
     use mysql::Conn;
 
     use crate::db::{self, ConnectionConfig};

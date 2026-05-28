@@ -196,6 +196,11 @@ fn refuse_manifest_bound_dev_catalog_for_test_writes(
 /// Returns `Ok(())` when this process may run mutating smoke or test workflows against the resolved [`ConnectionConfig`].
 ///
 /// `context` labels the caller in errors (for example `m0-smoke` or a test module path).
+///
+/// # Errors
+///
+/// Returns an error message when the config resolves to the canonical dev/prod catalog or the
+/// `COHERENCE_DB_PROFILE` environment variable is not set to `test`.
 #[must_use = "caller must propagate or handle refusal"]
 pub fn require_isolated_test_world_for_writes(
     context: &str,
@@ -236,7 +241,10 @@ pub fn require_isolated_test_world_for_writes(
 }
 
 /// Same policy as [`require_isolated_test_world_for_writes`] but panic with the refusal text (crate unit tests).
-#[cfg(test)]
+///
+/// # Panics
+///
+/// Panics if the config resolves to the canonical dev/prod catalog and context is not test.
 #[track_caller]
 pub fn panic_unless_isolated_test_world_for_writes(context: &str, config: &ConnectionConfig) {
     if let Err(msg) = require_isolated_test_world_for_writes(context, config) {
@@ -246,25 +254,22 @@ pub fn panic_unless_isolated_test_world_for_writes(context: &str, config: &Conne
 
 /// Serialize `std::env` access for unit tests: [`lock_test_env`] must bracket guard scenarios and
 /// any test that reads [`ConnectionConfig::from_env`] against a real Dolt catalog.
-#[cfg(test)]
 static TEST_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 /// Hold for the duration of any test that calls [`ConnectionConfig::from_env`] against a real Dolt
 /// target so guard tests cannot transient `remove_var`/`set_var` between load and connect.
-#[cfg(test)]
-pub(crate) fn lock_test_env() -> std::sync::MutexGuard<'static, ()> {
+pub fn lock_test_env() -> std::sync::MutexGuard<'static, ()> {
     TEST_ENV_LOCK
         .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
-#[cfg(test)]
-pub(crate) struct EnvConnLock<T> {
-    pub(crate) _lock: std::sync::MutexGuard<'static, ()>,
-    pub(crate) inner: T,
+pub struct EnvConnLock<T> {
+    #[allow(clippy::pub_underscore_fields)]
+    pub _lock: std::sync::MutexGuard<'static, ()>,
+    pub inner: T,
 }
 
-#[cfg(test)]
 impl<T> std::ops::Deref for EnvConnLock<T> {
     type Target = T;
 
@@ -273,7 +278,6 @@ impl<T> std::ops::Deref for EnvConnLock<T> {
     }
 }
 
-#[cfg(test)]
 impl<T> std::ops::DerefMut for EnvConnLock<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
@@ -350,7 +354,7 @@ dolt_mode = "user-scoped"
         fn snapshot(keys: &[&str]) -> Self {
             let pairs = keys
                 .iter()
-                .map(|k| (k.to_string(), env::var(k).ok()))
+                .map(|k| ((*k).to_string(), env::var(k).ok()))
                 .collect();
             Self { pairs }
         }

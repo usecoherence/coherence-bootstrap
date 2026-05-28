@@ -1,3 +1,4 @@
+#![allow(clippy::wildcard_enum_match_arm)]
 use coherence_core_db::models::{ReviewMode, RiskLevel, SpecStatus, SpecLevel};
 
 use crate::action::AppAction;
@@ -19,7 +20,7 @@ pub fn update(app: &mut AppState, action: AppAction) -> Vec<Effect> {
                 app.detail_scroll = app.detail_scroll.saturating_sub(1);
                 vec![]
             }
-            _ => vec![],
+            Screen::Specs => vec![],
         },
 
         AppAction::NavDown => match app.screen {
@@ -35,7 +36,7 @@ pub fn update(app: &mut AppState, action: AppAction) -> Vec<Effect> {
                 app.detail_scroll = app.detail_scroll.saturating_add(1);
                 vec![]
             }
-            _ => vec![],
+            Screen::Specs => vec![],
         },
 
         AppAction::Enter => match app.screen {
@@ -62,7 +63,7 @@ pub fn update(app: &mut AppState, action: AppAction) -> Vec<Effect> {
                     vec![]
                 }
             }
-            _ => vec![],
+            Screen::Specs => vec![],
         },
 
         AppAction::Back => match app.screen {

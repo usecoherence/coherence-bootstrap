@@ -40,14 +40,13 @@ pub struct ConnectionConfig {
     pub database: String,
 }
 
+#[must_use]
 pub fn user_scoped_dolt_from_manifest(manifest: &Option<project_manifest::ProjectManifest>) -> bool {
     match manifest.as_ref() {
-        Some(m) if m.dolt_mode.is_some() => {
-            matches!(
-                m.dolt_mode.as_ref().unwrap().as_str(),
-                "user-scoped" | "user_scoped" | "user"
-            )
-        }
+        Some(m) => match m.dolt_mode.as_deref() {
+            Some(mode) => matches!(mode, "user-scoped" | "user_scoped" | "user"),
+            None => true,
+        },
         _ => true, // default to user-scoped when no manifest or no dolt_mode set
     }
 }
@@ -71,9 +70,7 @@ pub fn user_scoped_socket_default_path() -> PathBuf {
 /// True when non-empty **`DOLT_DB`** is set (logical catalog explicitly selected).
 #[must_use]
 pub fn explicit_dolt_database_from_env() -> bool {
-    env::var(DOLT_DB_ENV)
-        .map(|s| !s.trim().is_empty())
-        .unwrap_or(false)
+    env::var(DOLT_DB_ENV).is_ok_and(|s| !s.trim().is_empty())
 }
 
 const USER_SCOPED_INTERNAL_TCP_PORT: u16 = 33_306;
@@ -92,6 +89,7 @@ fn read_repo_local_dolt_tcp_port_file() -> Option<u16> {
 /// generated **`dolt-start`** scripts), Refinery still needs the real TCP port. Repo-local
 /// **`dolt sql-server`** exposes the same instance on socket and TCP — query **`@@port`** over the
 /// socket so TCP migrations hit the same process as [`connect_without_database`].
+#[allow(clippy::ref_option)]
 fn try_repo_local_tcp_port_via_socket_probe(
     socket_path: &std::path::Path,
     user: &str,
@@ -129,15 +127,16 @@ impl ConnectionConfig {
             }
         }
 
-        let socket_path = env::var("DOLT_SOCKET")
-            .map(PathBuf::from)
-            .unwrap_or_else(|_| {
+        let socket_path = env::var("DOLT_SOCKET").map_or_else(
+            |_| {
                 if user_scoped {
                     user_scoped_socket_default_path()
                 } else {
                     PathBuf::from(".dolt/dolt.sock")
                 }
-            });
+            },
+            PathBuf::from,
+        );
 
         let host = env::var("DOLT_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
 
@@ -447,7 +446,7 @@ pub fn ensure_project_database(config: &ConnectionConfig) -> Result<(), String> 
     if config.database.trim().is_empty() {
         return Err("logical catalog name is empty; cannot ensure database".to_string());
     }
-    ensure_databases_named(config, &[config.database.clone()])
+    ensure_databases_named(config, std::slice::from_ref(&config.database))
 }
 
 pub fn connect(config: &ConnectionConfig) -> Result<(Conn, ConnectionMode), String> {
@@ -520,6 +519,7 @@ pub fn counts(conn: &mut Conn) -> Result<(u64, u64), String> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
     use super::*;
 
     #[test]
@@ -531,6 +531,7 @@ mod tests {
 
 #[cfg(test)]
 mod connection_config_manifest_tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
     use std::env;
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -565,10 +566,10 @@ mod connection_config_manifest_tests {
     struct SaveCwd(PathBuf);
 
     impl SaveCwd {
-        fn chdir(path: &Path) -> Self {
-            let prev = env::current_dir().expect("cwd");
-            env::set_current_dir(path).expect("chdir");
-            Self(prev)
+        fn chdir(path: &Path) -> Result<Self, String> {
+            let prev = env::current_dir().map_err(|e| format!("cwd: {e}"))?;
+            env::set_current_dir(path).map_err(|e| format!("chdir: {e}"))?;
+            Ok(Self(prev))
         }
     }
 
@@ -582,7 +583,7 @@ mod connection_config_manifest_tests {
         fs::create_dir_all(repo.join(".coherence")).unwrap();
         fs::write(
             repo.join(".coherence/project.toml"),
-            format!("version = 1\nproject_slug = \"myproj\"\n{dolt_db_line}",),
+            format!("version = 1\nproject_slug = \"myproj\"\n{dolt_db_line}"),
         )
         .unwrap();
     }
@@ -610,7 +611,7 @@ mod connection_config_manifest_tests {
         write_manifest(tmp.path(), "dolt_db_name = \"from_manifest\"\n");
         let nested = tmp.path().join("deep/nested");
         fs::create_dir_all(&nested).unwrap();
-        let _cwd = SaveCwd::chdir(&nested);
+        let _cwd = SaveCwd::chdir(&nested).unwrap();
         env::set_var("DOLT_DB", "from_env");
         let cfg = ConnectionConfig::from_env().expect("from_env");
         assert_eq!(cfg.database, "from_env");
@@ -628,7 +629,7 @@ mod connection_config_manifest_tests {
         write_manifest(tmp.path(), "dolt_db_name = \"frozen_catalog_abc1\"\n");
         let nested = tmp.path().join("deep/nested");
         fs::create_dir_all(&nested).unwrap();
-        let _cwd = SaveCwd::chdir(&nested);
+        let _cwd = SaveCwd::chdir(&nested).unwrap();
         let cfg = ConnectionConfig::from_env().expect("from_env");
         assert_eq!(cfg.database, "frozen_catalog_abc1");
     }
@@ -643,7 +644,7 @@ mod connection_config_manifest_tests {
 
         let tmp = tmp_git_repo();
         write_manifest(tmp.path(), "dolt_db_name = \"x\"\n");
-        let _cwd = SaveCwd::chdir(tmp.path());
+        let _cwd = SaveCwd::chdir(tmp.path()).unwrap();
         let _cfg = ConnectionConfig::from_env().expect("from_env");
         assert_eq!(env::var("COHERENCE_PROJECT_SLUG").unwrap(), "myproj");
     }
@@ -667,7 +668,7 @@ dolt_db_name = "legacy_only_ignored"
 "#,
         )
         .unwrap();
-        let _cwd = SaveCwd::chdir(tmp.path());
+        let _cwd = SaveCwd::chdir(tmp.path()).unwrap();
         let cfg = ConnectionConfig::from_env().expect("from_env");
         assert_eq!(cfg.database, "svc_cafe_dev");
     }
@@ -689,7 +690,7 @@ project_hash = "cafe"
 "#,
         )
         .unwrap();
-        let _cwd = SaveCwd::chdir(tmp.path());
+        let _cwd = SaveCwd::chdir(tmp.path()).unwrap();
 
         env::set_var("COHERENCE_ENV", "test");
         let test_catalog = ConnectionConfig::from_env().expect("from_env").database;
@@ -711,7 +712,7 @@ project_hash = "cafe"
 
         let tmp = tmp_git_repo();
         write_manifest(tmp.path(), "");
-        let _cwd = SaveCwd::chdir(tmp.path());
+        let _cwd = SaveCwd::chdir(tmp.path()).unwrap();
         let err = ConnectionConfig::from_env().unwrap_err();
         assert!(
             err.contains("project init") && err.contains("DOLT_DB"),
@@ -729,7 +730,7 @@ project_hash = "cafe"
 
         let tmp = tmp_git_repo();
         write_manifest(tmp.path(), "dolt_db_name = \"x\"\n");
-        let _cwd = SaveCwd::chdir(tmp.path());
+        let _cwd = SaveCwd::chdir(tmp.path()).unwrap();
         let err = ConnectionConfig::from_env().unwrap_err();
         assert!(err.contains("COHERENCE_ENV"), "{err}");
     }
@@ -743,7 +744,7 @@ project_hash = "cafe"
         env::remove_var("COHERENCE_ENV");
 
         let tmp = TempDir::new().unwrap();
-        let _cwd = SaveCwd::chdir(tmp.path());
+        let _cwd = SaveCwd::chdir(tmp.path()).unwrap();
         let base = tmp
             .path()
             .file_name()
@@ -764,7 +765,7 @@ project_hash = "cafe"
 
         let tmp = tmp_git_repo();
         write_manifest(tmp.path(), "");
-        let _cwd = SaveCwd::chdir(tmp.path());
+        let _cwd = SaveCwd::chdir(tmp.path()).unwrap();
         let err = manifest_catalog_preflight_for_connect("migrate").unwrap_err();
         assert!(err.starts_with("migrate:"), "{err}");
         assert!(
@@ -791,7 +792,7 @@ project_hash = "cafe"
 "#,
         )
         .unwrap();
-        let _cwd = SaveCwd::chdir(tmp.path());
+        let _cwd = SaveCwd::chdir(tmp.path()).unwrap();
         manifest_catalog_preflight_for_connect("migrate").expect("preflight");
     }
 
@@ -805,7 +806,7 @@ project_hash = "cafe"
 
         let tmp = tmp_git_repo();
         write_manifest(tmp.path(), "");
-        let _cwd = SaveCwd::chdir(tmp.path());
+        let _cwd = SaveCwd::chdir(tmp.path()).unwrap();
         manifest_catalog_preflight_for_connect("migrate").unwrap();
     }
 
@@ -818,7 +819,7 @@ project_hash = "cafe"
         env::remove_var("COHERENCE_ENV");
 
         let tmp = tmp_git_repo();
-        let _cwd = SaveCwd::chdir(tmp.path());
+        let _cwd = SaveCwd::chdir(tmp.path()).unwrap();
         let err = manifest_catalog_preflight_for_connect("db-ping").unwrap_err();
         assert!(err.starts_with("db-ping:"), "{err}");
         assert!(
@@ -840,7 +841,7 @@ project_hash = "cafe"
         env::remove_var("COHERENCE_ENV");
 
         let tmp = TempDir::new().unwrap();
-        let _cwd = SaveCwd::chdir(tmp.path());
+        let _cwd = SaveCwd::chdir(tmp.path()).unwrap();
         let err = manifest_catalog_preflight_for_connect("db-ping").unwrap_err();
         assert!(err.contains("git work tree"), "{err}");
     }
@@ -855,7 +856,7 @@ project_hash = "cafe"
 
         let tmp = tmp_git_repo();
         write_manifest(tmp.path(), "dolt_db_name = \"frozen_legacy\"\n");
-        let _cwd = SaveCwd::chdir(tmp.path());
+        let _cwd = SaveCwd::chdir(tmp.path()).unwrap();
         manifest_catalog_preflight_for_connect("migrate").unwrap();
     }
 }

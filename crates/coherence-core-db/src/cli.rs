@@ -1,7 +1,7 @@
 use crate::commands;
 
-pub fn run(args: Vec<String>) -> i32 {
-    let command = args.get(1).map(String::as_str).unwrap_or("help");
+pub fn run(args: &[String]) -> i32 {
+    let command = args.get(1).map_or("help", String::as_str);
     match command {
         "help" | "--help" | "-h" => {
             print_help();

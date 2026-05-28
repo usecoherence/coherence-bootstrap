@@ -17,7 +17,7 @@ pub fn run(args: &[String]) -> i32 {
 fn run_impl(args: &[String]) -> Result<(), String> {
     let sub = args
         .first()
-        .map(|s| s.as_str())
+        .map(String::as_str)
         .ok_or_else(|| "usage: coherence-core-db spec <add|list|show> ...".to_string())?;
     let tail = &args[1..];
     match sub {
@@ -43,8 +43,7 @@ fn gen_spec_id() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
     let ms = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_millis())
-        .unwrap_or(0);
+        .map_or(0, |d| d.as_millis());
     format!("SPEC-GEN-{ms}")
 }
 
@@ -83,7 +82,7 @@ fn spec_add(args: &[String]) -> Result<(), String> {
     spec.description = description.to_string();
     spec.level = level;
     spec.status = status;
-    spec.created_at = ts.clone();
+    spec.created_at.clone_from(&ts);
     spec.updated_at = ts;
 
     let mut conn = connect_migrated()?;
@@ -109,7 +108,7 @@ fn spec_list(args: &[String]) -> Result<(), String> {
             "{}\t{}\t{}\t{}\t{}",
             s.id,
             s.slug,
-            s.title.replace('\t', " ").replace('\n', " "),
+            s.title.replace(['\t', '\n'], " "),
             s.level.as_db_str(),
             s.status.as_db_str(),
         );
@@ -127,7 +126,7 @@ fn spec_show(args: &[String]) -> Result<(), String> {
         (Some(a), Some(b)) if a != b.as_str() => {
             return Err("spec show: --id and positional SPEC_ID disagree".into());
         }
-        (Some(a), Some(_)) | (Some(a), None) => a.to_string(),
+        (Some(a), Some(_) | None) => a.to_string(),
         (None, Some(b)) => b.clone(),
         (None, None) => {
             return Err("spec show requires <SPEC_ID> or --id <SPEC_ID>".into());

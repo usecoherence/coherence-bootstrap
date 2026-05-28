@@ -47,7 +47,7 @@ pub struct ExpectedAcTestFile {
     pub content: String,
 }
 
-/// Map an AC slug into a conventional `#[test]` fn name (`validates_…` + snake_case body).
+/// Map an AC slug into a conventional `#[test]` fn name (`validates_…` + `snake_case` body).
 #[must_use]
 pub fn slug_to_rust_ident(slug: &str) -> String {
     let mut body = String::new();
@@ -129,7 +129,7 @@ fn depends_on_parent_map(relations: &[SpecRelation]) -> HashMap<String, String> 
         best.entry(rel.source_spec_id.clone())
             .and_modify(|cur| {
                 if rel.target_spec_id < *cur {
-                    *cur = rel.target_spec_id.clone();
+                    cur.clone_from(&rel.target_spec_id);
                 }
             })
             .or_insert_with(|| rel.target_spec_id.clone());

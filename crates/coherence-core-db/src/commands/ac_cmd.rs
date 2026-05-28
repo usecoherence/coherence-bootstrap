@@ -17,7 +17,7 @@ pub fn run(args: &[String]) -> i32 {
 fn run_impl(args: &[String]) -> Result<(), String> {
     let sub = args
         .first()
-        .map(|s| s.as_str())
+        .map(String::as_str)
         .ok_or_else(|| "usage: coherence-core-db ac <add|list|show> ...".to_string())?;
     let tail = &args[1..];
     match sub {
@@ -43,8 +43,7 @@ fn gen_ac_id() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
     let ms = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_millis())
-        .unwrap_or(0);
+        .map_or(0, |d| d.as_millis());
     format!("AC-GEN-{ms}")
 }
 
@@ -109,7 +108,7 @@ fn ac_add(args: &[String]) -> Result<(), String> {
     ac.review_mode = review_mode;
     ac.risk_level = risk_level;
     ac.concerns = concerns;
-    ac.created_at = ts.clone();
+    ac.created_at.clone_from(&ts);
     ac.updated_at = ts;
 
     spec_store::put_acceptance_criterion(&mut conn, &ac)?;
@@ -143,7 +142,7 @@ fn ac_list(args: &[String]) -> Result<(), String> {
             ac.id,
             ac.spec_id,
             ac.slug,
-            ac.title.replace('\t', " ").replace('\n', " "),
+            ac.title.replace(['\t', '\n'], " "),
             ac.review_mode.as_db_str(),
             ac.risk_level.as_db_str(),
             concerns.join(","),
@@ -162,7 +161,7 @@ fn ac_show(args: &[String]) -> Result<(), String> {
         (Some(a), Some(b)) if a != b.as_str() => {
             return Err("ac show: --id and positional AC_ID disagree".into());
         }
-        (Some(a), Some(_)) | (Some(a), None) => a.to_string(),
+        (Some(a), Some(_) | None) => a.to_string(),
         (None, Some(b)) => b.clone(),
         (None, None) => {
             return Err("ac show requires <AC_ID> or --id <AC_ID>".into());

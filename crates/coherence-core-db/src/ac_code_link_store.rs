@@ -138,7 +138,7 @@ pub fn list_code_links_for_ac(
             id,
             lac_id,
             code_location_id,
-            relation_kind,
+            &relation_kind,
             note,
             created_at,
             updated_at,
@@ -167,7 +167,7 @@ fn code_location_from_row(
         id,
         repo_path,
         file_path,
-        kind,
+        &kind,
         symbol,
         test_command,
         created_at,
@@ -175,17 +175,18 @@ fn code_location_from_row(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn code_location_from_columns(
     id: String,
     repo_path: String,
     file_path: String,
-    kind: String,
+    kind: &str,
     symbol: Option<String>,
     test_command: Option<String>,
     created_at: String,
     updated_at: String,
 ) -> Result<CodeLocation, String> {
-    let kind = CodeLocationKind::from_db_str(&kind)
+    let kind = CodeLocationKind::from_db_str(kind)
         .ok_or_else(|| format!("unknown code location kind: {kind}"))?;
     Ok(CodeLocation {
         id,
@@ -203,12 +204,12 @@ fn ac_code_link_from_columns(
     id: String,
     ac_id: String,
     code_location_id: String,
-    relation_kind: String,
+    relation_kind: &str,
     note: String,
     created_at: String,
     updated_at: String,
 ) -> Result<AcCodeLink, String> {
-    let relation_kind = AcCodeRelationKind::from_db_str(&relation_kind)
+    let relation_kind = AcCodeRelationKind::from_db_str(relation_kind)
         .ok_or_else(|| format!("unknown AC code relation kind: {relation_kind}"))?;
     Ok(AcCodeLink {
         id,
@@ -223,6 +224,7 @@ fn ac_code_link_from_columns(
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
     use mysql::Conn;
 
     use crate::ac_code_link_store;
@@ -253,8 +255,7 @@ mod tests {
         use std::time::{SystemTime, UNIX_EPOCH};
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_nanos())
-            .unwrap_or(0);
+            .map_or(0, |d| d.as_nanos());
         format!("{prefix}-{nanos}-{}", std::process::id())
     }
 

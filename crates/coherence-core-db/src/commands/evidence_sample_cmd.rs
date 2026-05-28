@@ -25,8 +25,7 @@ fn run_impl(args: &[String]) -> Result<(), String> {
     };
     let run_id = parsed
         .single_flag("run-id")?
-        .map(String::from)
-        .unwrap_or_else(|| format!("run-{}", uuid::Uuid::new_v4()));
+        .map_or_else(|| format!("run-{}", uuid::Uuid::new_v4()), String::from);
 
     let pointer = evidence_store::bootstrap_sample_run(&workspace, &run_id)?;
     print_report(&workspace, &run_id, &pointer)?;

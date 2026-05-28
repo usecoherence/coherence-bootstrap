@@ -30,14 +30,14 @@ fn print_coherence_catalog_doctor_summary() {
     match coherence_env_from_std_env() {
         Ok(te) => println!("COHERENCE_ENV: {}", te.as_str()),
         Err(e) => {
-            println!("COHERENCE_ENV: invalid — {e} (migrate/db-ping will fail until corrected)")
+            println!("COHERENCE_ENV: invalid — {e} (migrate/db-ping will fail until corrected)");
         }
     }
 
     match hypothetical_effective_catalog_from_cwd() {
         Ok(name) => println!("effective_catalog_without_DOLT_DB_override: {name}"),
         Err(reason) => {
-            println!("effective_catalog_without_DOLT_DB_override: unresolved ({reason})")
+            println!("effective_catalog_without_DOLT_DB_override: unresolved ({reason})");
         }
     }
 
@@ -49,7 +49,7 @@ fn print_coherence_catalog_doctor_summary() {
         match manifest_catalog_rules_without_dolt_db() {
             Ok(()) => println!("manifest_catalog_complete_for_connect_preflight: yes"),
             Err(reason) => {
-                println!("manifest_catalog_complete_for_connect_preflight: no ({reason})",)
+                println!("manifest_catalog_complete_for_connect_preflight: no ({reason})");
             }
         }
     }
@@ -60,6 +60,7 @@ fn print_coherence_catalog_doctor_summary() {
     );
 }
 
+#[allow(clippy::single_match_else)]
 fn print_project_manifest_diagnostic_lines() {
     match env::current_dir() {
         Ok(cwd) => match find_git_repo_root(cwd) {

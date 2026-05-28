@@ -1,4 +1,5 @@
 //! Integration: `scripts/with-isolated-test-profile` stderr marker on failure + keep (COREDB-44l).
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -60,8 +61,7 @@ fn failure_with_keep_includes_run_id_when_set() {
     assert_ne!(code, 0);
     assert!(
         stderr.contains("COHERENCE_PRESERVED_TEST_WORLD: RUN_ID=test-run-xyz"),
-        "stderr missing RUN_ID: {:?}",
-        stderr
+        "stderr missing RUN_ID: {stderr:?}",
     );
 }
 
