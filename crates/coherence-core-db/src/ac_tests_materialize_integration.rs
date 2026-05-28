@@ -6,15 +6,15 @@ use std::process::Command;
 use mysql::Conn;
 use tempfile::tempdir;
 
-use crate::ac_code_link_store;
-use crate::ac_materialize_codeintel_ids::{
+use coherence_core_db::ac_code_link_store;
+use coherence_core_db::ac_materialize_codeintel_ids::{
     ac_link_id_for_verified_by_file, code_location_id_for_materialized_ac_test,
 };
-use crate::db::{self, ConnectionConfig};
-use crate::migrations;
-use crate::models::{AcCodeRelationKind, AcceptanceCriterion, CodeLocationKind, Spec};
-use crate::spec_store;
-use crate::test_world_guard;
+use coherence_core_db::db::{self, ConnectionConfig};
+use coherence_core_db::migrations;
+use coherence_core_db::models::{AcCodeRelationKind, AcceptanceCriterion, CodeLocationKind, Spec};
+use coherence_core_db::spec_store;
+use coherence_core_db::test_world_guard;
 
 fn coherence_core_db_test_bin() -> PathBuf {
     if let Ok(p) = std::env::var("CARGO_BIN_EXE_coherence-core-db") {
@@ -64,7 +64,7 @@ fn materialize_rust_cli_upserts_codeintel_rows() {
     spec_store::put_acceptance_criterion(&mut conn, &ac).expect("put ac");
 
     let graph = spec_store::load_spec_graph(&mut conn).expect("load graph");
-    let files = crate::ac_test_layout::expected_rust_ac_test_files(&graph);
+    let files = coherence_core_db::ac_test_layout::expected_rust_ac_test_files(&graph);
     let ours = files
         .iter()
         .find(|f| f.ac_id == "AC-MAT-CLI-1")

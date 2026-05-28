@@ -10,7 +10,7 @@ use std::env;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use crate::project_manifest::{
+use coherence_core_db::project_manifest::{
     self, dolt_db_name_for_bind, read_manifest, short_hash_frozen_git_path, write_manifest,
     ProjectManifest, CURRENT_MANIFEST_SCHEMA_VERSION,
 };

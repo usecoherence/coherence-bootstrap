@@ -15,3 +15,6 @@ __pycache__/
 *.db
 .beads-credential-key
 config.yaml
+
+# bv (beads viewer) local config and caches
+.bv/

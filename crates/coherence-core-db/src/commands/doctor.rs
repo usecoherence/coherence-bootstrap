@@ -1,10 +1,10 @@
 use std::env;
 
-use crate::db::{
+use coherence_core_db::db::{
     explicit_dolt_database_from_env, hypothetical_effective_catalog_from_cwd,
     manifest_catalog_rules_without_dolt_db,
 };
-use crate::project_manifest::{
+use coherence_core_db::project_manifest::{
     coherence_env_from_std_env, coherence_manifest_path, find_git_repo_root, read_manifest,
 };
 

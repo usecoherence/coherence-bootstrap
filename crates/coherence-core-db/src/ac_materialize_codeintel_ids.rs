@@ -37,7 +37,7 @@ pub(crate) fn normalize_materialize_file_path(file_path: &str) -> String {
 }
 
 #[must_use]
-pub(crate) fn code_location_id_for_materialized_ac_test(
+pub fn code_location_id_for_materialized_ac_test(
     ac_id: &str,
     repo_path: &str,
     file_path: &str,
@@ -48,7 +48,7 @@ pub(crate) fn code_location_id_for_materialized_ac_test(
 }
 
 #[must_use]
-pub(crate) fn ac_link_id_for_verified_by_file(ac_id: &str, code_location_id: &str) -> String {
+pub fn ac_link_id_for_verified_by_file(ac_id: &str, code_location_id: &str) -> String {
     let digest = sha256_hex_labeled(b"acl-vb-v1", &[ac_id, code_location_id]);
     format!("acl-{digest}")
 }

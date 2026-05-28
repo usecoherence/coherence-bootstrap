@@ -1,10 +1,10 @@
 use std::collections::HashSet;
 
-use crate::db::{connect, ConnectionConfig};
-use crate::migrations;
-use crate::models::{AcceptanceCriterion, Spec, SpecRelation};
-use crate::spec_store;
-use crate::test_world_guard;
+use coherence_core_db::db::{connect, ConnectionConfig};
+use coherence_core_db::migrations;
+use coherence_core_db::models::{AcceptanceCriterion, Spec, SpecRelation};
+use coherence_core_db::spec_store;
+use coherence_core_db::test_world_guard;
 
 /// Smoke identifiers — stable and namespaced away from `m0-smoke` fixtures.
 const SMOKE_SPEC_ID: &str = "M1-SMOKE-SPEC-1";

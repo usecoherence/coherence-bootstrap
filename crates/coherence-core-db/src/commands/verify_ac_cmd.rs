@@ -1,10 +1,10 @@
 use std::path::Path;
 
-use crate::ac_verify::{verify_acceptance_criterion, AcVerifyAcRunResult, AcVerifyLinkStatus};
+use coherence_core_db::ac_verify::{verify_acceptance_criterion, AcVerifyAcRunResult, AcVerifyLinkStatus};
 use crate::commands::cli_parse::parse_args;
-use crate::db::{connect, ConnectionConfig};
-use crate::evidence_store::{self, RunLayout, SnapshotEnvelope, ARTIFACTS_SEGMENT};
-use crate::migrations;
+use coherence_core_db::db::{connect, ConnectionConfig};
+use coherence_core_db::evidence_store::{self, RunLayout, SnapshotEnvelope, ARTIFACTS_SEGMENT};
+use coherence_core_db::migrations;
 
 pub fn run(args: &[String]) -> i32 {
     match run_impl(args) {

@@ -1,7 +1,7 @@
 //! Demo command: materialize one managed run under `.coherence/runs/<run-id>/` (ADR-0005).
 
 use crate::commands::cli_parse;
-use crate::evidence_store::{self, resolve_artifact_path, CanonicalEvidencePointer, RunLayout};
+use coherence_core_db::evidence_store::{self, resolve_artifact_path, CanonicalEvidencePointer, RunLayout};
 use std::env;
 use std::fs;
 use std::path::PathBuf;

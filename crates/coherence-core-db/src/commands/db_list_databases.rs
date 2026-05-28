@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use mysql::prelude::Queryable;
 
-use crate::db::{self, ConnectionConfig};
+use coherence_core_db::db::{self, ConnectionConfig};
 
 fn resolve_config() -> ConnectionConfig {
     let socket_path = env::var("DOLT_SOCKET")

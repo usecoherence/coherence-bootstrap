@@ -1,5 +1,5 @@
-use crate::db::{self, ConnectionConfig};
-use crate::migrations;
+use coherence_core_db::db::{self, ConnectionConfig};
+use coherence_core_db::migrations;
 
 pub fn run() -> i32 {
     if let Err(err) = db::manifest_catalog_preflight_for_connect("migrate") {

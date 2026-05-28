@@ -1,7 +1,7 @@
-use crate::ac_verify::{verify_spec, AcVerifyLinkStatus};
+use coherence_core_db::ac_verify::{verify_spec, AcVerifyLinkStatus};
 use crate::commands::cli_parse::parse_args;
-use crate::db::{connect, ConnectionConfig};
-use crate::migrations;
+use coherence_core_db::db::{connect, ConnectionConfig};
+use coherence_core_db::migrations;
 
 pub fn run(args: &[String]) -> i32 {
     match run_impl(args) {

@@ -1,8 +1,8 @@
 use crate::commands::cli_parse::{parse_args, ParsedArgs};
-use crate::db::{connect, ConnectionConfig};
-use crate::migrations;
-use crate::models::{slug_from_id, AcceptanceCriterion, ConcernKind, ReviewMode, RiskLevel};
-use crate::spec_store;
+use coherence_core_db::db::{connect, ConnectionConfig};
+use coherence_core_db::migrations;
+use coherence_core_db::models::{slug_from_id, AcceptanceCriterion, ConcernKind, ReviewMode, RiskLevel};
+use coherence_core_db::spec_store;
 
 pub fn run(args: &[String]) -> i32 {
     match run_impl(args) {

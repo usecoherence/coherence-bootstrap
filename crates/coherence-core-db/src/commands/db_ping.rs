@@ -1,4 +1,4 @@
-use crate::db::{self, ConnectionConfig};
+use coherence_core_db::db::{self, ConnectionConfig};
 
 pub fn run() -> i32 {
     if let Err(err) = db::manifest_catalog_preflight_for_connect("db-ping") {

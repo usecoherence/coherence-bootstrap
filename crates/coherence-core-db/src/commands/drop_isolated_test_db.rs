@@ -3,8 +3,8 @@
 
 use mysql::prelude::Queryable;
 
-use crate::db::{self, ConnectionConfig, user_scoped_dolt_from_manifest};
-use crate::project_manifest;
+use coherence_core_db::db::{self, ConnectionConfig, user_scoped_dolt_from_manifest};
+use coherence_core_db::project_manifest;
 
 fn configured_test_db_prefix() -> String {
     std::env::var("COHERENCE_TEST_DB_PREFIX").unwrap_or_else(|_| "coherence_test_".to_string())

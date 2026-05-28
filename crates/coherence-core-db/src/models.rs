@@ -277,7 +277,7 @@ impl SpecGraph {
     }
 }
 
-pub(crate) fn slug_from_id(id: &str) -> String {
+pub fn slug_from_id(id: &str) -> String {
     id.to_ascii_lowercase().replace('_', "-")
 }
 

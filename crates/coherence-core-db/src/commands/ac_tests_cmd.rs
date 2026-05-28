@@ -3,16 +3,16 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::ac_code_link_store;
-use crate::ac_materialize_codeintel_ids::{
+use coherence_core_db::ac_code_link_store;
+use coherence_core_db::ac_materialize_codeintel_ids::{
     ac_link_id_for_verified_by_file, code_location_id_for_materialized_ac_test,
 };
-use crate::ac_test_layout::{expected_rust_ac_test_files, ExpectedAcTestFile};
+use coherence_core_db::ac_test_layout::{expected_rust_ac_test_files, ExpectedAcTestFile};
 use crate::commands::cli_parse::parse_args;
-use crate::db::{connect, ConnectionConfig};
-use crate::migrations;
-use crate::models::{AcCodeLink, AcCodeRelationKind, CodeLocation, SpecGraph};
-use crate::spec_store;
+use coherence_core_db::db::{connect, ConnectionConfig};
+use coherence_core_db::migrations;
+use coherence_core_db::models::{AcCodeLink, AcCodeRelationKind, CodeLocation, SpecGraph};
+use coherence_core_db::spec_store;
 use mysql::Conn;
 
 pub fn run(args: &[String]) -> i32 {
@@ -263,7 +263,7 @@ fn check_rust(args: &[String]) -> Result<i32, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{AcceptanceCriterion, Spec, SpecGraph};
+    use coherence_core_db::models::{AcceptanceCriterion, Spec, SpecGraph};
 
     #[test]
     fn validate_tests_ac_rel_path_rejects_traversal() {

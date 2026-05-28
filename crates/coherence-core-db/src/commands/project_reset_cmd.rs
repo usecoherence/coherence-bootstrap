@@ -4,9 +4,9 @@
 
 use std::env;
 
-use crate::db::ConnectionConfig;
-use crate::migrations;
-use crate::project_manifest;
+use coherence_core_db::db::ConnectionConfig;
+use coherence_core_db::migrations;
+use coherence_core_db::project_manifest;
 
 pub fn run() -> i32 {
     match run_impl() {
@@ -39,7 +39,7 @@ fn run_impl() -> Result<(), String> {
         return Err("project init step failed (see stderr above)".into());
     }
 
-    crate::db::manifest_catalog_preflight_for_connect("project reset")?;
+    coherence_core_db::db::manifest_catalog_preflight_for_connect("project reset")?;
 
     let config = ConnectionConfig::from_env()?;
     let applied = migrations::apply_all(&config)?;
