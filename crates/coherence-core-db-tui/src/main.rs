@@ -1,7 +1,8 @@
+mod project_discovery;
 mod tree;
 
 use std::env;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Command;
 
 use coherence_core_db::db::ConnectionConfig;
@@ -46,37 +47,6 @@ static THEME: Theme = Theme {
     status_fg: Color::Rgb(180, 180, 220),
     env_fg: Color::Rgb(200, 200, 100),
 };
-
-fn discover_projects() -> Vec<(PathBuf, String)> {
-    let home = env::var("HOME").unwrap_or_else(|_| "/".to_string());
-    let mut projects = Vec::new();
-
-    if let Ok(output) = Command::new("find")
-        .args([
-            format!("{}/git", home).as_str(),
-            "-maxdepth",
-            "6",
-            "-name",
-            "project.toml",
-            "-path",
-            "*/.coherence/project.toml",
-        ])
-        .output()
-    {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        for line in stdout.lines() {
-            let path = PathBuf::from(line);
-            if let Some(parent) = path.parent().and_then(Path::parent) {
-                let slug = parent
-                    .file_name()
-                    .map(|s| s.to_string_lossy().to_string())
-                    .unwrap_or_default();
-                projects.push((parent.to_path_buf(), slug));
-            }
-        }
-    }
-    projects
-}
 
 #[derive(Clone, Copy, PartialEq)]
 enum Screen {
@@ -421,7 +391,7 @@ impl AppState {
 }
 
 fn main() -> Result<(), String> {
-    let projects = discover_projects();
+    let projects = project_discovery::discover_projects();
     if projects.is_empty() {
         eprintln!("No Coherence projects found under ~/git/");
         eprintln!("(Looking for ~/git/**/*/.coherence/project.toml with find -maxdepth 6)");
