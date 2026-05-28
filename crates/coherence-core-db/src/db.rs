@@ -40,13 +40,16 @@ pub struct ConnectionConfig {
     pub database: String,
 }
 
-/// ADR-0006 explicit opt-in: coordinated defaults for one user-scoped `dolt sql-server`.
-#[must_use]
-pub fn user_scoped_dolt_from_env() -> bool {
-    matches!(
-        env::var("COHERENCE_USE_USER_SCOPED_DOLT").as_deref(),
-        Ok("1") | Ok("true") | Ok("TRUE") | Ok("yes") | Ok("YES")
-    )
+pub fn user_scoped_dolt_from_manifest(manifest: &Option<project_manifest::ProjectManifest>) -> bool {
+    match manifest.as_ref() {
+        Some(m) if m.dolt_mode.is_some() => {
+            matches!(
+                m.dolt_mode.as_ref().unwrap().as_str(),
+                "user-scoped" | "user_scoped" | "user"
+            )
+        }
+        _ => true, // default to user-scoped when no manifest or no dolt_mode set
+    }
 }
 
 fn runtime_coherence_dir() -> PathBuf {
@@ -115,10 +118,9 @@ impl ConnectionConfig {
     /// or when a parsable `.coherence/project.toml` lacks both a bound **`project_hash`** and legacy
     /// **`dolt_db_name`** (run `project init` or set `DOLT_DB`).
     pub fn from_env() -> Result<Self, String> {
-        let user_scoped = user_scoped_dolt_from_env();
-        let coherence_env = project_manifest::coherence_env_from_std_env()?;
-
         let manifest = project_manifest::try_read_project_manifest_from_cwd();
+        let user_scoped = user_scoped_dolt_from_manifest(&manifest);
+        let coherence_env = project_manifest::coherence_env_from_std_env()?;
         if let Some(ref m) = manifest {
             if env::var_os(COHERENCE_PROJECT_SLUG_ENV).is_none()
                 && !m.project_slug.trim().is_empty()
@@ -594,7 +596,6 @@ mod connection_config_manifest_tests {
     const ENV_FOR_CONNECTION_TESTS: &[&str] = &[
         "DOLT_DB",
         "COHERENCE_PROJECT_SLUG",
-        "COHERENCE_USE_USER_SCOPED_DOLT",
         "COHERENCE_ENV",
     ];
 
@@ -603,7 +604,6 @@ mod connection_config_manifest_tests {
         let _guard = crate::test_world_guard::lock_test_env();
         let _restore = MultiEnvRestore::snapshot(ENV_FOR_CONNECTION_TESTS);
         env::remove_var("COHERENCE_PROJECT_SLUG");
-        env::remove_var("COHERENCE_USE_USER_SCOPED_DOLT");
         env::remove_var("COHERENCE_ENV");
 
         let tmp = tmp_git_repo();
@@ -622,7 +622,6 @@ mod connection_config_manifest_tests {
         let _restore = MultiEnvRestore::snapshot(ENV_FOR_CONNECTION_TESTS);
         env::remove_var("DOLT_DB");
         env::remove_var("COHERENCE_PROJECT_SLUG");
-        env::remove_var("COHERENCE_USE_USER_SCOPED_DOLT");
         env::remove_var("COHERENCE_ENV");
 
         let tmp = tmp_git_repo();
@@ -640,7 +639,6 @@ mod connection_config_manifest_tests {
         let _restore = MultiEnvRestore::snapshot(ENV_FOR_CONNECTION_TESTS);
         env::remove_var("DOLT_DB");
         env::remove_var("COHERENCE_PROJECT_SLUG");
-        env::remove_var("COHERENCE_USE_USER_SCOPED_DOLT");
         env::remove_var("COHERENCE_ENV");
 
         let tmp = tmp_git_repo();
@@ -656,7 +654,6 @@ mod connection_config_manifest_tests {
         let _restore = MultiEnvRestore::snapshot(ENV_FOR_CONNECTION_TESTS);
         env::remove_var("DOLT_DB");
         env::remove_var("COHERENCE_PROJECT_SLUG");
-        env::remove_var("COHERENCE_USE_USER_SCOPED_DOLT");
         env::remove_var("COHERENCE_ENV");
 
         let tmp = tmp_git_repo();
@@ -681,7 +678,6 @@ dolt_db_name = "legacy_only_ignored"
         let _restore = MultiEnvRestore::snapshot(ENV_FOR_CONNECTION_TESTS);
         env::remove_var("DOLT_DB");
         env::remove_var("COHERENCE_PROJECT_SLUG");
-        env::remove_var("COHERENCE_USE_USER_SCOPED_DOLT");
 
         let tmp = tmp_git_repo();
         fs::create_dir_all(tmp.path().join(".coherence")).unwrap();
@@ -711,7 +707,6 @@ project_hash = "cafe"
         let _restore = MultiEnvRestore::snapshot(ENV_FOR_CONNECTION_TESTS);
         env::remove_var("DOLT_DB");
         env::remove_var("COHERENCE_PROJECT_SLUG");
-        env::remove_var("COHERENCE_USE_USER_SCOPED_DOLT");
         env::remove_var("COHERENCE_ENV");
 
         let tmp = tmp_git_repo();
@@ -730,7 +725,6 @@ project_hash = "cafe"
         let _restore = MultiEnvRestore::snapshot(ENV_FOR_CONNECTION_TESTS);
         env::remove_var("DOLT_DB");
         env::remove_var("COHERENCE_PROJECT_SLUG");
-        env::remove_var("COHERENCE_USE_USER_SCOPED_DOLT");
         env::set_var("COHERENCE_ENV", "staging");
 
         let tmp = tmp_git_repo();
@@ -746,7 +740,6 @@ project_hash = "cafe"
         let _restore = MultiEnvRestore::snapshot(ENV_FOR_CONNECTION_TESTS);
         env::remove_var("DOLT_DB");
         env::remove_var("COHERENCE_PROJECT_SLUG");
-        env::remove_var("COHERENCE_USE_USER_SCOPED_DOLT");
         env::remove_var("COHERENCE_ENV");
 
         let tmp = TempDir::new().unwrap();
@@ -767,7 +760,6 @@ project_hash = "cafe"
         let _restore = MultiEnvRestore::snapshot(ENV_FOR_CONNECTION_TESTS);
         env::remove_var("DOLT_DB");
         env::remove_var("COHERENCE_PROJECT_SLUG");
-        env::remove_var("COHERENCE_USE_USER_SCOPED_DOLT");
         env::remove_var("COHERENCE_ENV");
 
         let tmp = tmp_git_repo();
@@ -787,7 +779,6 @@ project_hash = "cafe"
         let _restore = MultiEnvRestore::snapshot(ENV_FOR_CONNECTION_TESTS);
         env::remove_var("DOLT_DB");
         env::remove_var("COHERENCE_PROJECT_SLUG");
-        env::remove_var("COHERENCE_USE_USER_SCOPED_DOLT");
         env::remove_var("COHERENCE_ENV");
 
         let tmp = tmp_git_repo();
@@ -810,7 +801,6 @@ project_hash = "cafe"
         let _restore = MultiEnvRestore::snapshot(ENV_FOR_CONNECTION_TESTS);
         env::remove_var("COHERENCE_PROJECT_SLUG");
         env::remove_var("COHERENCE_ENV");
-        env::set_var("COHERENCE_USE_USER_SCOPED_DOLT", "1");
         env::set_var("DOLT_DB", "explicit_db");
 
         let tmp = tmp_git_repo();
@@ -825,7 +815,6 @@ project_hash = "cafe"
         let _restore = MultiEnvRestore::snapshot(ENV_FOR_CONNECTION_TESTS);
         env::remove_var("DOLT_DB");
         env::remove_var("COHERENCE_PROJECT_SLUG");
-        env::remove_var("COHERENCE_USE_USER_SCOPED_DOLT");
         env::remove_var("COHERENCE_ENV");
 
         let tmp = tmp_git_repo();
@@ -848,7 +837,6 @@ project_hash = "cafe"
         let _restore = MultiEnvRestore::snapshot(ENV_FOR_CONNECTION_TESTS);
         env::remove_var("DOLT_DB");
         env::remove_var("COHERENCE_PROJECT_SLUG");
-        env::remove_var("COHERENCE_USE_USER_SCOPED_DOLT");
         env::remove_var("COHERENCE_ENV");
 
         let tmp = TempDir::new().unwrap();
@@ -863,7 +851,6 @@ project_hash = "cafe"
         let _restore = MultiEnvRestore::snapshot(ENV_FOR_CONNECTION_TESTS);
         env::remove_var("DOLT_DB");
         env::remove_var("COHERENCE_PROJECT_SLUG");
-        env::remove_var("COHERENCE_USE_USER_SCOPED_DOLT");
         env::remove_var("COHERENCE_ENV");
 
         let tmp = tmp_git_repo();

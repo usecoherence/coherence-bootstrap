@@ -1,5 +1,6 @@
 .PHONY: tool check test test-isolated smoke smoke-isolated \
-	test-world-reset fmt clippy install-local install-local-force install-local-check print-bin-name
+	test-world-reset fmt clippy install-local install-local-force install-local-check print-bin-name \
+	cleanup-user-scoped
 
 BIN_NAME ?= coherence-core-db
 INSTALL_ROOT ?= $(HOME)/.local
@@ -55,6 +56,19 @@ install-local-force:
 	@mkdir -p "$(INSTALL_BIN_DIR)"
 	@cargo install --path "$(CRATE_PATH)" --root "$(INSTALL_ROOT)" --locked --force
 	@echo "Installed (forced) $(BIN_NAME) to $(INSTALL_BIN_DIR)/$(BIN_NAME)"
+
+cleanup-user-scoped:
+	@echo "Stopping all dolt sql-server processes..."
+	@for pid in $$(pgrep -f "dolt sql-server" 2>/dev/null); do \
+		echo "  Killing PID $$pid"; \
+		kill $$pid 2>/dev/null || true; \
+	done
+	@sleep 1
+	@echo "Cleaning user-scoped data-dir..."
+	@rm -rf /home/br11k/.local/share/coherence/db/*
+	@echo "Cleaning user-scoped runtime dir..."
+	@rm -rf /run/user/1000/coherence/*
+	@echo "cleanup-user-scoped: done"
 
 %:
 	@:

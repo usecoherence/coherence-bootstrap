@@ -309,7 +309,6 @@ fn project_reset_errors_without_manifest_file() {
         .env_remove("COHERENCE_ENV")
         .env_remove("COHERENCE_PROJECT_SLUG")
         .env_remove("COHERENCE_DB_PROFILE")
-        .env_remove("COHERENCE_USE_USER_SCOPED_DOLT")
         .output()
         .expect("project reset");
     assert!(!out.status.success());
@@ -345,7 +344,6 @@ fn db_ping_manifest_preflight_errors_in_git_repo_without_manifest_file() {
         .env_remove("COHERENCE_ENV")
         .env_remove("COHERENCE_PROJECT_SLUG")
         .env_remove("COHERENCE_DB_PROFILE")
-        .env_remove("COHERENCE_USE_USER_SCOPED_DOLT")
         .output()
         .expect("db-ping");
     assert!(

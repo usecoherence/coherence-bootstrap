@@ -59,6 +59,7 @@ fn run_impl(args: &[String]) -> Result<(), String> {
             dolt_db_name: None,
             frozen_git_toplevel: None,
             project_hash: None,
+            dolt_mode: Some("user-scoped".to_string()),
         }
     };
 
@@ -127,6 +128,9 @@ fn apply_bind(manifest: &mut ProjectManifest, frozen_git_path: &str) -> Result<(
     manifest.project_hash = Some(hash);
     manifest.frozen_git_toplevel = Some(frozen_git_path.trim().to_string());
     manifest.dolt_db_name = Some(dolt_db);
+    if manifest.dolt_mode.is_none() {
+        manifest.dolt_mode = Some("user-scoped".to_string());
+    }
     Ok(())
 }
 

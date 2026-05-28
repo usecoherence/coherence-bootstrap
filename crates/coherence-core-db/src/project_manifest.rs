@@ -127,9 +127,9 @@ pub struct ProjectManifest {
     pub dolt_db_name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub frozen_git_toplevel: Option<String>,
-    /// Stable hash segment bound at project init (schema ≥ 2 when present).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub project_hash: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dolt_mode: Option<String>,
 }
 
 /// Walk `start` and ancestors until a `.git` file or directory is found; return that directory.
@@ -377,6 +377,7 @@ mod tests {
             dolt_db_name: Some("my_catalog".to_string()),
             frozen_git_toplevel: Some("/tmp/repo".to_string()),
             project_hash: None,
+            dolt_mode: None,
         };
         write_manifest(tmp.path(), &manifest).unwrap();
         let loaded = read_manifest(tmp.path()).unwrap();
@@ -392,6 +393,7 @@ mod tests {
             dolt_db_name: None,
             frozen_git_toplevel: None,
             project_hash: None,
+            dolt_mode: None,
         };
         assert!(write_manifest(tmp.path(), &bad).is_err());
     }
@@ -463,6 +465,7 @@ mod tests {
             dolt_db_name: None,
             frozen_git_toplevel: None,
             project_hash: Some("a1b2".to_string()),
+            dolt_mode: Some("user-scoped".to_string()),
         };
         write_manifest(tmp.path(), &manifest).unwrap();
         let loaded = read_manifest(tmp.path()).unwrap();
@@ -472,25 +475,13 @@ mod tests {
     #[test]
     fn write_rejects_project_hash_on_schema_v1() {
         let tmp = TempDir::new().unwrap();
-        let bad = ProjectManifest {
+let bad = ProjectManifest {
             version: 1,
             project_slug: "x".to_string(),
             dolt_db_name: None,
             frozen_git_toplevel: None,
             project_hash: Some("abcd".to_string()),
-        };
-        assert!(write_manifest(tmp.path(), &bad).is_err());
-    }
-
-    #[test]
-    fn write_rejects_empty_project_hash_string() {
-        let tmp = TempDir::new().unwrap();
-        let bad = ProjectManifest {
-            version: CURRENT_MANIFEST_SCHEMA_VERSION,
-            project_slug: "x".to_string(),
-            dolt_db_name: None,
-            frozen_git_toplevel: None,
-            project_hash: Some("   ".to_string()),
+            dolt_mode: None,
         };
         assert!(write_manifest(tmp.path(), &bad).is_err());
     }

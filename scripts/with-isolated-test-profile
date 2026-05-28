@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Run a command with the isolated test-world DB profile (ADR-0004).
-# When COHERENCE_USE_USER_SCOPED_DOLT is set (ADR-0006), assigns a fresh disposable DOLT_DB
+# When user-scoped Dolt mode is active (dolt_mode="user-scoped" in project.toml), assigns a fresh disposable DOLT_DB
 # (coherence_test_<uuid> by default) for the child process and drops it on success unless
 # COHERENCE_KEEP_TEST_WORLD is set. On failure+keep, prints COHERENCE_PRESERVED_TEST_WORLD lines.
 # COHERENCE_ISOLATED_TEST_VERBOSE=1: log chosen DOLT_DB at start; print identity block on success+keep.

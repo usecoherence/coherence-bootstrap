@@ -9,10 +9,7 @@ if [ "${1:-}" = "--strict" ]; then strict=1; fi
 status=0
 
 user_scoped_dolt=0
-case "${COHERENCE_USE_USER_SCOPED_DOLT:-}" in
-1 | true | TRUE | yes | YES) user_scoped_dolt=1 ;;
-*) ;;
-esac
+if coherence_use_user_scoped_dolt; then user_scoped_dolt=1; fi
 
 check() {
   local label="$1" cmd="$2" required="${3:-required}"

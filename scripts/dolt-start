@@ -81,9 +81,8 @@ start_user_scoped() {
 
   wait_for_socket_mysql "$socket" "$tcp_port"
 
-  echo
+echo
   echo "Operator env (example):"
-  echo "  export COHERENCE_USE_USER_SCOPED_DOLT=1"
   echo "  export DOLT_SOCKET=$socket"
   echo "  export DOLT_DB=<project_slug>"
   echo "(Internal TCP for Refinery defaults to 127.0.0.1:$tcp_port when DOLT_PORT is unset — same as COHERENCE_DOLT_TCP_PORT.)"

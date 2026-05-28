@@ -3,10 +3,15 @@
 # shellcheck disable=SC2034  # library; callers use functions
 
 coherence_use_user_scoped_dolt() {
-  case "${COHERENCE_USE_USER_SCOPED_DOLT:-}" in
-  1 | true | TRUE | yes | YES) return 0 ;;
-  *) return 1 ;;
-  esac
+  local manifest="${ROOT:-$(pwd)}/.coherence/project.toml"
+  if [ -f "$manifest" ]; then
+    local mode
+    mode=$(grep -E '^dolt_mode\s*=' "$manifest" 2>/dev/null | cut -d '=' -f2 | tr -d ' "')
+    case "$mode" in
+      repo-local|repo_local|local) return 1 ;;
+    esac
+  fi
+  return 0
 }
 
 coherence_xdg_data_home() {

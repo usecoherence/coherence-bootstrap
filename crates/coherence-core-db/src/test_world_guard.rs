@@ -8,7 +8,7 @@
 
 use std::env;
 
-use crate::db::{user_scoped_dolt_from_env, ConnectionConfig};
+use crate::db::ConnectionConfig;
 use crate::project_manifest::{self, CoherenceEnv};
 
 /// Environment variable that must name an isolated profile before mutating workflows run.
@@ -89,7 +89,8 @@ fn database_has_disposable_prefix(database: &str) -> bool {
 /// disposable `DOLT_DB` names in that mode. Repo-local `.dolt` catalogs keep the historical
 /// `COHERENCE_DB_PROFILE=test`-only gate so `make tool run` / `make test-isolated` work without extra env.
 fn resolved_identity_checks_active() -> bool {
-    user_scoped_dolt_from_env()
+    let manifest = project_manifest::try_read_project_manifest_from_cwd();
+    crate::db::user_scoped_dolt_from_manifest(&manifest)
 }
 
 /// Under user-scoped Dolt, refuses resolved `database` names that cannot be proven disposable or non-canonical.
@@ -297,7 +298,6 @@ mod tests {
         "COHERENCE_TEST_DB_PREFIX",
         "COHERENCE_ENV",
         "DOLT_DB",
-        "COHERENCE_USE_USER_SCOPED_DOLT",
         "DOLT_SOCKET",
         "DOLT_HOST",
         "DOLT_PORT",
@@ -336,6 +336,7 @@ mod tests {
             r#"version = 2
 project_slug = "svc"
 project_hash = "cafe"
+dolt_mode = "user-scoped"
 "#,
         )
         .unwrap();
@@ -385,7 +386,6 @@ project_hash = "cafe"
         env::remove_var("COHERENCE_TEST_DB_PREFIX");
         env::remove_var("COHERENCE_ENV");
         env::remove_var("DOLT_DB");
-        env::remove_var("COHERENCE_USE_USER_SCOPED_DOLT");
     }
 
     #[test]
@@ -415,8 +415,18 @@ project_hash = "cafe"
         let _lock = lock_test_env();
         let _restore = SavedTestEnv::snapshot(SNAPSHOT_KEYS);
         clear_guard_env();
+        let tmp = tmp_git_repo();
+        std::fs::create_dir_all(tmp.path().join(".coherence")).unwrap();
+        std::fs::write(
+            tmp.path().join(".coherence/project.toml"),
+            r#"version = 2
+project_slug = "fixture_project"
+dolt_mode = "user-scoped"
+"#,
+        )
+        .unwrap();
+        let _cwd = SaveCwd::chdir(tmp.path());
         env::set_var(PROFILE_ENV_VAR, "test");
-        env::set_var("COHERENCE_USE_USER_SCOPED_DOLT", "1");
         let uuid = "550e8400-e29b-41d4-a716-446655440000";
         let config = dummy_config(format!("coherence_test_{uuid}"));
         require_isolated_test_world_for_writes("test_ctx", &config).unwrap();
@@ -427,6 +437,17 @@ project_hash = "cafe"
         let _lock = lock_test_env();
         let _restore = SavedTestEnv::snapshot(SNAPSHOT_KEYS);
         clear_guard_env();
+        let tmp = tmp_git_repo();
+        std::fs::create_dir_all(tmp.path().join(".coherence")).unwrap();
+        std::fs::write(
+            tmp.path().join(".coherence/project.toml"),
+            r#"version = 2
+project_slug = "coherence-core-db"
+dolt_mode = "repo-local"
+"#,
+        )
+        .unwrap();
+        let _cwd = SaveCwd::chdir(tmp.path());
         env::set_var(PROFILE_ENV_VAR, "test");
         let config = dummy_config("coherence-core-db");
         require_isolated_test_world_for_writes("test_ctx", &config).unwrap();
@@ -448,7 +469,17 @@ project_hash = "cafe"
         let _lock = lock_test_env();
         let _restore = SavedTestEnv::snapshot(SNAPSHOT_KEYS);
         clear_guard_env();
-        env::set_var("COHERENCE_USE_USER_SCOPED_DOLT", "1");
+        let tmp = tmp_git_repo();
+        std::fs::create_dir_all(tmp.path().join(".coherence")).unwrap();
+        std::fs::write(
+            tmp.path().join(".coherence/project.toml"),
+            r#"version = 2
+project_slug = "coherence-core-db"
+dolt_mode = "user-scoped"
+"#,
+        )
+        .unwrap();
+        let _cwd = SaveCwd::chdir(tmp.path());
         env::set_var(PROFILE_ENV_VAR, "test");
         env::set_var(PROJECT_SLUG_ENV_VAR, "Coherence-Core-Db");
         let config = dummy_config("coherence-core-db");
@@ -468,7 +499,17 @@ project_hash = "cafe"
         let _lock = lock_test_env();
         let _restore = SavedTestEnv::snapshot(SNAPSHOT_KEYS);
         clear_guard_env();
-        env::set_var("COHERENCE_USE_USER_SCOPED_DOLT", "1");
+        let tmp = tmp_git_repo();
+        std::fs::create_dir_all(tmp.path().join(".coherence")).unwrap();
+        std::fs::write(
+            tmp.path().join(".coherence/project.toml"),
+            r#"version = 2
+project_slug = "coherence-core-db"
+dolt_mode = "user-scoped"
+"#,
+        )
+        .unwrap();
+        let _cwd = SaveCwd::chdir(tmp.path());
         env::set_var(PROFILE_ENV_VAR, "test");
         env::set_var(PROJECT_SLUG_ENV_VAR, "coherence-core-db");
         let config = dummy_config("my_private_throwaway_db");
@@ -480,7 +521,17 @@ project_hash = "cafe"
         let _lock = lock_test_env();
         let _restore = SavedTestEnv::snapshot(SNAPSHOT_KEYS);
         clear_guard_env();
-        env::set_var("COHERENCE_USE_USER_SCOPED_DOLT", "1");
+        let tmp = tmp_git_repo();
+        std::fs::create_dir_all(tmp.path().join(".coherence")).unwrap();
+        std::fs::write(
+            tmp.path().join(".coherence/project.toml"),
+            r#"version = 2
+project_slug = "fixture_project"
+dolt_mode = "user-scoped"
+"#,
+        )
+        .unwrap();
+        let _cwd = SaveCwd::chdir(tmp.path());
         env::set_var(PROFILE_ENV_VAR, "test");
         let config = dummy_config("some_random_db_name");
         let msg = require_isolated_test_world_for_writes("test_ctx", &config).unwrap_err();
@@ -495,7 +546,17 @@ project_hash = "cafe"
         let _lock = lock_test_env();
         let _restore = SavedTestEnv::snapshot(SNAPSHOT_KEYS);
         clear_guard_env();
-        env::set_var("COHERENCE_USE_USER_SCOPED_DOLT", "1");
+        let tmp = tmp_git_repo();
+        std::fs::create_dir_all(tmp.path().join(".coherence")).unwrap();
+        std::fs::write(
+            tmp.path().join(".coherence/project.toml"),
+            r#"version = 2
+project_slug = "fixture_project"
+dolt_mode = "user-scoped"
+"#,
+        )
+        .unwrap();
+        let _cwd = SaveCwd::chdir(tmp.path());
         env::set_var(PROFILE_ENV_VAR, "test");
         env::set_var(TEST_WORLD_ALLOWLIST_ENV_VAR, "staging_clone,fixture_db");
         let config = dummy_config("Fixture_Db");
@@ -550,7 +611,16 @@ project_hash = "cafe"
         env::set_var("COHERENCE_ENV", "test");
 
         let tmp = tmp_git_repo();
-        write_v2_manifest_with_hash(tmp.path());
+        std::fs::create_dir_all(tmp.path().join(".coherence")).unwrap();
+        std::fs::write(
+            tmp.path().join(".coherence/project.toml"),
+            r#"version = 2
+project_slug = "svc"
+project_hash = "cafe"
+dolt_mode = "repo-local"
+"#,
+        )
+        .unwrap();
         let _cwd = SaveCwd::chdir(tmp.path());
 
         let config = dummy_config("svc_cafe_test");

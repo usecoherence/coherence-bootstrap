@@ -14,7 +14,6 @@ fn run_wrapper(args: &[&str], extra_env: &[(&str, &str)]) -> (i32, String) {
     let script = root.join("scripts/with-isolated-test-profile");
     let mut cmd = Command::new("bash");
     cmd.current_dir(&root)
-        .env("COHERENCE_USE_USER_SCOPED_DOLT", "1")
         .env("COHERENCE_KEEP_TEST_WORLD", "1")
         .env_remove("DOLT_PASSWORD")
         .arg(&script);

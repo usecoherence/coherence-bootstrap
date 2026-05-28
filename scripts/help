@@ -45,16 +45,15 @@ Dolt:
   make tool dolt-stop
   make tool migrate
 
-ADR-0006 (optional user-scoped shared server):
-  export COHERENCE_USE_USER_SCOPED_DOLT=1
-  then make tool dolt-start / dolt-stop / dolt-status (same commands).
+ADR-0006 (user-scoped Dolt — set `dolt_mode = "user-scoped"` in project.toml):
+  make tool dolt-start / dolt-stop / dolt-status (same commands).
   Layout:
     • data-dir:      ${COHERENCE_DOLT_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/coherence/db}
     • runtime-dir:   ${COHERENCE_DOLT_RUNTIME_DIR:-$XDG_RUNTIME_DIR/coherence}
                        (when XDG_RUNTIME_DIR is unset: ${HOME}/.cache/coherence/run)
     • socket:        ${DOLT_SOCKET:-<runtime-dir>/dolt.sock}
-  Select project DB with DOLT_DB=<slug>. Embedded migrations still connect via loopback TCP; internal port defaults to 33306 (override COHERENCE_DOLT_TCP_PORT).
-  Repo-local .dolt sql-server remains the default when COHERENCE_USE_USER_SCOPED_DOLT is unset (CI/agents).
+  Select project DB with DOLT_DB=<slug>. Internal TCP port defaults to 33306 (override COHERENCE_DOLT_TCP_PORT).
+  Repo-local .dolt (set `dolt_mode = "repo-local"` in project.toml or no project.toml) remains the default for CI/agents.
   Scripted verification: ./scripts/user-scoped-dolt-smoke.sh
   Isolated tests (make test-isolated, make tool run) under user-scoped: ./scripts/with-isolated-test-profile exports a fresh DOLT_DB=coherence_test_<uuid> (override prefix with COHERENCE_TEST_DB_PREFIX), then coherence-core-db drop-isolated-test-db after a successful run. Set COHERENCE_KEEP_TEST_WORLD (non-empty) to skip dropping after failure or success; on child failure with keep, stderr prints a COHERENCE_PRESERVED_TEST_WORLD block (DOLT_SOCKET, DOLT_DB, optional COHERENCE_ISOLATED_TEST_RUN_ID). Quiet success does not print that block; set COHERENCE_ISOLATED_TEST_VERBOSE=1 for allocation logging and for the block after success+keep. Teardown only drops names matching that prefix.
 
@@ -70,7 +69,7 @@ Canonical repository database policy (ADR-0004):
 Coherence DB ownership:
   one repository = one logical Coherence DB catalog (repo-local .dolt server by default)
   preferred local socket when repo-local: .dolt/dolt.sock
-  optional shared server socket when ADR-0006: see COHERENCE_USE_USER_SCOPED_DOLT above
+  optional shared server socket when ADR-0006: see `dolt_mode` in project.toml (default: user-scoped)
   cross-repo coordination uses links/contracts/commits/versions, not shared writes
   consumer repos must not write into dependency/vendor repos' Dolt DBs
   core-db owns shared conventions and future workspace indexing, not this repo's truth

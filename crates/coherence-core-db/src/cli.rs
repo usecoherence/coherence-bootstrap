@@ -10,6 +10,7 @@ pub fn run(args: Vec<String>) -> i32 {
         "doctor" => commands::doctor::run(),
         "migrate" => commands::migrate::run(),
         "db-ping" => commands::db_ping::run(),
+        "db-list-databases" => commands::db_list_databases::run(),
         "drop-isolated-test-db" => commands::drop_isolated_test_db::run(),
         "m0-smoke" => commands::m0_smoke::run(),
         "m1-spec-smoke" => commands::m1_spec_smoke::run(),
@@ -21,7 +22,7 @@ pub fn run(args: Vec<String>) -> i32 {
         "evidence-sample" => commands::evidence_sample_cmd::run(&args[2..]),
         "project" => commands::project_cmd::run(&args[2..]),
         "version" | "--version" | "-V" => {
-            println!("coherence-core-db 0.1.0");
+            println!("coherence-core-db {}", env!("CARGO_PKG_VERSION"));
             0
         }
         other => {
@@ -39,7 +40,8 @@ fn print_help() {
            help       Show this help\n\
            doctor     Check runtime assumptions\n\
            migrate    Run migrations via migration library\n\
-           db-ping    Verify MySQL-protocol readiness (socket first, then TCP)\n\
+            db-ping    Verify MySQL-protocol readiness (socket first, then TCP)\n\
+            db-list-databases  List all databases on the Dolt server\n\
            drop-isolated-test-db  Drop a coherence_test_* DB on user-scoped server (ADR-0004)\n\
            m0-smoke       Run minimal Rust -> Dolt DB vertical slice\n\
            m1-spec-smoke  Run M1 spec store smoke (Spec / AC / SpecRelation)\n\
@@ -55,7 +57,7 @@ fn print_help() {
            • Curated catalog — long-lived spec/AC/codeintel rows; never written by tests/smoke without isolation.\n\
            • Isolated test world — COHERENCE_DB_PROFILE=test and a disposable Dolt target (DOLT_DB naming on user-scoped Dolt).\n\
            • Per-run evidence — under .coherence/runs/<run-id>/ per ADR-0005; not heavy blobs in canonical tables.\n\
-           • Optional user-scoped server — COHERENCE_USE_USER_SCOPED_DOLT=1: one dolt sql-server, pick catalog with DOLT_DB.\n\
+           • Optional user-scoped server — set dolt_mode = \"user-scoped\" in project.toml: one dolt sql-server, pick catalog with DOLT_DB.\n\
            Key env: DOLT_SOCKET, DOLT_DB, COHERENCE_ENV (dev|test|prod; unset/empty=dev; picks catalog tier when project_hash bound and DOLT_DB unset), COHERENCE_DB_PROFILE, COHERENCE_PROJECT_SLUG, COHERENCE_KEEP_TEST_WORLD.\n\n\
          Repository workflow:\n\
            make tool help\n\

@@ -3,16 +3,18 @@
 
 use mysql::prelude::Queryable;
 
-use crate::db::{self, ConnectionConfig};
+use crate::db::{self, ConnectionConfig, user_scoped_dolt_from_manifest};
+use crate::project_manifest;
 
 fn configured_test_db_prefix() -> String {
     std::env::var("COHERENCE_TEST_DB_PREFIX").unwrap_or_else(|_| "coherence_test_".to_string())
 }
 
 pub fn run() -> i32 {
-    if !db::user_scoped_dolt_from_env() {
+    let manifest = project_manifest::try_read_project_manifest_from_cwd();
+    if !user_scoped_dolt_from_manifest(&manifest) {
         eprintln!(
-            "drop-isolated-test-db: skipped (set COHERENCE_USE_USER_SCOPED_DOLT=1 to enable)"
+            "drop-isolated-test-db: skipped (dolt_mode is not user-scoped in project.toml)"
         );
         return 0;
     }
