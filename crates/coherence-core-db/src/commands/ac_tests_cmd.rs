@@ -39,7 +39,7 @@ fn run_impl(args: &[String]) -> Result<i32, String> {
         "check-rust" => check_rust(tail),
         other => Err(format!(
             "unknown ac-tests subcommand: {other} (expected materialize-rust or check-rust)\n\
-             materialize-rust: create missing tests/ac/**/*.rs from the DB graph (see ac-tests check-rust)\n\
+             materialize-rust: create missing tests/ac_*.rs from the DB graph (see ac-tests check-rust)\n\
              check-rust: verify every expected file exists; exits 1 if any are missing"
         )),
     }
@@ -89,18 +89,23 @@ fn sorted_expected_rust_ac_test_files(graph: &SpecGraph) -> Vec<ExpectedAcTestFi
 }
 
 fn validate_tests_ac_rel_path(rel: &str) -> Result<(), String> {
-    if !rel.starts_with("tests/ac/") {
+    if !rel.starts_with("tests/ac_") {
         return Err(format!(
-            "internal layout error: expected path under tests/ac/, got {rel:?}"
+            "internal layout error: expected path with tests/ac_ prefix, got {rel:?}"
         ));
     }
     if rel.contains("..") {
         return Err(format!("unsafe relative path: {rel:?}"));
     }
+    // Flat layout — reject paths with subdirectory separators after the prefix.
+    let tail = &rel["tests/ac_".len()..];
+    if tail.contains('/') {
+        return Err(format!("flat layout expected, got subdirectory in {rel:?}"));
+    }
     Ok(())
 }
 
-/// Writes missing skeleton files under `workspace/tests/ac/`. Does not overwrite existing files.
+/// Writes missing skeleton files under `workspace/tests/`. Does not overwrite existing files.
 /// Returns `(created_rel_paths, existing_rel_paths)` using the same relative strings as layout.
 fn materialize_rust_ac_tests(
     workspace: &Path,
@@ -108,7 +113,7 @@ fn materialize_rust_ac_tests(
 ) -> Result<(Vec<String>, Vec<String>), String> {
     let expected = sorted_expected_rust_ac_test_files(graph);
 
-    let tests_ac_root = workspace.join("tests/ac");
+    let tests_root = workspace.join("tests");
 
     let mut created = Vec::new();
     let mut existing = Vec::new();
@@ -116,9 +121,9 @@ fn materialize_rust_ac_tests(
     for file in expected {
         validate_tests_ac_rel_path(&file.file_path)?;
         let abs = workspace.join(&file.file_path);
-        if !abs.starts_with(&tests_ac_root) {
+        if !abs.starts_with(&tests_root) {
             return Err(format!(
-                "refusing to write outside tests/ac: {}",
+                "refusing to write outside tests/: {}",
                 abs.display()
             ));
         }
@@ -150,7 +155,7 @@ fn materialize_rust_ac_tests(
 ///
 /// Product choice (COREDB-k34.2): reconcile links for all present expected files each run (not only
 /// files created in the just-finished pass) so repeated `materialize-rust` keeps the DB aligned with
-/// `tests/ac/**` and `verify-ac` remains consistent.
+/// `tests/ac_*.rs` and `verify-ac` remains consistent.
 fn upsert_codeintel_for_expected_ac_test_files(
     conn: &mut Conn,
     workspace: &Path,
@@ -191,15 +196,15 @@ fn missing_rust_ac_test_files(
     workspace: &Path,
     graph: &SpecGraph,
 ) -> Result<Vec<(String, String)>, String> {
-    let tests_ac_root = workspace.join("tests/ac");
+    let tests_root = workspace.join("tests");
     let mut missing = Vec::new();
 
     for file in sorted_expected_rust_ac_test_files(graph) {
         validate_tests_ac_rel_path(&file.file_path)?;
         let abs = workspace.join(&file.file_path);
-        if !abs.starts_with(&tests_ac_root) {
+        if !abs.starts_with(&tests_root) {
             return Err(format!(
-                "refusing to scan outside tests/ac: {}",
+                "refusing to scan outside tests/: {}",
                 abs.display()
             ));
         }
@@ -268,7 +273,7 @@ mod tests {
 
     #[test]
     fn validate_tests_ac_rel_path_rejects_traversal() {
-        assert!(validate_tests_ac_rel_path("tests/ac/../etc/passwd").is_err());
+        assert!(validate_tests_ac_rel_path("tests/ac_/../etc/passwd").is_err());
     }
 
     #[test]
@@ -283,7 +288,7 @@ mod tests {
 
         let (c1, e1) = materialize_rust_ac_tests(root, &graph).expect("first run");
         assert_eq!(c1.len(), 1);
-        assert!(c1[0].ends_with("sample-ac.rs"));
+        assert!(c1[0].ends_with("tests/ac_sample-ac.rs"));
         assert!(e1.is_empty());
 
         let (c2, e2) = materialize_rust_ac_tests(root, &graph).expect("second run");
@@ -312,8 +317,8 @@ mod tests {
             created[0] < created[1],
             "paths should be sorted: {created:?}",
         );
-        assert!(created[0].contains("/ac-a."));
-        assert!(created[1].contains("/ac-z."));
+        assert!(created[0].contains("tests/ac_ac-a."));
+        assert!(created[1].contains("tests/ac_ac-z."));
     }
 
     #[test]

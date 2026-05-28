@@ -71,7 +71,7 @@ fn materialize_rust_cli_upserts_codeintel_rows() {
         .expect("expected file entry for seeded AC");
     let rel_path = ours.file_path.clone();
     #[allow(clippy::case_sensitive_file_extension_comparisons)]
-    let is_ok = rel_path.starts_with("tests/ac/") && rel_path.ends_with(".rs");
+    let is_ok = rel_path.starts_with("tests/ac_") && rel_path.ends_with(".rs");
     assert!(
         is_ok,
         "unexpected layout path {rel_path}"

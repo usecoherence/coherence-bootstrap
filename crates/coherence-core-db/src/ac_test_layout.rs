@@ -4,16 +4,16 @@
 //!
 //! Each AC yields a path:
 //!
-//! `tests/ac/<root-spec-slug>/[<intermediate-spec-slugs>/]<ac.slug>.rs`
+//! `tests/ac_<ac.slug>.rs`
 //!
-//! Segments use persisted **spec slugs** and **AC slugs** (never titles).
+//! Files are flat under `tests/ac_` (no subdirectories) so Cargo auto-discovers them.
 //!
 //! # Root and ancestry (MVP)
 //!
 //! Parent links come only from [`SpecRelation`] rows with `relation_kind == "depends_on"`,
 //! interpreted as **child depends on parent**: `source_spec_id` is the child spec and
-//! `target_spec_id` is its parent (toward the root). A spec with no incoming edge in this
-//! sense is treated as **root** for path purposes; a lone spec yields `tests/ac/<that.slug>/<ac.slug>.rs`.
+//! `target_spec_id` is its parent (toward the root). The spec hierarchy is still computed
+//! (for future use) but the flat path uses `tests/ac_<ac.slug>.rs` regardless.
 //!
 //! For a spec with multiple `depends_on` parents (data error or future fan-in), the **lexicographically
 //! smallest** `target_spec_id` is kept so the layout stays deterministic.
@@ -24,7 +24,7 @@
 //!
 //! # `test_command` stub
 //!
-//! [`ExpectedAcTestFile::test_command`] is populated with `cargo test <rust_fn_name>` where
+//! [`ExpectedAcTestFile::test_command`] is populated with `cargo test -p coherence-core-db <rust_fn_name>` where
 //! `<rust_fn_name>` is [`slug_to_rust_ident`] for the AC slug. This is a deterministic, human-oriented
 //! hint for `verify-ac`-style runners; it is not guaranteed to match final crate test discovery.
 //!
@@ -96,18 +96,11 @@ pub fn expected_rust_ac_test_files(graph: &SpecGraph) -> Vec<ExpectedAcTestFile>
 
     let mut out = Vec::with_capacity(acs.len());
     for ac in acs {
-        let path_segments = spec_slug_path(ac.spec_id.as_str(), &spec_by_id, &parent_map);
-        let mut file_path = String::from("tests/ac");
-        for seg in path_segments {
-            file_path.push('/');
-            file_path.push_str(&seg);
-        }
-        file_path.push('/');
-        file_path.push_str(&ac.slug);
-        file_path.push_str(".rs");
+        let _path_segments = spec_slug_path(ac.spec_id.as_str(), &spec_by_id, &parent_map);
+        let file_path = format!("tests/ac_{}.rs", ac.slug);
 
         let ident = slug_to_rust_ident(&ac.slug);
-        let test_command = format!("cargo test {ident}");
+        let test_command = format!("cargo test -p coherence-core-db {ident}");
         let content = skeleton_rust_content(&ac.id, &ident);
 
         out.push(ExpectedAcTestFile {
@@ -211,7 +204,7 @@ mod tests {
         let files = expected_rust_ac_test_files(&g);
         assert_eq!(files.len(), 1);
         assert!(
-            files[0].file_path.ends_with("machine-slug.rs"),
+            files[0].file_path.ends_with("tests/ac_machine-slug.rs"),
             "got {}",
             files[0].file_path
         );
@@ -236,11 +229,11 @@ mod tests {
         assert_eq!(files.len(), 1);
         assert_eq!(
             files[0].file_path,
-            "tests/ac/coredb/code-links/rejects-malformed-url.rs"
+            "tests/ac_rejects-malformed-url.rs"
         );
         assert_eq!(
             files[0].test_command,
-            "cargo test validates_rejects_malformed_url"
+            "cargo test -p coherence-core-db validates_rejects_malformed_url"
         );
         assert!(files[0]
             .content
@@ -255,6 +248,6 @@ mod tests {
         let ac = crate::models::AcceptanceCriterion::new("AC-1", "SPEC-B", "t");
         let g = SpecGraph::new(vec![a, b], vec![ac], vec![rel]);
         let files = expected_rust_ac_test_files(&g);
-        assert_eq!(files[0].file_path, "tests/ac/spec-b/ac-1.rs");
+        assert_eq!(files[0].file_path, "tests/ac_ac-1.rs");
     }
 }
