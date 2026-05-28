@@ -2,6 +2,7 @@ mod action;
 mod app;
 mod effects;
 mod project_discovery;
+mod repository;
 mod theme;
 mod tree;
 mod update;

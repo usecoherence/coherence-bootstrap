@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use crate::repository::SpecRepository;
 use crate::tree;
 
 #[derive(Clone, Copy, PartialEq)]
@@ -9,7 +10,6 @@ pub enum Screen {
     Specs,
 }
 
-#[derive(Clone)]
 pub struct AppState {
     pub screen: Screen,
     pub focus_tree: bool,
@@ -27,6 +27,9 @@ pub struct AppState {
     pub detail_ac_id: Option<String>,
 
     pub status: String,
+
+    pub project_dir: Option<PathBuf>,
+    pub repo: Option<Box<dyn SpecRepository>>,
 }
 
 impl AppState {
@@ -46,6 +49,8 @@ impl AppState {
             detail_spec_id: None,
             detail_ac_id: None,
             status: "Select a project".into(),
+            project_dir: None,
+            repo: None,
         }
     }
 
