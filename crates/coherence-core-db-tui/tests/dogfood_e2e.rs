@@ -1,14 +1,12 @@
 // Smoke + e2e tests for coherence-test-world + TUI AppState.
 #![allow(clippy::pedantic, clippy::unwrap_used)]
 
-use std::sync::atomic::{AtomicUsize, Ordering};
-
 use coherence_core_db_tui::action::AppAction;
 use coherence_core_db_tui::app::{AppState, Screen};
 use coherence_core_db_tui::effects::Effect;
 use coherence_core_db_tui::update::update;
 use coherence_core_db_tui::effects;
-use coherence_test_world::{DoltServer, DoltWorld, Evidence, Scaffold, VerificationResult, World, AcTest};
+use coherence_test_world::{AcTest, DoltWorld, E2eRecipe, Evidence, Scaffold, VerificationResult, World};
 
 /// Guard that restores env vars and current_dir on Drop — even if the test panics.
 struct EnvGuard {
@@ -134,58 +132,25 @@ fn appstate_key_edit_mode_creates_draft() {
 
 // ---- Real e2e: Dolt sql-server + DoltSpecRepository + execute_effects ----
 
-static TEST_COUNTER: AtomicUsize = AtomicUsize::new(0);
-
-fn unique_slug() -> String {
-    let n = TEST_COUNTER.fetch_add(1, Ordering::SeqCst);
-    format!("e2e_project_{n}")
-}
-
-fn unique_db_name(slug: &str) -> String {
-    format!("{slug}_dev")
-}
-
-fn setup_e2e_env() -> (Scaffold, DoltWorld, DoltServer, String, String) {
-    let slug = unique_slug();
-    let db_name = unique_db_name(&slug);
-
-    let socket_path = std::env::temp_dir().join(format!("dolt_{slug}.sock"));
-
-    let scaffold = Scaffold::new(&slug).unwrap();
-    scaffold.write_file(".coherence/project.toml", &format!(
-        r#"
-project_slug = "{slug}"
-dolt_db_name = "{db_name}"
-dolt_mode = "user-scoped"
-"#)).unwrap();
-    scaffold.init_git().unwrap();
-
-    let dolt = DoltWorld::init(&db_name).unwrap();
-    dolt.run_sql(
-        "INSERT INTO specs (id, slug, title, level, status) VALUES ('e2e-spec-1', 'e2e-spec-1', 'E2E Test Spec', 'product', 'draft')",
-    ).unwrap();
-
-    let server = dolt.start_server(&socket_path).unwrap();
-
-    (scaffold, dolt, server, slug, db_name)
-}
-
 #[test]
 fn real_e2e_dolt_server_loads_spec_graph() {
-    let (scaffold, _dolt, _server, slug, db_name) = setup_e2e_env();
+    let env = E2eRecipe::default()
+        .spec("e2e-spec-1", "E2E Test Spec", "product", "draft")
+        .build()
+        .unwrap();
 
     let _guard = EnvGuard::save(&["DOLT_SOCKET", "DOLT_DB", "COHERENCE_DB_PROFILE", "COHERENCE_ENV"]);
 
     // cd into scaffold dir so DoltSpecRepository reads its project.toml
-    std::env::set_current_dir(scaffold.path(".")).unwrap();
+    std::env::set_current_dir(env.scaffold.path(".")).unwrap();
 
     // Set env for DoltSpecRepository to connect to our test server
-    std::env::set_var("DOLT_SOCKET", _server.socket_path().to_string_lossy().as_ref());
-    std::env::set_var("DOLT_DB", &db_name);
+    std::env::set_var("DOLT_SOCKET", env.server.socket_path().to_string_lossy().as_ref());
+    std::env::set_var("DOLT_DB", &env.db_name);
     std::env::set_var("COHERENCE_DB_PROFILE", "test");
     std::env::set_var("COHERENCE_ENV", "dev");
 
-    let projects = vec![(scaffold.path("."), slug.clone())];
+    let projects = vec![(env.scaffold.path("."), env.slug.clone())];
     let mut app = AppState::new(projects);
 
     // Navigate to Specs screen → triggers RefreshGraph effect

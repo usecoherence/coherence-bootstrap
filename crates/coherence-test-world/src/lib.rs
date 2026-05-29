@@ -7,9 +7,11 @@
 )]
 
 pub mod dolt_world;
+pub mod recipe;
 pub mod scaffold;
 pub mod world;
 
 pub use dolt_world::{DoltServer, DoltWorld};
+pub use recipe::{E2eEnvironment, E2eRecipe};
 pub use scaffold::Scaffold;
 pub use world::{AcTest, Evidence, VerificationResult, World, WorldRecipe};
