@@ -5,6 +5,7 @@ use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph, Wrap};
 use ratatui::Frame;
 
 use crate::app::{AppState, Screen};
+use crate::edit::Draft;
 use crate::theme::Theme;
 
 pub fn ui(frame: &mut Frame, app: &AppState, theme: &Theme) {
@@ -52,7 +53,7 @@ fn title_line(app: &AppState, theme: &Theme) -> Line<'static> {
         Screen::EnvPicker => " [↑↓] nav  [Enter] select  [Esc] back  [q] quit",
         Screen::Specs => {
             if app.edit_mode {
-                " [s] status  [l] level  [r] review  [k] risk  [e] open editor  [Esc] done"
+                " [s] status  [l] level  [r] review  [k] risk  [e] editor  [Enter] save  [Esc] cancel"
             } else if app.focus_tree {
                 " [↑↓] nav  [Enter] expand/open  [p] project  [d] DB  [e] edit  [Esc] back  [q] quit"
             } else {
@@ -212,10 +213,24 @@ fn render_detail(frame: &mut Frame, area: Rect, app: &AppState, theme: &Theme) {
         return;
     };
 
+    let dirty = app.draft.as_ref().is_some_and(Draft::is_dirty);
+    let changes = if dirty { "  [modified]" } else { "" };
+
     let content = if let Some(ref spec_id) = app.detail_spec_id {
         let spec = graph.specs.iter().find(|s| s.id == *spec_id);
+        let spec_draft = app.draft.as_ref().and_then(|d| match d {
+            Draft::Spec { spec_id: did, .. } if did == spec_id => Some(d),
+            _ => None,
+        });
         match spec {
             Some(s) => {
+                let (level, status, desc) = match spec_draft {
+                    Some(Draft::Spec { pending_level, pending_status, pending_description, .. }) => {
+                        let d = pending_description.as_deref().unwrap_or(&s.description);
+                        (pending_level.as_db_str(), pending_status.as_db_str(), d)
+                    }
+                    _ => (s.level.as_db_str(), s.status.as_db_str(), &s.description as &str),
+                };
                 let concerns = graph.acceptance_criteria.iter()
                     .filter(|a| a.spec_id == s.id)
                     .map(|a| format!("      ├ {} — {} (risk={} review={})", a.slug, a.title, a.risk_level.as_db_str(), a.review_mode.as_db_str()))
@@ -229,13 +244,13 @@ fn render_detail(frame: &mut Frame, area: Rect, app: &AppState, theme: &Theme) {
                      ┃  Level    │ {}    \n\
                      ┃  Status   │ {}    \n\
                      ┣{:━^80}┨\n\
-                      ┃  Description:    \n\
+                      ┃  Description:{changes}    \n\
                       {}\n\
                      {}\n\
                      ┗{:━^80}┛",
                     " Spec ", s.id, s.slug, s.title,
-                    s.level.as_db_str(), s.status.as_db_str(), "",
-                    textwrap_indent(&s.description, "┃  "),
+                    level, status, "",
+                    textwrap_indent(desc, "┃  "),
                     if concerns.is_empty() { String::new() } else { format!("┃\n┃  Acceptance Criteria:\n{concerns}\n") },
                     ""
                 )
@@ -247,8 +262,20 @@ fn render_detail(frame: &mut Frame, area: Rect, app: &AppState, theme: &Theme) {
             .acceptance_criteria
             .iter()
             .find(|a| a.id == *ac_id);
+        let ac_draft = app.draft.as_ref().and_then(|d| match d {
+            Draft::Ac { ac_id: did, .. } if did == ac_id => Some(d),
+            _ => None,
+        });
         match ac {
             Some(a) => {
+                let (review_mode, risk_level, intent_changes, intent) = match ac_draft {
+                    Some(Draft::Ac { pending_review_mode, pending_risk_level, pending_intent, .. }) => {
+                        let i = pending_intent.as_deref().unwrap_or(&a.intent);
+                        let ch = if pending_intent.is_some() { "  [modified]" } else { "" };
+                        (pending_review_mode.as_db_str(), pending_risk_level.as_db_str(), ch, i)
+                    }
+                    _ => (a.review_mode.as_db_str(), a.risk_level.as_db_str(), "", &a.intent as &str),
+                };
                 let concerns_str = a.concerns.iter()
                     .map(|c| c.as_db_str())
                     .collect::<Vec<_>>()
@@ -263,12 +290,12 @@ fn render_detail(frame: &mut Frame, area: Rect, app: &AppState, theme: &Theme) {
                      ┃  Risk       │ {}    \n\
                      ┃  Concerns   │ {}    \n\
                      ┣{:━^80}┨\n\
-                     ┃  Intent:    \n\
+                     ┃  Intent:{intent_changes}    \n\
                      {}\n\
                      ┗{:━^80}┛",
                     " Acceptance Criterion ", a.id, a.spec_id, a.slug, a.title,
-                    a.review_mode.as_db_str(), a.risk_level.as_db_str(), concerns_str, "",
-                    textwrap_indent(&a.intent, "┃  "),
+                    review_mode, risk_level, concerns_str, "",
+                    textwrap_indent(intent, "┃  "),
                     ""
                 )
             }

@@ -2,6 +2,7 @@ use ratatui::crossterm::event::{KeyCode, KeyEventKind};
 
 use crate::app::{AppState, Screen};
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum AppAction {
     NavUp,
     NavDown,
@@ -19,6 +20,7 @@ pub enum AppAction {
     CycleReviewMode,
     CycleRiskLevel,
     OpenEditor,
+    SaveDraft,
     SwitchToProjectPicker,
     SwitchToEnvPicker,
 }
@@ -48,6 +50,7 @@ pub fn key_to_action(key: ratatui::crossterm::event::KeyEvent, app: &AppState) -
         Screen::Specs => {
             if app.edit_mode {
                 match key.code {
+                    KeyCode::Enter => Some(AppAction::SaveDraft),
                     KeyCode::Char('e') => Some(AppAction::OpenEditor),
                     KeyCode::Char('s') => Some(AppAction::CycleStatus),
                     KeyCode::Char('l') => Some(AppAction::CycleLevel),
@@ -75,5 +78,56 @@ pub fn key_to_action(key: ratatui::crossterm::event::KeyEvent, app: &AppState) -
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ratatui::crossterm::event::KeyModifiers;
+
+    use super::*;
+
+    fn make_app_state() -> AppState {
+        AppState {
+            edit_mode: false,
+            draft: None,
+            screen: Screen::Specs,
+            focus_tree: true,
+            detail_scroll: 0,
+            projects: Vec::new(),
+            selected_project: 0,
+            envs: Vec::new(),
+            selected_env: 0,
+            graph: None,
+            tree_items: Vec::new(),
+            selected_tree: 0,
+            detail_spec_id: None,
+            detail_ac_id: None,
+            status: String::new(),
+            project_dir: None,
+            repo: None,
+        }
+    }
+
+    #[test]
+    fn key_enter_in_edit_mode_returns_save_draft() {
+        let mut app = make_app_state();
+        app.edit_mode = true;
+        let key = ratatui::crossterm::event::KeyEvent::new(
+            KeyCode::Enter,
+            KeyModifiers::NONE,
+        );
+        assert_eq!(key_to_action(key, &app), Some(AppAction::SaveDraft));
+    }
+
+    #[test]
+    fn key_esc_in_edit_mode_returns_back() {
+        let mut app = make_app_state();
+        app.edit_mode = true;
+        let key = ratatui::crossterm::event::KeyEvent::new(
+            KeyCode::Esc,
+            KeyModifiers::NONE,
+        );
+        assert_eq!(key_to_action(key, &app), Some(AppAction::Back));
     }
 }

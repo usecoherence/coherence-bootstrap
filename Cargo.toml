@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/coherence-core-db", "crates/coherence-core-db-tui"]
+members = ["crates/coherence-core-db", "crates/coherence-core-db-tui", "crates/coherence-test-world"]
 resolver = "2"
 
 [workspace.package]

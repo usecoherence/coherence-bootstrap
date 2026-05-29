@@ -1,9 +1,10 @@
 use std::path::PathBuf;
 
+use crate::edit::Draft;
 use crate::repository::SpecRepository;
 use crate::tree;
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Screen {
     ProjectPicker,
     EnvPicker,
@@ -14,6 +15,7 @@ pub struct AppState {
     pub screen: Screen,
     pub focus_tree: bool,
     pub edit_mode: bool,
+    pub draft: Option<Draft>,
     pub detail_scroll: u16,
     pub projects: Vec<(PathBuf, String)>,
     pub selected_project: usize,
@@ -38,6 +40,7 @@ impl AppState {
             screen: Screen::ProjectPicker,
             focus_tree: true,
             edit_mode: false,
+            draft: None,
             detail_scroll: 0,
             projects,
             selected_project: 0,

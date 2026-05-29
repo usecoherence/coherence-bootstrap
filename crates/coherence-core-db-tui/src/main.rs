@@ -19,21 +19,15 @@
     clippy::wildcard_enum_match_arm,
 )]
 
-mod action;
-mod app;
-mod effects;
-mod project_discovery;
-mod repository;
-mod theme;
-mod tree;
-mod update;
-mod ui;
-
 use ratatui::crossterm::event::{self, Event};
 
-use action::{key_to_action, AppAction};
-use update::update;
-use theme::THEME;
+use coherence_core_db_tui::action::{key_to_action, AppAction};
+use coherence_core_db_tui::app;
+use coherence_core_db_tui::effects;
+use coherence_core_db_tui::project_discovery;
+use coherence_core_db_tui::theme::THEME;
+use coherence_core_db_tui::ui;
+use coherence_core_db_tui::update::update;
 
 fn main() -> Result<(), String> {
     let projects = project_discovery::discover_projects();

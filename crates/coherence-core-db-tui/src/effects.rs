@@ -4,8 +4,10 @@ use std::process::Command;
 use coherence_core_db::models::{AcceptanceCriterion, Spec};
 
 use crate::app::AppState;
+use crate::edit::Draft;
 use crate::repository::{DoltSpecRepository, SpecRepository};
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum Effect {
     PersistSpec(Spec),
     PersistAc(AcceptanceCriterion),
@@ -76,7 +78,11 @@ fn open_editor_for_spec(app: &mut AppState, spec_id: &str) {
     };
 
     let tmp = format!("/tmp/coherence-spec-{}.md", spec.id);
-    if std::fs::write(&tmp, &spec.description).is_err() {
+    let initial = match app.draft.as_ref() {
+        Some(Draft::Spec { pending_description: Some(desc), .. }) => desc.clone(),
+        _ => spec.description.clone(),
+    };
+    if std::fs::write(&tmp, &initial).is_err() {
         app.status = "write failed".into();
         return;
     }
@@ -86,20 +92,12 @@ fn open_editor_for_spec(app: &mut AppState, spec_id: &str) {
 
     if ok {
         let new_desc = std::fs::read_to_string(&tmp).unwrap_or_default();
-        let mut updated = spec.clone();
-        updated.description = new_desc;
-        match repo(app).put_spec(&updated) {
-            Ok(()) => {
-                app.status = "Spec description updated".into();
-                if let Some(ref graph) = app.graph {
-                    let mut g = graph.clone();
-                    if let Some(s) = g.specs.iter_mut().find(|s| s.id == updated.id) {
-                        s.description = updated.description.clone();
-                    }
-                    app.graph = Some(g);
-                }
+        match app.draft.as_mut() {
+            Some(Draft::Spec { pending_description, .. }) => {
+                *pending_description = Some(new_desc);
+                app.status = "Description updated in draft".into();
             }
-            Err(e) => app.status = format!("update failed: {e}"),
+            _ => app.status = "No active draft".into(),
         }
     } else {
         app.status = "Edit cancelled".into();
@@ -115,7 +113,11 @@ fn open_editor_for_ac(app: &mut AppState, ac_id: &str) {
     };
 
     let tmp = format!("/tmp/coherence-ac-{}.md", ac.id);
-    if std::fs::write(&tmp, &ac.intent).is_err() {
+    let initial = match app.draft.as_ref() {
+        Some(Draft::Ac { pending_intent: Some(intent), .. }) => intent.clone(),
+        _ => ac.intent.clone(),
+    };
+    if std::fs::write(&tmp, &initial).is_err() {
         app.status = "write failed".into();
         return;
     }
@@ -125,20 +127,12 @@ fn open_editor_for_ac(app: &mut AppState, ac_id: &str) {
 
     if ok {
         let new_intent = std::fs::read_to_string(&tmp).unwrap_or_default();
-        let mut updated = ac.clone();
-        updated.intent = new_intent;
-        match repo(app).put_acceptance_criterion(&updated) {
-            Ok(()) => {
-                app.status = "AC intent updated".into();
-                if let Some(ref graph) = app.graph {
-                    let mut g = graph.clone();
-                    if let Some(a) = g.acceptance_criteria.iter_mut().find(|a| a.id == updated.id) {
-                        a.intent = updated.intent.clone();
-                    }
-                    app.graph = Some(g);
-                }
+        match app.draft.as_mut() {
+            Some(Draft::Ac { pending_intent, .. }) => {
+                *pending_intent = Some(new_intent);
+                app.status = "Intent updated in draft".into();
             }
-            Err(e) => app.status = format!("update failed: {e}"),
+            _ => app.status = "No active draft".into(),
         }
     } else {
         app.status = "Edit cancelled".into();

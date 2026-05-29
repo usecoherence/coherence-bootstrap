@@ -156,6 +156,7 @@ name = "coherence-core-db-tui"
 version = "0.1.0"
 dependencies = [
  "coherence-core-db",
+ "coherence-test-world",
  "crossterm",
  "mysql",
  "ratatui",
@@ -163,6 +164,14 @@ dependencies = [
  "serde_json",
  "toml",
  "tui-tree-widget",
+]
+
+[[package]]
+name = "coherence-test-world"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
