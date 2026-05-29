@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Child, Command};
+use std::time::Duration;
 
 #[derive(Debug)]
 pub struct DoltWorld {
@@ -31,6 +32,25 @@ CREATE TABLE IF NOT EXISTS acceptance_criteria (
     updated_at VARCHAR(50) NOT NULL DEFAULT '',
     FOREIGN KEY (spec_id) REFERENCES specs(id)
 );
+
+CREATE TABLE IF NOT EXISTS acceptance_criterion_concerns (
+    id VARCHAR(255) PRIMARY KEY,
+    acceptance_criterion_id VARCHAR(255) NOT NULL,
+    concern TEXT NOT NULL,
+    created_at VARCHAR(50) NOT NULL DEFAULT '',
+    updated_at VARCHAR(50) NOT NULL DEFAULT '',
+    FOREIGN KEY (acceptance_criterion_id) REFERENCES acceptance_criteria(id)
+);
+
+CREATE TABLE IF NOT EXISTS spec_relations (
+    id VARCHAR(255) PRIMARY KEY,
+    source_spec_id VARCHAR(255) NOT NULL,
+    target_spec_id VARCHAR(255) NOT NULL,
+    relation_kind VARCHAR(50) NOT NULL DEFAULT 'depends_on',
+    note TEXT NOT NULL DEFAULT '',
+    FOREIGN KEY (source_spec_id) REFERENCES specs(id),
+    FOREIGN KEY (target_spec_id) REFERENCES specs(id)
+);
 ";
 
 fn dolt_in(dir: &Path, args: &[&str]) -> Result<std::process::Output, String> {
@@ -58,7 +78,7 @@ impl DoltWorld {
 
         dolt_ok(&data_dir, &["init"])?;
         dolt_ok(&data_dir, &["sql", "-q", &format!("CREATE DATABASE IF NOT EXISTS {db_name}")])?;
-        dolt_ok(&data_dir, &["sql", "-q", MIGRATION_SPECS])?;
+        dolt_ok(&data_dir, &["sql", "-q", &format!("USE {db_name}; {MIGRATION_SPECS}")])?;
 
         Ok(Self { data_dir, db_name })
     }
@@ -71,7 +91,8 @@ impl DoltWorld {
     }
 
     pub fn run_sql(&self, query: &str) -> Result<String, String> {
-        let out = dolt_in(&self.data_dir, &["sql", "-q", query])?;
+        let query = format!("USE {}; {query}", self.db_name);
+        let out = dolt_in(&self.data_dir, &["sql", "-q", &query])?;
         if out.status.success() {
             Ok(String::from_utf8_lossy(&out.stdout).to_string())
         } else {
@@ -102,13 +123,86 @@ impl DoltWorld {
     }
 }
 
+impl DoltWorld {
+    pub fn start_server(&self, socket: &Path) -> Result<DoltServer, String> {
+        let port = pick_unused_port();
+        let mut child = Command::new("dolt")
+            .args([
+                "sql-server",
+                "--data-dir",
+                &self.data_dir.to_string_lossy(),
+                "--host",
+                "127.0.0.1",
+                "--port",
+                &port.to_string(),
+                "--socket",
+                &socket.to_string_lossy(),
+            ])
+            .spawn()
+            .map_err(|e| format!("start dolt sql-server: {e}"))?;
+
+        let start = std::time::Instant::now();
+        let timeout = Duration::from_secs(15);
+        loop {
+            if socket.exists() {
+                let ping = Command::new("dolt")
+                    .args(["sql", "-q", "SELECT 1"])
+                    .env("DOLT_SOCKET", socket.to_string_lossy().as_ref())
+                    .output();
+                if let Ok(out) = ping {
+                    if out.status.success() {
+                        return Ok(DoltServer { child, socket_path: socket.to_path_buf() });
+                    }
+                }
+            }
+            if start.elapsed() > timeout {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err("dolt sql-server did not become ready within 15s".into());
+            }
+            std::thread::sleep(Duration::from_millis(200));
+        }
+    }
+}
+
 impl Drop for DoltWorld {
     fn drop(&mut self) {
         let _ = std::fs::remove_dir_all(&self.data_dir);
     }
 }
 
+fn pick_unused_port() -> u16 {
+    // let the OS assign a port, then close it immediately
+    if let Ok(listener) = std::net::TcpListener::bind("127.0.0.1:0") {
+        if let Ok(addr) = listener.local_addr() {
+            return addr.port();
+        }
+    }
+    43306 // fallback
+}
+
+#[derive(Debug)]
+pub struct DoltServer {
+    child: Child,
+    socket_path: PathBuf,
+}
+
+impl DoltServer {
+    pub fn socket_path(&self) -> &Path {
+        &self.socket_path
+    }
+}
+
+impl Drop for DoltServer {
+    fn drop(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+        let _ = std::fs::remove_file(&self.socket_path);
+    }
+}
+
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 

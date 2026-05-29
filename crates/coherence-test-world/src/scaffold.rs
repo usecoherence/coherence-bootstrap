@@ -68,6 +68,7 @@ fn tempfile_dir(prefix: &str) -> Result<PathBuf, String> {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 
