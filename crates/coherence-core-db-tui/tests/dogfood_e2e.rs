@@ -1,3 +1,6 @@
+// Smoke tests for coherence-test-world + TUI AppState.
+// These verify basic scaffolding and navigation, but do NOT drive a real
+// Dolt sql-server + DoltSpecRepository pipeline.  That requires COREDB-9d0.7.
 #![allow(clippy::pedantic)]
 
 use coherence_core_db_tui::action::AppAction;
