@@ -232,6 +232,25 @@ fn real_e2e_dolt_server_loads_spec_graph() {
 }
 
 #[test]
-fn project_env_selection_loads_selected_env_spec_and_ac() {
-    project_env_selection::run_project_env_selection_spec_ac_e2e();
+fn project_env_selection_loads_selected_env_spec_and_ac() -> Result<(), String> {
+    let world = project_env_selection::ProjectEnvSelectionWorld::builder()
+        .with_dev_spec("dev-only-spec")
+        .with_test_project_env_ac()
+        .build()?;
+    let mut app = world.open_tui()?;
+
+    world
+        .drive(&mut app)
+        .select_project()
+        .select_env("test")
+        .load_specs();
+
+    project_env_selection::assert_that(&app)
+        .loaded_spec(project_env_selection::PROJECT_ENV_SPEC_ID)
+        .loaded_ac(project_env_selection::PROJECT_ENV_AC_ID)
+        .under_spec(project_env_selection::PROJECT_ENV_SPEC_ID)
+        .missing_spec("dev-only-spec")
+        .status_contains("Loaded test specs");
+
+    Ok(())
 }
