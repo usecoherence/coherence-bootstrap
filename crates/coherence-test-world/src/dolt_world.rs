@@ -32,7 +32,14 @@ impl DoltWorld {
         let db_name = db_name.to_string();
 
         dolt_ok(&data_dir, &["init"])?;
-        dolt_ok(&data_dir, &["sql", "-q", &format!("CREATE DATABASE IF NOT EXISTS {db_name}")])?;
+        dolt_ok(
+            &data_dir,
+            &[
+                "sql",
+                "-q",
+                &format!("CREATE DATABASE IF NOT EXISTS {db_name}"),
+            ],
+        )?;
 
         Ok(Self { data_dir, db_name })
     }
@@ -49,7 +56,14 @@ impl DoltWorld {
     }
 
     pub fn create_database(&self, db_name: &str) -> Result<(), String> {
-        dolt_ok(&self.data_dir, &["sql", "-q", &format!("CREATE DATABASE IF NOT EXISTS {db_name}")])
+        dolt_ok(
+            &self.data_dir,
+            &[
+                "sql",
+                "-q",
+                &format!("CREATE DATABASE IF NOT EXISTS {db_name}"),
+            ],
+        )
     }
 
     pub fn run_sql_in(&self, db_name: &str, query: &str) -> Result<String, String> {
@@ -79,8 +93,7 @@ impl DoltWorld {
                 .duration_since(std::time::UNIX_EPOCH)
                 .map_or(0, |d| d.as_nanos())
         ));
-        std::fs::create_dir_all(&path)
-            .map_err(|e| format!("create temp dolt dir: {e}"))?;
+        std::fs::create_dir_all(&path).map_err(|e| format!("create temp dolt dir: {e}"))?;
         Ok(path)
     }
 }
@@ -113,7 +126,10 @@ impl DoltWorld {
                     .output();
                 if let Ok(out) = ping {
                     if out.status.success() {
-                        return Ok(DoltServer { child, socket_path: socket.to_path_buf() });
+                        return Ok(DoltServer {
+                            child,
+                            socket_path: socket.to_path_buf(),
+                        });
                     }
                 }
             }

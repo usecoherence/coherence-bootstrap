@@ -82,8 +82,14 @@ fn resolve_workspace_root(workspace_flag: Option<&str>) -> Result<PathBuf, Strin
 
 /// Expected per-AC Rust files in deterministic order (`file_path`).
 /// Shared by [`materialize_rust_ac_tests`] and [`missing_rust_ac_test_files`].
-fn sorted_expected_rust_ac_test_files(graph: &SpecGraph) -> Vec<ExpectedAcTestFile> {
+fn sorted_expected_rust_ac_test_files(
+    graph: &SpecGraph,
+    ac_id_filter: Option<&str>,
+) -> Vec<ExpectedAcTestFile> {
     let mut expected = expected_rust_ac_test_files(graph);
+    if let Some(ac_id) = ac_id_filter {
+        expected.retain(|file| file.ac_id == ac_id);
+    }
     expected.sort_by(|a, b| a.file_path.cmp(&b.file_path));
     expected
 }
@@ -110,8 +116,9 @@ fn validate_tests_ac_rel_path(rel: &str) -> Result<(), String> {
 fn materialize_rust_ac_tests(
     workspace: &Path,
     graph: &SpecGraph,
+    ac_id_filter: Option<&str>,
 ) -> Result<(Vec<String>, Vec<String>), String> {
-    let expected = sorted_expected_rust_ac_test_files(graph);
+    let expected = sorted_expected_rust_ac_test_files(graph, ac_id_filter);
 
     let tests_root = workspace.join("tests");
 
@@ -160,9 +167,10 @@ fn upsert_codeintel_for_expected_ac_test_files(
     conn: &mut Conn,
     workspace: &Path,
     graph: &SpecGraph,
+    ac_id_filter: Option<&str>,
 ) -> Result<usize, String> {
     let mut n = 0usize;
-    for file in sorted_expected_rust_ac_test_files(graph) {
+    for file in sorted_expected_rust_ac_test_files(graph, ac_id_filter) {
         validate_tests_ac_rel_path(&file.file_path)?;
         let abs = workspace.join(&file.file_path);
         if !abs.is_file() {
@@ -195,11 +203,12 @@ fn upsert_codeintel_for_expected_ac_test_files(
 fn missing_rust_ac_test_files(
     workspace: &Path,
     graph: &SpecGraph,
+    ac_id_filter: Option<&str>,
 ) -> Result<Vec<(String, String)>, String> {
     let tests_root = workspace.join("tests");
     let mut missing = Vec::new();
 
-    for file in sorted_expected_rust_ac_test_files(graph) {
+    for file in sorted_expected_rust_ac_test_files(graph, ac_id_filter) {
         validate_tests_ac_rel_path(&file.file_path)?;
         let abs = workspace.join(&file.file_path);
         if !abs.starts_with(&tests_root) {
@@ -225,12 +234,14 @@ fn missing_rust_ac_test_files(
 fn materialize_rust(args: &[String]) -> Result<(), String> {
     let parsed = parse_args(args)?;
     let ws_flag = parsed.single_flag("workspace")?;
+    let ac_id_filter = parsed.single_flag("ac-id")?;
     let root = resolve_workspace_root(ws_flag)?;
 
     let mut conn = connect_migrated()?;
     let graph = spec_store::load_spec_graph(&mut conn)?;
-    let (created, existing) = materialize_rust_ac_tests(&root, &graph)?;
-    let codeintel_n = upsert_codeintel_for_expected_ac_test_files(&mut conn, &root, &graph)?;
+    let (created, existing) = materialize_rust_ac_tests(&root, &graph, ac_id_filter)?;
+    let codeintel_n =
+        upsert_codeintel_for_expected_ac_test_files(&mut conn, &root, &graph, ac_id_filter)?;
 
     println!("Created:");
     for p in &created {
@@ -247,11 +258,12 @@ fn materialize_rust(args: &[String]) -> Result<(), String> {
 fn check_rust(args: &[String]) -> Result<i32, String> {
     let parsed = parse_args(args)?;
     let ws_flag = parsed.single_flag("workspace")?;
+    let ac_id_filter = parsed.single_flag("ac-id")?;
     let root = resolve_workspace_root(ws_flag)?;
 
     let mut conn = connect_migrated()?;
     let graph = spec_store::load_spec_graph(&mut conn)?;
-    let missing = missing_rust_ac_test_files(&root, &graph)?;
+    let missing = missing_rust_ac_test_files(&root, &graph, ac_id_filter)?;
 
     if missing.is_empty() {
         println!("All expected AC test files are present.");
@@ -286,12 +298,12 @@ mod tests {
         let spec = Spec::new("SPEC-R", "Root");
         let graph = SpecGraph::new(vec![spec], vec![ac], vec![]);
 
-        let (c1, e1) = materialize_rust_ac_tests(root, &graph).expect("first run");
+        let (c1, e1) = materialize_rust_ac_tests(root, &graph, None).expect("first run");
         assert_eq!(c1.len(), 1);
         assert!(c1[0].ends_with("tests/ac_sample-ac.rs"));
         assert!(e1.is_empty());
 
-        let (c2, e2) = materialize_rust_ac_tests(root, &graph).expect("second run");
+        let (c2, e2) = materialize_rust_ac_tests(root, &graph, None).expect("second run");
         assert!(c2.is_empty());
         assert_eq!(e2, c1);
 
@@ -311,7 +323,7 @@ mod tests {
         let ac_a = AcceptanceCriterion::new("AC-A", "SPEC-R", "a");
         let graph = SpecGraph::new(vec![spec], vec![ac_z, ac_a], vec![]);
 
-        let (created, _) = materialize_rust_ac_tests(root, &graph).expect("materialize");
+        let (created, _) = materialize_rust_ac_tests(root, &graph, None).expect("materialize");
         assert_eq!(created.len(), 2);
         assert!(
             created[0] < created[1],
@@ -319,6 +331,21 @@ mod tests {
         );
         assert!(created[0].contains("tests/ac_ac-a."));
         assert!(created[1].contains("tests/ac_ac-z."));
+    }
+
+    #[test]
+    fn materialize_can_filter_to_one_ac_id() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let root = tmp.path();
+        let spec = Spec::new("SPEC-R", "Root");
+
+        let ac_one = AcceptanceCriterion::new("AC-ONE", "SPEC-R", "one");
+        let ac_two = AcceptanceCriterion::new("AC-TWO", "SPEC-R", "two");
+        let graph = SpecGraph::new(vec![spec], vec![ac_one, ac_two], vec![]);
+
+        let (created, _) =
+            materialize_rust_ac_tests(root, &graph, Some("AC-TWO")).expect("materialize");
+        assert_eq!(created, vec!["tests/ac_ac-two.rs"]);
     }
 
     #[test]
@@ -331,8 +358,8 @@ mod tests {
         let spec = Spec::new("SPEC-R", "Root");
         let graph = SpecGraph::new(vec![spec], vec![ac], vec![]);
 
-        materialize_rust_ac_tests(root, &graph).expect("materialize");
-        let missing = missing_rust_ac_test_files(root, &graph).expect("check scan");
+        materialize_rust_ac_tests(root, &graph, None).expect("materialize");
+        let missing = missing_rust_ac_test_files(root, &graph, None).expect("check scan");
         assert!(missing.is_empty());
     }
 
@@ -346,9 +373,9 @@ mod tests {
         let spec = Spec::new("SPEC-R", "Root");
         let graph = SpecGraph::new(vec![spec], vec![ac], vec![]);
 
-        let (created, _) = materialize_rust_ac_tests(root, &graph).expect("materialize");
+        let (created, _) = materialize_rust_ac_tests(root, &graph, None).expect("materialize");
         fs::remove_file(root.join(&created[0])).expect("remove");
-        let missing = missing_rust_ac_test_files(root, &graph).expect("check scan");
+        let missing = missing_rust_ac_test_files(root, &graph, None).expect("check scan");
         assert_eq!(missing.len(), 1);
         assert_eq!(missing[0].0, "AC-DEL");
         assert_eq!(missing[0].1, created[0]);
@@ -363,11 +390,11 @@ mod tests {
         ac1.slug = "one-ac".into();
         let spec = Spec::new("SPEC-R", "Root");
         let graph1 = SpecGraph::new(vec![spec.clone()], vec![ac1.clone()], vec![]);
-        materialize_rust_ac_tests(root, &graph1).expect("materialize");
+        materialize_rust_ac_tests(root, &graph1, None).expect("materialize");
 
         let ac2 = AcceptanceCriterion::new("AC-TWO", "SPEC-R", "Two");
         let graph2 = SpecGraph::new(vec![spec], vec![ac1, ac2], vec![]);
-        let missing = missing_rust_ac_test_files(root, &graph2).expect("check scan");
+        let missing = missing_rust_ac_test_files(root, &graph2, None).expect("check scan");
         assert_eq!(missing.len(), 1);
         assert_eq!(missing[0].0, "AC-TWO");
     }

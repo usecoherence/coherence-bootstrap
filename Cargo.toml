@@ -1,3 +1,10 @@
+[package]
+name = "coherence-core-db-bootstrap"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+
 [workspace]
 members = ["crates/coherence-core-db", "crates/coherence-core-db-tui", "crates/coherence-test-world"]
 resolver = "2"
@@ -19,3 +26,8 @@ expect_used = "warn"
 
 [workspace.dependencies]
 toml = "0.8.19"
+
+[dev-dependencies]
+coherence-core-db = { path = "crates/coherence-core-db" }
+coherence-core-db-tui = { path = "crates/coherence-core-db-tui" }
+coherence-test-world = { path = "crates/coherence-test-world" }

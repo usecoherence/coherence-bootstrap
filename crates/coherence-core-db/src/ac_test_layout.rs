@@ -24,7 +24,7 @@
 //!
 //! # `test_command` stub
 //!
-//! [`ExpectedAcTestFile::test_command`] is populated with `cargo test -p coherence-core-db <rust_fn_name>` where
+//! [`ExpectedAcTestFile::test_command`] is populated with `cargo test -p coherence-core-db-bootstrap <rust_fn_name>` where
 //! `<rust_fn_name>` is [`slug_to_rust_ident`] for the AC slug. This is a deterministic, human-oriented
 //! hint for `verify-ac`-style runners; it is not guaranteed to match final crate test discovery.
 //!
@@ -100,7 +100,7 @@ pub fn expected_rust_ac_test_files(graph: &SpecGraph) -> Vec<ExpectedAcTestFile>
         let file_path = format!("tests/ac_{}.rs", ac.slug);
 
         let ident = slug_to_rust_ident(&ac.slug);
-        let test_command = format!("cargo test -p coherence-core-db {ident}");
+        let test_command = format!("cargo test -p coherence-core-db-bootstrap {ident}");
         let content = skeleton_rust_content(&ac.id, &ident);
 
         out.push(ExpectedAcTestFile {
@@ -227,13 +227,10 @@ mod tests {
 
         let files = expected_rust_ac_test_files(&g);
         assert_eq!(files.len(), 1);
-        assert_eq!(
-            files[0].file_path,
-            "tests/ac_rejects-malformed-url.rs"
-        );
+        assert_eq!(files[0].file_path, "tests/ac_rejects-malformed-url.rs");
         assert_eq!(
             files[0].test_command,
-            "cargo test -p coherence-core-db validates_rejects_malformed_url"
+            "cargo test -p coherence-core-db-bootstrap validates_rejects_malformed_url"
         );
         assert!(files[0]
             .content

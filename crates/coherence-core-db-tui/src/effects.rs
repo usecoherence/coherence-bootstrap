@@ -29,7 +29,10 @@ pub fn execute_effects(app: &mut AppState, effects: Vec<Effect>) {
 }
 
 fn repo(app: &mut AppState) -> &mut dyn SpecRepository {
-    app.repo.as_mut().expect("SpecRepository not initialized").as_mut()
+    app.repo
+        .as_mut()
+        .expect("SpecRepository not initialized")
+        .as_mut()
 }
 
 fn persist_spec(app: &mut AppState, spec: Spec) {
@@ -73,13 +76,22 @@ fn persist_ac(app: &mut AppState, ac: AcceptanceCriterion) {
 fn open_editor_for_spec(app: &mut AppState, spec_id: &str) {
     let spec = match repo(app).get_spec(spec_id) {
         Ok(Some(s)) => s,
-        Ok(None) => { app.status = "spec not found".into(); return; }
-        Err(e) => { app.status = format!("get spec: {e}"); return; }
+        Ok(None) => {
+            app.status = "spec not found".into();
+            return;
+        }
+        Err(e) => {
+            app.status = format!("get spec: {e}");
+            return;
+        }
     };
 
     let tmp = format!("/tmp/coherence-spec-{}.md", spec.id);
     let initial = match app.draft.as_ref() {
-        Some(Draft::Spec { pending_description: Some(desc), .. }) => desc.clone(),
+        Some(Draft::Spec {
+            pending_description: Some(desc),
+            ..
+        }) => desc.clone(),
         _ => spec.description.clone(),
     };
     if std::fs::write(&tmp, &initial).is_err() {
@@ -87,13 +99,22 @@ fn open_editor_for_spec(app: &mut AppState, spec_id: &str) {
         return;
     }
 
-    let editor = env::var("EDITOR").or_else(|_| env::var("VISUAL")).unwrap_or_else(|_| "micro".to_string());
-    let ok = Command::new(&editor).arg(&tmp).status().map(|s| s.success()).unwrap_or(false);
+    let editor = env::var("EDITOR")
+        .or_else(|_| env::var("VISUAL"))
+        .unwrap_or_else(|_| "micro".to_string());
+    let ok = Command::new(&editor)
+        .arg(&tmp)
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
 
     if ok {
         let new_desc = std::fs::read_to_string(&tmp).unwrap_or_default();
         match app.draft.as_mut() {
-            Some(Draft::Spec { pending_description, .. }) => {
+            Some(Draft::Spec {
+                pending_description,
+                ..
+            }) => {
                 *pending_description = Some(new_desc);
                 app.status = "Description updated in draft".into();
             }
@@ -108,13 +129,22 @@ fn open_editor_for_spec(app: &mut AppState, spec_id: &str) {
 fn open_editor_for_ac(app: &mut AppState, ac_id: &str) {
     let ac = match repo(app).get_acceptance_criterion(ac_id) {
         Ok(Some(a)) => a,
-        Ok(None) => { app.status = "AC not found".into(); return; }
-        Err(e) => { app.status = format!("get AC: {e}"); return; }
+        Ok(None) => {
+            app.status = "AC not found".into();
+            return;
+        }
+        Err(e) => {
+            app.status = format!("get AC: {e}");
+            return;
+        }
     };
 
     let tmp = format!("/tmp/coherence-ac-{}.md", ac.id);
     let initial = match app.draft.as_ref() {
-        Some(Draft::Ac { pending_intent: Some(intent), .. }) => intent.clone(),
+        Some(Draft::Ac {
+            pending_intent: Some(intent),
+            ..
+        }) => intent.clone(),
         _ => ac.intent.clone(),
     };
     if std::fs::write(&tmp, &initial).is_err() {
@@ -122,8 +152,14 @@ fn open_editor_for_ac(app: &mut AppState, ac_id: &str) {
         return;
     }
 
-    let editor = env::var("EDITOR").or_else(|_| env::var("VISUAL")).unwrap_or_else(|_| "micro".to_string());
-    let ok = Command::new(&editor).arg(&tmp).status().map(|s| s.success()).unwrap_or(false);
+    let editor = env::var("EDITOR")
+        .or_else(|_| env::var("VISUAL"))
+        .unwrap_or_else(|_| "micro".to_string());
+    let ok = Command::new(&editor)
+        .arg(&tmp)
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
 
     if ok {
         let new_intent = std::fs::read_to_string(&tmp).unwrap_or_default();
