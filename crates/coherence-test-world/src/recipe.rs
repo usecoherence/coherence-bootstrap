@@ -29,7 +29,11 @@ impl E2eEnvironment {
     }
 }
 
-/// Declarative builder that replaces the handwritten `setup_e2e_env()` boilerplate.
+/// Declarative builder that replaces handwritten setup boilerplate.
+///
+/// Recipes prepare the world; AC tests still execute through command strings.
+/// Migration and seed SQL are caller-supplied so generic test-world mechanics do
+/// not own project schemas.
 ///
 /// ```ignore
 /// let env = E2eRecipe::default()

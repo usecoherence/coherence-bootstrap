@@ -85,6 +85,11 @@ pub enum World {
     Dolt(DoltWorld),
 }
 
+/// A language-agnostic verifier command to execute inside a [`World`].
+///
+/// AC tests should prefer this command boundary over Rust callbacks: projects
+/// can run `cargo test`, `pytest`, `npm test`, shell scripts, or any other
+/// command once a recipe has prepared the required filesystem and services.
 #[derive(Debug, Clone)]
 pub struct CommandRequest {
     pub command: String,

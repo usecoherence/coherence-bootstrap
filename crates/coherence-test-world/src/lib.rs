@@ -1,3 +1,15 @@
+//! Generic command-boundary test worlds for acceptance-criteria tests.
+//!
+//! The crate prepares disposable worlds and then executes AC checks as normal
+//! shell commands inside those worlds. That command boundary is intentional:
+//! Rust, Python, Node, Go, shell, or any other language can participate without
+//! a language-specific adapter as long as the project can expose a verifier
+//! command such as `cargo test`, `pytest`, `npm test`, or `./verify-ac.sh`.
+//!
+//! Current scope is local process execution plus service lifecycles such as
+//! Dolt. Containers, recipe CLIs, and language-specific adapters are deferred
+//! until the `World` / `Recipe` / `Service` API stabilizes.
+
 #![allow(
     clippy::missing_errors_doc,
     clippy::missing_panics_doc,
