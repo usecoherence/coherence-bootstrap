@@ -8,51 +8,6 @@ pub struct DoltWorld {
     db_name: String,
 }
 
-static MIGRATION_SPECS: &str = r"
-CREATE TABLE IF NOT EXISTS specs (
-    id VARCHAR(255) PRIMARY KEY,
-    slug VARCHAR(255) NOT NULL,
-    title VARCHAR(255) NOT NULL,
-    description TEXT NOT NULL DEFAULT '',
-    level VARCHAR(50) NOT NULL DEFAULT 'module',
-    status VARCHAR(50) NOT NULL DEFAULT 'draft',
-    created_at VARCHAR(50) NOT NULL DEFAULT '',
-    updated_at VARCHAR(50) NOT NULL DEFAULT ''
-);
-
-CREATE TABLE IF NOT EXISTS acceptance_criteria (
-    id VARCHAR(255) PRIMARY KEY,
-    spec_id VARCHAR(255) NOT NULL,
-    slug VARCHAR(255) NOT NULL,
-    title VARCHAR(255) NOT NULL,
-    intent TEXT NOT NULL DEFAULT '',
-    review_mode VARCHAR(50) NOT NULL DEFAULT 'manual',
-    risk_level VARCHAR(50) NOT NULL DEFAULT 'medium',
-    created_at VARCHAR(50) NOT NULL DEFAULT '',
-    updated_at VARCHAR(50) NOT NULL DEFAULT '',
-    FOREIGN KEY (spec_id) REFERENCES specs(id)
-);
-
-CREATE TABLE IF NOT EXISTS acceptance_criterion_concerns (
-    id VARCHAR(255) PRIMARY KEY,
-    acceptance_criterion_id VARCHAR(255) NOT NULL,
-    concern TEXT NOT NULL,
-    created_at VARCHAR(50) NOT NULL DEFAULT '',
-    updated_at VARCHAR(50) NOT NULL DEFAULT '',
-    FOREIGN KEY (acceptance_criterion_id) REFERENCES acceptance_criteria(id)
-);
-
-CREATE TABLE IF NOT EXISTS spec_relations (
-    id VARCHAR(255) PRIMARY KEY,
-    source_spec_id VARCHAR(255) NOT NULL,
-    target_spec_id VARCHAR(255) NOT NULL,
-    relation_kind VARCHAR(50) NOT NULL DEFAULT 'depends_on',
-    note TEXT NOT NULL DEFAULT '',
-    FOREIGN KEY (source_spec_id) REFERENCES specs(id),
-    FOREIGN KEY (target_spec_id) REFERENCES specs(id)
-);
-";
-
 fn dolt_in(dir: &Path, args: &[&str]) -> Result<std::process::Output, String> {
     Command::new("dolt")
         .args(args)
@@ -78,7 +33,6 @@ impl DoltWorld {
 
         dolt_ok(&data_dir, &["init"])?;
         dolt_ok(&data_dir, &["sql", "-q", &format!("CREATE DATABASE IF NOT EXISTS {db_name}")])?;
-        dolt_ok(&data_dir, &["sql", "-q", &format!("USE {db_name}; {MIGRATION_SPECS}")])?;
 
         Ok(Self { data_dir, db_name })
     }
@@ -215,7 +169,7 @@ mod tests {
     #[test]
     fn dolt_world_run_sql_works() {
         let dw = DoltWorld::init("test_db").unwrap();
-        let result = dw.run_sql("SELECT COUNT(*) AS c FROM specs");
+        let result = dw.run_sql("SELECT 1 AS c");
         assert!(result.is_ok());
     }
 

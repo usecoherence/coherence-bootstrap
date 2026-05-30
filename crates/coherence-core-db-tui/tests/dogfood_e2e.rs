@@ -8,6 +8,54 @@ use coherence_core_db_tui::update::update;
 use coherence_core_db_tui::effects;
 use coherence_test_world::{AcTest, DoltWorld, E2eRecipe, Evidence, Scaffold, VerificationResult, World};
 
+const CORE_DB_SCHEMA: &str = r"
+CREATE TABLE IF NOT EXISTS specs (
+    id VARCHAR(255) PRIMARY KEY,
+    slug VARCHAR(255) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    level VARCHAR(50) NOT NULL DEFAULT 'module',
+    status VARCHAR(50) NOT NULL DEFAULT 'draft',
+    created_at VARCHAR(50) NOT NULL DEFAULT '',
+    updated_at VARCHAR(50) NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS acceptance_criteria (
+    id VARCHAR(255) PRIMARY KEY,
+    spec_id VARCHAR(255) NOT NULL,
+    slug VARCHAR(255) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    intent TEXT NOT NULL DEFAULT '',
+    review_mode VARCHAR(50) NOT NULL DEFAULT 'manual',
+    risk_level VARCHAR(50) NOT NULL DEFAULT 'medium',
+    created_at VARCHAR(50) NOT NULL DEFAULT '',
+    updated_at VARCHAR(50) NOT NULL DEFAULT '',
+    FOREIGN KEY (spec_id) REFERENCES specs(id)
+);
+
+CREATE TABLE IF NOT EXISTS acceptance_criterion_concerns (
+    id VARCHAR(255) PRIMARY KEY,
+    acceptance_criterion_id VARCHAR(255) NOT NULL,
+    concern TEXT NOT NULL,
+    created_at VARCHAR(50) NOT NULL DEFAULT '',
+    updated_at VARCHAR(50) NOT NULL DEFAULT '',
+    FOREIGN KEY (acceptance_criterion_id) REFERENCES acceptance_criteria(id)
+);
+
+CREATE TABLE IF NOT EXISTS spec_relations (
+    id VARCHAR(255) PRIMARY KEY,
+    source_spec_id VARCHAR(255) NOT NULL,
+    target_spec_id VARCHAR(255) NOT NULL,
+    relation_kind VARCHAR(50) NOT NULL DEFAULT 'depends_on',
+    note TEXT NOT NULL DEFAULT '',
+    FOREIGN KEY (source_spec_id) REFERENCES specs(id),
+    FOREIGN KEY (target_spec_id) REFERENCES specs(id)
+);
+";
+
+const E2E_SPEC_SEED: &str =
+    "INSERT INTO specs (id, slug, title, level, status) VALUES ('e2e-spec-1', 'e2e-spec-1', 'E2E Test Spec', 'product', 'draft')";
+
 /// Guard that restores env vars and current_dir on Drop — even if the test panics.
 struct EnvGuard {
     orig_dir: std::path::PathBuf,
@@ -55,9 +103,9 @@ dolt_db_name = "test_project_test123_dev"
 #[test]
 fn dolt_world_seeds_and_queries_specs() {
     let dw = DoltWorld::init("dogfood_specs").unwrap();
-    dw.run_sql(
-        "INSERT INTO specs (id, slug, title, level, status) VALUES ('s1', 'spec-1', 'Test Spec', 'product', 'draft')",
-    )
+    dw.run_sql(CORE_DB_SCHEMA)
+        .unwrap();
+    dw.run_sql("INSERT INTO specs (id, slug, title, level, status) VALUES ('s1', 'spec-1', 'Test Spec', 'product', 'draft')")
     .unwrap();
     let count = dw.run_sql("SELECT COUNT(*) AS c FROM specs").unwrap();
     assert!(count.contains("1") || count.contains("| 1 |"));
@@ -135,7 +183,8 @@ fn appstate_key_edit_mode_creates_draft() {
 #[test]
 fn real_e2e_dolt_server_loads_spec_graph() {
     let env = E2eRecipe::default()
-        .spec("e2e-spec-1", "E2E Test Spec", "product", "draft")
+        .migrate_sql(CORE_DB_SCHEMA)
+        .seed_sql(E2E_SPEC_SEED)
         .build()
         .unwrap();
 

@@ -19,12 +19,14 @@ pub struct E2eEnvironment {
 ///
 /// ```ignore
 /// let env = E2eRecipe::default()
-///     .spec("e2e-spec-1", "E2E Test Spec", "product", "draft")
+///     .migrate_sql(include_str!("schema.sql"))
+///     .seed_sql("INSERT INTO examples (id) VALUES ('one')")
 ///     .build()?;
 /// ```
 pub struct E2eRecipe {
     slug: String,
-    specs: Vec<(String, String, String, String)>,
+    migration_sql: Vec<String>,
+    seed_sql: Vec<String>,
 }
 
 impl Default for E2eRecipe {
@@ -32,7 +34,8 @@ impl Default for E2eRecipe {
         let n = RECIPE_COUNTER.fetch_add(1, Ordering::SeqCst);
         Self {
             slug: format!("e2e_project_{n}"),
-            specs: Vec::new(),
+            migration_sql: Vec::new(),
+            seed_sql: Vec::new(),
         }
     }
 }
@@ -55,9 +58,13 @@ impl E2eRecipe {
         std::env::temp_dir().join(format!("dolt_{}.sock", self.slug))
     }
 
-    /// Register a spec to seed into the Dolt database.
-    pub fn spec(mut self, id: &str, title: &str, level: &str, status: &str) -> Self {
-        self.specs.push((id.to_string(), title.to_string(), level.to_string(), status.to_string()));
+    pub fn migrate_sql(mut self, sql: &str) -> Self {
+        self.migration_sql.push(sql.to_string());
+        self
+    }
+
+    pub fn seed_sql(mut self, sql: &str) -> Self {
+        self.seed_sql.push(sql.to_string());
         self
     }
 
@@ -65,7 +72,7 @@ impl E2eRecipe {
     ///
     /// # Errors
     ///
-    /// Returns an error if scaffold creation, Dolt init, SQL seeding, or
+    /// Returns an error if scaffold creation, Dolt init, SQL migration/seeding, or
     /// server startup fails.
     pub fn build(&self) -> Result<E2eEnvironment, String> {
         let slug = &self.slug;
@@ -87,11 +94,12 @@ dolt_mode = "user-scoped"
 
         let dolt_world = DoltWorld::init(&db_name)?;
 
-        for (id, title, level, status) in &self.specs {
-            dolt_world.run_sql(&format!(
-                "INSERT INTO specs (id, slug, title, level, status) \
-                 VALUES ('{id}', '{id}', '{title}', '{level}', '{status}')",
-            ))?;
+        for sql in &self.migration_sql {
+            dolt_world.run_sql(sql)?;
+        }
+
+        for sql in &self.seed_sql {
+            dolt_world.run_sql(sql)?;
         }
 
         let server = dolt_world.start_server(&socket_path)?;
