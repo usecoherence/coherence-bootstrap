@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 
 use crate::dolt_world::DoltWorld;
 use crate::scaffold::Scaffold;
@@ -83,33 +84,50 @@ pub enum World {
     Dolt(DoltWorld),
 }
 
-impl World {
-    pub fn run_command(&self, cmd: &str) -> Result<Evidence, String> {
-        match self {
-            Self::Filesystem(scaffold) => {
-                let output = std::process::Command::new("sh")
-                    .args(["-c", cmd])
-                    .current_dir(&scaffold.root)
-                    .output()
-                    .map_err(|e| format!("command failed: {e}"))?;
-                Ok(Evidence::new().record_command(&output))
-            }
-            Self::Command => {
-                let output = std::process::Command::new("sh")
-                    .args(["-c", cmd])
-                    .output()
-                    .map_err(|e| format!("command failed: {e}"))?;
-                Ok(Evidence::new().record_command(&output))
-            }
-            Self::Dolt(dw) => {
-                let output = std::process::Command::new("dolt")
-                    .args(["sql", "-q", cmd])
-                    .current_dir(dw.data_dir())
-                    .output()
-                    .map_err(|e| format!("dolt sql: {e}"))?;
-                Ok(Evidence::new().record_command(&output))
-            }
+#[derive(Debug, Clone)]
+pub struct CommandRequest {
+    pub command: String,
+    pub cwd: Option<PathBuf>,
+    pub env: HashMap<String, String>,
+}
+
+impl CommandRequest {
+    pub fn new(command: &str) -> Self {
+        Self {
+            command: command.to_string(),
+            cwd: None,
+            env: HashMap::new(),
         }
+    }
+
+    pub fn cwd(mut self, cwd: impl Into<PathBuf>) -> Self {
+        self.cwd = Some(cwd.into());
+        self
+    }
+
+    pub fn env(mut self, key: &str, value: &str) -> Self {
+        self.env.insert(key.to_string(), value.to_string());
+        self
+    }
+}
+
+impl World {
+    pub fn run(&self, request: CommandRequest) -> Result<Evidence, String> {
+        let base_dir = self.base_dir();
+        let cwd = resolve_cwd(base_dir, request.cwd.as_deref())?;
+        let mut command = std::process::Command::new("sh");
+        command
+            .args(["-c", &request.command])
+            .current_dir(cwd)
+            .envs(&request.env);
+        let output = command
+            .output()
+            .map_err(|e| format!("command failed: {e}"))?;
+        Ok(Evidence::new().record_command(&output))
+    }
+
+    pub fn run_command(&self, cmd: &str) -> Result<Evidence, String> {
+        self.run(CommandRequest::new(cmd))
     }
 
     pub fn scaffold(&self) -> Option<&Scaffold> {
@@ -117,6 +135,23 @@ impl World {
             Self::Filesystem(s) => Some(s),
             _ => None,
         }
+    }
+
+    fn base_dir(&self) -> Option<&Path> {
+        match self {
+            Self::Filesystem(scaffold) => Some(&scaffold.root),
+            Self::Dolt(dw) => Some(dw.data_dir()),
+            Self::Command => None,
+        }
+    }
+}
+
+fn resolve_cwd(base_dir: Option<&Path>, cwd: Option<&Path>) -> Result<PathBuf, String> {
+    match (base_dir, cwd) {
+        (Some(base), Some(path)) if path.is_relative() => Ok(base.join(path)),
+        (_, Some(path)) => Ok(path.to_path_buf()),
+        (Some(base), None) => Ok(base.to_path_buf()),
+        (None, None) => std::env::current_dir().map_err(|e| format!("current dir: {e}")),
     }
 }
 
@@ -222,5 +257,25 @@ mod tests {
         assert!(dir.join("evidence.json").exists());
         assert!(dir.join("snapshots/config.toml").exists());
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn world_run_accepts_env_vars() {
+        let evidence = World::Command
+            .run(CommandRequest::new("printf %s \"$AC_TEST_VALUE\"").env("AC_TEST_VALUE", "ok"))
+            .unwrap();
+        assert_eq!(evidence.stdout, "ok");
+        assert_eq!(evidence.exit_code, Some(0));
+    }
+
+    #[test]
+    fn filesystem_world_run_resolves_relative_cwd_inside_scaffold() {
+        let scaffold = Scaffold::new("world-cwd").unwrap();
+        scaffold.write_file("nested/input.txt", "ok").unwrap();
+        let evidence = World::Filesystem(scaffold)
+            .run(CommandRequest::new("cat input.txt").cwd("nested"))
+            .unwrap();
+        assert_eq!(evidence.stdout, "ok");
+        assert_eq!(evidence.exit_code, Some(0));
     }
 }
