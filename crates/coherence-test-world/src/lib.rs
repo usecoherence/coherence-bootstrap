@@ -9,9 +9,11 @@
 pub mod dolt_world;
 pub mod recipe;
 pub mod scaffold;
+pub mod service;
 pub mod world;
 
 pub use dolt_world::{DoltServer, DoltWorld};
 pub use recipe::{E2eEnvironment, E2eRecipe};
 pub use scaffold::Scaffold;
+pub use service::{RunningService, Service, Services};
 pub use world::{AcTest, CommandRequest, Evidence, VerificationResult, World, WorldRecipe};
