@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use crate::dolt_world::DoltWorld;
+use crate::recipe::E2eRecipe;
 use crate::scaffold::Scaffold;
 
 #[derive(Debug, Clone)]
@@ -112,6 +113,10 @@ impl CommandRequest {
 }
 
 impl World {
+    pub fn recipe(prefix: &str) -> E2eRecipe {
+        E2eRecipe::named(prefix)
+    }
+
     pub fn run(&self, request: CommandRequest) -> Result<Evidence, String> {
         let base_dir = self.base_dir();
         let cwd = resolve_cwd(base_dir, request.cwd.as_deref())?;

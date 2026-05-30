@@ -6,9 +6,7 @@ use coherence_core_db_tui::app::{AppState, Screen};
 use coherence_core_db_tui::effects::Effect;
 use coherence_core_db_tui::update::update;
 use coherence_core_db_tui::effects;
-use coherence_test_world::{
-    AcTest, DoltWorld, E2eRecipe, EnvGuard, Evidence, Scaffold, VerificationResult, World,
-};
+use coherence_test_world::{AcTest, DoltWorld, EnvGuard, Evidence, Scaffold, VerificationResult, World};
 
 const CORE_DB_SCHEMA: &str = r"
 CREATE TABLE IF NOT EXISTS specs (
@@ -156,9 +154,11 @@ fn appstate_key_edit_mode_creates_draft() {
 
 #[test]
 fn real_e2e_dolt_server_loads_spec_graph() {
-    let env = E2eRecipe::default()
+    let env = World::recipe("core_db_dogfood")
         .migrate_sql(CORE_DB_SCHEMA)
         .seed_sql(E2E_SPEC_SEED)
+        .env("COHERENCE_DB_PROFILE", "test")
+        .env("COHERENCE_ENV", "dev")
         .build()
         .unwrap();
 
@@ -168,11 +168,10 @@ fn real_e2e_dolt_server_loads_spec_graph() {
     // cd into scaffold dir so DoltSpecRepository reads its project.toml
     guard.set_current_dir(&env.scaffold.path(".")).unwrap();
 
-    // Set env for DoltSpecRepository to connect to our test server
-    std::env::set_var("DOLT_SOCKET", env.server.socket_path().to_string_lossy().as_ref());
-    std::env::set_var("DOLT_DB", &env.db_name);
-    std::env::set_var("COHERENCE_DB_PROFILE", "test");
-    std::env::set_var("COHERENCE_ENV", "dev");
+    // Set recipe-provided env for DoltSpecRepository.
+    for (key, value) in env.env() {
+        std::env::set_var(key, value);
+    }
 
     let projects = vec![(env.scaffold.path("."), env.slug.clone())];
     let mut app = AppState::new(projects);
