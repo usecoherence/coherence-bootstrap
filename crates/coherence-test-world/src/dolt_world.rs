@@ -45,7 +45,15 @@ impl DoltWorld {
     }
 
     pub fn run_sql(&self, query: &str) -> Result<String, String> {
-        let query = format!("USE {}; {query}", self.db_name);
+        self.run_sql_in(&self.db_name, query)
+    }
+
+    pub fn create_database(&self, db_name: &str) -> Result<(), String> {
+        dolt_ok(&self.data_dir, &["sql", "-q", &format!("CREATE DATABASE IF NOT EXISTS {db_name}")])
+    }
+
+    pub fn run_sql_in(&self, db_name: &str, query: &str) -> Result<String, String> {
+        let query = format!("USE {db_name}; {query}");
         let out = dolt_in(&self.data_dir, &["sql", "-q", &query])?;
         if out.status.success() {
             Ok(String::from_utf8_lossy(&out.stdout).to_string())

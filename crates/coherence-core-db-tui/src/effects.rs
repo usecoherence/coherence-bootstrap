@@ -142,25 +142,38 @@ fn open_editor_for_ac(app: &mut AppState, ac_id: &str) {
 
 fn refresh_graph(app: &mut AppState) {
     let proj_path = app.projects[app.selected_project].0.clone();
+    let selected_env = app
+        .envs
+        .get(app.selected_env)
+        .cloned()
+        .unwrap_or_else(|| "dev".to_string());
+    let previous_env = env::var("COHERENCE_ENV").ok();
+    env::set_var("COHERENCE_ENV", &selected_env);
 
-    let mut repo = match DoltSpecRepository::new(proj_path.clone()) {
-        Ok(r) => r,
-        Err(e) => {
-            app.status = format!("DB connect failed: {e}");
-            return;
-        }
-    };
+    let loaded = (|| {
+        let mut repo = DoltSpecRepository::new(proj_path.clone())
+            .map_err(|e| format!("DB connect failed: {e}"))?;
+        let graph = repo
+            .load_spec_graph()
+            .map_err(|e| format!("Load failed: {e}"))?;
+        Ok::<_, String>((repo, graph))
+    })();
 
-    match repo.load_spec_graph() {
-        Ok(graph) => {
+    match previous_env {
+        Some(value) => env::set_var("COHERENCE_ENV", value),
+        None => env::remove_var("COHERENCE_ENV"),
+    }
+
+    match loaded {
+        Ok((repo, graph)) => {
             app.project_dir = Some(proj_path.clone());
             app.repo = Some(Box::new(repo));
             app.graph = Some(graph);
             app.build_tree();
-            app.status = format!("Loaded specs from {}", proj_path.display());
+            app.status = format!("Loaded {selected_env} specs from {}", proj_path.display());
         }
         Err(e) => {
-            app.status = format!("Load failed: {e}");
+            app.status = e;
         }
     }
     app.update_preview();
