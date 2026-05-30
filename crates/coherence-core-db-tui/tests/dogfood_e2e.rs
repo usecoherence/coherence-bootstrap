@@ -6,7 +6,9 @@ use coherence_core_db_tui::app::{AppState, Screen};
 use coherence_core_db_tui::effects::Effect;
 use coherence_core_db_tui::update::update;
 use coherence_core_db_tui::effects;
-use coherence_test_world::{AcTest, DoltWorld, E2eRecipe, Evidence, Scaffold, VerificationResult, World};
+use coherence_test_world::{
+    AcTest, DoltWorld, E2eRecipe, EnvGuard, Evidence, Scaffold, VerificationResult, World,
+};
 
 const CORE_DB_SCHEMA: &str = r"
 CREATE TABLE IF NOT EXISTS specs (
@@ -55,34 +57,6 @@ CREATE TABLE IF NOT EXISTS spec_relations (
 
 const E2E_SPEC_SEED: &str =
     "INSERT INTO specs (id, slug, title, level, status) VALUES ('e2e-spec-1', 'e2e-spec-1', 'E2E Test Spec', 'product', 'draft')";
-
-/// Guard that restores env vars and current_dir on Drop — even if the test panics.
-struct EnvGuard {
-    orig_dir: std::path::PathBuf,
-    saved: Vec<(String, Option<String>)>,
-}
-
-impl EnvGuard {
-    fn save(keys: &[&str]) -> Self {
-        let orig_dir = std::env::current_dir().unwrap();
-        let saved: Vec<_> = keys.iter().map(|k| {
-            (k.to_string(), std::env::var(k).ok())
-        }).collect();
-        Self { orig_dir, saved }
-    }
-}
-
-impl Drop for EnvGuard {
-    fn drop(&mut self) {
-        for (key, val) in &self.saved {
-            match val {
-                Some(v) => std::env::set_var(key, v),
-                None => std::env::remove_var(key),
-            }
-        }
-        let _ = std::env::set_current_dir(&self.orig_dir);
-    }
-}
 
 // ---- Primitive smoke tests (no Dolt server needed) ----
 
@@ -188,10 +162,11 @@ fn real_e2e_dolt_server_loads_spec_graph() {
         .build()
         .unwrap();
 
-    let _guard = EnvGuard::save(&["DOLT_SOCKET", "DOLT_DB", "COHERENCE_DB_PROFILE", "COHERENCE_ENV"]);
+    let guard = EnvGuard::save(&["DOLT_SOCKET", "DOLT_DB", "COHERENCE_DB_PROFILE", "COHERENCE_ENV"])
+        .unwrap();
 
     // cd into scaffold dir so DoltSpecRepository reads its project.toml
-    std::env::set_current_dir(env.scaffold.path(".")).unwrap();
+    guard.set_current_dir(&env.scaffold.path(".")).unwrap();
 
     // Set env for DoltSpecRepository to connect to our test server
     std::env::set_var("DOLT_SOCKET", env.server.socket_path().to_string_lossy().as_ref());
