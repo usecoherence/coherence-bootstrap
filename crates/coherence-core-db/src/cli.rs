@@ -21,6 +21,7 @@ pub fn run(args: &[String]) -> i32 {
         "verify-spec" => commands::verify_spec_cmd::run(&args[2..]),
         "evidence-sample" => commands::evidence_sample_cmd::run(&args[2..]),
         "project" => commands::project_cmd::run(&args[2..]),
+        "tui" => commands::tui_cmd::run(&args[2..]),
         "version" | "--version" | "-V" => {
             println!("coherence-core-db {}", env!("CARGO_PKG_VERSION"));
             0
@@ -49,10 +50,11 @@ fn print_help() {
            ac             Manage acceptance criteria (add, list, show); each AC has a per-spec slug (default from id)\n\
            ac-tests       AC test files: materialize-rust (create missing tests/ac/**/*.rs), check-rust (hard gate vs graph)\n\
            verify-ac      Run verified_by linked test commands for one AC\n\
-           verify-spec    Aggregate verify-ac across all ACs for one spec\n\
-           evidence-sample  Create a demo run under .coherence/runs/<run-id>/ (ADR-0005 skeleton)\n\
-           project        project catalog-preflight (manifest/git binding check); project init binds project_hash + legacy dolt_db_name once project_slug exists; project reset re-binds if needed + migrate (keeps project_slug); operator flow in AGENTS.md \"Project identity and manifest lifecycle\".\n\
-           version        Print version\n\n\
+            verify-spec    Aggregate verify-ac across all ACs for one spec\n\
+            evidence-sample  Create a demo run under .coherence/runs/<run-id>/ (ADR-0005 skeleton)\n\
+            project        project catalog-preflight (manifest/git binding check); project init binds project_hash + legacy dolt_db_name once project_slug exists; project reset re-binds if needed + migrate (keeps project_slug); operator flow in AGENTS.md \"Project identity and manifest lifecycle\".\n\
+            tui            Launch the coherence-core-db-tui binary\n\
+            version        Print version\n\n\
          Canonical repository database — curated catalog vs disposable tests:\n\
            • Curated catalog — long-lived spec/AC/codeintel rows; never written by tests/smoke without isolation.\n\
            • Isolated test world — COHERENCE_DB_PROFILE=test and a disposable Dolt target (DOLT_DB naming on user-scoped Dolt).\n\
@@ -70,4 +72,15 @@ fn print_help() {
            make tool present-work\n\
            make tool feedback"
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tui_help_dispatches_successfully() {
+        let args = vec!["coherence-core-db".into(), "tui".into(), "--help".into()];
+        assert_eq!(run(&args), 0);
+    }
 }
