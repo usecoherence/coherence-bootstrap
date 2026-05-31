@@ -1,7 +1,8 @@
 use std::env;
 use std::process::Command;
 
-use coherence_core_db::models::{AcceptanceCriterion, Spec};
+use coherence_core_db::ac_verify::{AcVerifyAcRunResult, VerifySpecRunResult};
+use coherence_core_db::models::{AcceptanceCriterion, Spec, SpecLevel};
 
 use crate::app::AppState;
 use crate::edit::Draft;
@@ -14,6 +15,10 @@ pub enum Effect {
     OpenEditorForSpec(String),
     OpenEditorForAc(String),
     RefreshGraph,
+    VerifyAc(String),
+    VerifySpec(String),
+    VerifyLevel(SpecLevel),
+    VerifyAll,
 }
 
 pub fn execute_effects(app: &mut AppState, effects: Vec<Effect>) {
@@ -24,6 +29,10 @@ pub fn execute_effects(app: &mut AppState, effects: Vec<Effect>) {
             Effect::OpenEditorForSpec(spec_id) => open_editor_for_spec(app, &spec_id),
             Effect::OpenEditorForAc(ac_id) => open_editor_for_ac(app, &ac_id),
             Effect::RefreshGraph => refresh_graph(app),
+            Effect::VerifyAc(ac_id) => verify_ac(app, &ac_id),
+            Effect::VerifySpec(spec_id) => verify_spec(app, &spec_id),
+            Effect::VerifyLevel(level) => verify_level(app, level),
+            Effect::VerifyAll => verify_all(app),
         }
     }
 }
@@ -201,7 +210,14 @@ fn refresh_graph(app: &mut AppState) {
     }
 
     match loaded {
-        Ok((repo, graph)) => {
+        Ok((mut repo, graph)) => {
+            app.verification_statuses.clear();
+            for ac in &graph.acceptance_criteria {
+                if let Ok(Some(latest)) = repo.get_ac_verification_latest(&ac.id) {
+                    app.verification_statuses
+                        .insert(ac.id.clone(), latest.overall_status);
+                }
+            }
             app.project_dir = Some(proj_path.clone());
             app.repo = Some(Box::new(repo));
             app.graph = Some(graph);
@@ -213,4 +229,102 @@ fn refresh_graph(app: &mut AppState) {
         }
     }
     app.update_preview();
+}
+
+fn verify_ac(app: &mut AppState, ac_id: &str) {
+    match repo(app).verify_acceptance_criterion(ac_id) {
+        Ok(result) => {
+            app.verification_statuses
+                .insert(result.ac_id.clone(), result.overall_status());
+            app.status = verify_ac_summary(&result);
+        }
+        Err(e) => app.status = format!("verify AC failed: {e}"),
+    }
+}
+
+fn verify_spec(app: &mut AppState, spec_id: &str) {
+    match repo(app).verify_spec(spec_id) {
+        Ok(result) => {
+            update_statuses_from_report(app, &result);
+            app.status = verify_spec_summary("Spec", &result);
+        }
+        Err(e) => app.status = format!("verify spec failed: {e}"),
+    }
+}
+
+fn verify_level(app: &mut AppState, level: SpecLevel) {
+    let Some(graph) = app.graph.clone() else {
+        app.status = "No spec graph loaded".into();
+        return;
+    };
+    let spec_ids: Vec<String> = graph
+        .specs
+        .iter()
+        .filter(|spec| spec.level == level)
+        .map(|spec| spec.id.clone())
+        .collect();
+    verify_specs(app, &format!("{} level", level.as_db_str()), &spec_ids);
+}
+
+fn verify_all(app: &mut AppState) {
+    let Some(graph) = app.graph.clone() else {
+        app.status = "No spec graph loaded".into();
+        return;
+    };
+    let spec_ids: Vec<String> = graph.specs.iter().map(|spec| spec.id.clone()).collect();
+    verify_specs(app, "All specs", &spec_ids);
+}
+
+fn verify_specs(app: &mut AppState, label: &str, spec_ids: &[String]) {
+    if spec_ids.is_empty() {
+        app.status = format!("{label}: no specs to verify");
+        return;
+    }
+
+    let mut reports = Vec::with_capacity(spec_ids.len());
+    for spec_id in spec_ids {
+        match repo(app).verify_spec(spec_id) {
+            Ok(report) => reports.push(report),
+            Err(e) => {
+                app.status = format!("verify {label} failed: {e}");
+                return;
+            }
+        }
+    }
+
+    for report in &reports {
+        update_statuses_from_report(app, report);
+    }
+
+    let acs: usize = reports.iter().map(|r| r.acceptance_criteria).sum();
+    let passed: usize = reports.iter().map(|r| r.passed).sum();
+    let failed: usize = reports.iter().map(|r| r.failed).sum();
+    let skipped: usize = reports.iter().map(|r| r.skipped).sum();
+    let no_verification: usize = reports.iter().map(|r| r.no_verification).sum();
+    app.status = format!(
+        "{label}: {acs} ACs, {passed} passed, {failed} failed, {skipped} skipped, {no_verification} no verification"
+    );
+}
+
+fn update_statuses_from_report(app: &mut AppState, report: &VerifySpecRunResult) {
+    for result in &report.ac_results {
+        app.verification_statuses
+            .insert(result.ac_id.clone(), result.overall_status());
+    }
+}
+
+fn verify_ac_summary(result: &AcVerifyAcRunResult) -> String {
+    format!("AC {}: {}", result.ac_id, result.overall_status_label())
+}
+
+fn verify_spec_summary(label: &str, result: &VerifySpecRunResult) -> String {
+    format!(
+        "{label} {}: {} ACs, {} passed, {} failed, {} skipped, {} no verification",
+        result.spec_id,
+        result.acceptance_criteria,
+        result.passed,
+        result.failed,
+        result.skipped,
+        result.no_verification
+    )
 }

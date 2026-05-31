@@ -23,9 +23,14 @@ pub enum AppAction {
     SaveDraft,
     SwitchToProjectPicker,
     SwitchToEnvPicker,
+    VerifySelected,
+    VerifyAll,
 }
 
-pub fn key_to_action(key: ratatui::crossterm::event::KeyEvent, app: &AppState) -> Option<AppAction> {
+pub fn key_to_action(
+    key: ratatui::crossterm::event::KeyEvent,
+    app: &AppState,
+) -> Option<AppAction> {
     if key.kind != KeyEventKind::Press {
         return None;
     }
@@ -73,6 +78,8 @@ pub fn key_to_action(key: ratatui::crossterm::event::KeyEvent, app: &AppState) -
                     KeyCode::Char('e') => Some(AppAction::EnterEditMode),
                     KeyCode::Char('p') => Some(AppAction::SwitchToProjectPicker),
                     KeyCode::Char('d') => Some(AppAction::SwitchToEnvPicker),
+                    KeyCode::Char('v') => Some(AppAction::VerifySelected),
+                    KeyCode::Char('V') => Some(AppAction::VerifyAll),
                     KeyCode::Char('q') => Some(AppAction::Quit),
                     _ => None,
                 }
@@ -101,8 +108,10 @@ mod tests {
             graph: None,
             tree_items: Vec::new(),
             selected_tree: 0,
+            tree_scroll: 0,
             detail_spec_id: None,
             detail_ac_id: None,
+            verification_statuses: std::collections::HashMap::new(),
             status: String::new(),
             project_dir: None,
             repo: None,
@@ -113,10 +122,7 @@ mod tests {
     fn key_enter_in_edit_mode_returns_save_draft() {
         let mut app = make_app_state();
         app.edit_mode = true;
-        let key = ratatui::crossterm::event::KeyEvent::new(
-            KeyCode::Enter,
-            KeyModifiers::NONE,
-        );
+        let key = ratatui::crossterm::event::KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE);
         assert_eq!(key_to_action(key, &app), Some(AppAction::SaveDraft));
     }
 
@@ -124,10 +130,21 @@ mod tests {
     fn key_esc_in_edit_mode_returns_back() {
         let mut app = make_app_state();
         app.edit_mode = true;
-        let key = ratatui::crossterm::event::KeyEvent::new(
-            KeyCode::Esc,
-            KeyModifiers::NONE,
-        );
+        let key = ratatui::crossterm::event::KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE);
         assert_eq!(key_to_action(key, &app), Some(AppAction::Back));
+    }
+
+    #[test]
+    fn key_v_in_specs_returns_verify_selected() {
+        let app = make_app_state();
+        let key = ratatui::crossterm::event::KeyEvent::new(KeyCode::Char('v'), KeyModifiers::NONE);
+        assert_eq!(key_to_action(key, &app), Some(AppAction::VerifySelected));
+    }
+
+    #[test]
+    fn key_shift_v_in_specs_returns_verify_all() {
+        let app = make_app_state();
+        let key = ratatui::crossterm::event::KeyEvent::new(KeyCode::Char('V'), KeyModifiers::SHIFT);
+        assert_eq!(key_to_action(key, &app), Some(AppAction::VerifyAll));
     }
 }

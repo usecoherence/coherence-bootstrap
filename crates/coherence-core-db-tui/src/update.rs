@@ -1,5 +1,5 @@
 #![allow(clippy::wildcard_enum_match_arm)]
-use coherence_core_db::models::{ReviewMode, RiskLevel, SpecStatus, SpecLevel};
+use coherence_core_db::models::{ReviewMode, RiskLevel, SpecLevel, SpecStatus};
 
 use crate::action::AppAction;
 use crate::app::{AppState, Screen};
@@ -110,8 +110,7 @@ pub fn update(app: &mut AppState, action: AppAction) -> Vec<Effect> {
         }
 
         AppAction::FocusTreeDown => {
-            app.selected_tree = (app.selected_tree + 1)
-                .min(app.tree_items.len().saturating_sub(1));
+            app.selected_tree = (app.selected_tree + 1).min(app.tree_items.len().saturating_sub(1));
             app.update_preview();
             vec![]
         }
@@ -140,11 +139,13 @@ pub fn update(app: &mut AppState, action: AppAction) -> Vec<Effect> {
         AppAction::EnterEditMode => {
             app.edit_mode = true;
             let draft = if let Some(sid) = app.detail_spec_id.clone() {
-                app.graph.as_ref()
+                app.graph
+                    .as_ref()
                     .and_then(|g| g.specs.iter().find(|s| s.id == sid))
                     .map(Draft::from_spec)
             } else if let Some(aid) = app.detail_ac_id.clone() {
-                app.graph.as_ref()
+                app.graph
+                    .as_ref()
                     .and_then(|g| g.acceptance_criteria.iter().find(|a| a.id == aid))
                     .map(Draft::from_ac)
             } else {
@@ -207,7 +208,10 @@ pub fn update(app: &mut AppState, action: AppAction) -> Vec<Effect> {
                 return vec![];
             };
             match draft {
-                Draft::Ac { pending_review_mode, .. } => {
+                Draft::Ac {
+                    pending_review_mode,
+                    ..
+                } => {
                     *pending_review_mode = match pending_review_mode {
                         ReviewMode::Manual => ReviewMode::Automated,
                         ReviewMode::Automated => ReviewMode::Hybrid,
@@ -226,7 +230,9 @@ pub fn update(app: &mut AppState, action: AppAction) -> Vec<Effect> {
                 return vec![];
             };
             match draft {
-                Draft::Ac { pending_risk_level, .. } => {
+                Draft::Ac {
+                    pending_risk_level, ..
+                } => {
                     *pending_risk_level = match pending_risk_level {
                         RiskLevel::Low => RiskLevel::Medium,
                         RiskLevel::Medium => RiskLevel::High,
@@ -246,7 +252,9 @@ pub fn update(app: &mut AppState, action: AppAction) -> Vec<Effect> {
                 return vec![];
             }
             match app.draft.as_ref() {
-                Some(Draft::Spec { spec_id, .. }) => vec![Effect::OpenEditorForSpec(spec_id.clone())],
+                Some(Draft::Spec { spec_id, .. }) => {
+                    vec![Effect::OpenEditorForSpec(spec_id.clone())]
+                }
                 Some(Draft::Ac { ac_id, .. }) => vec![Effect::OpenEditorForAc(ac_id.clone())],
                 None => unreachable!(),
             }
@@ -268,7 +276,13 @@ pub fn update(app: &mut AppState, action: AppAction) -> Vec<Effect> {
                 return vec![];
             }
             let effects = match &draft {
-                Draft::Spec { spec_id, pending_status, pending_level, pending_description, .. } => {
+                Draft::Spec {
+                    spec_id,
+                    pending_status,
+                    pending_level,
+                    pending_description,
+                    ..
+                } => {
                     if let Some(ref mut graph) = app.graph {
                         if let Some(s) = graph.specs.iter_mut().find(|s| s.id == *spec_id) {
                             s.status = *pending_status;
@@ -278,15 +292,32 @@ pub fn update(app: &mut AppState, action: AppAction) -> Vec<Effect> {
                             }
                         }
                     }
-                    let spec = match app.graph.as_ref().and_then(|g| g.specs.iter().find(|s| s.id == *spec_id)) {
+                    let spec = match app
+                        .graph
+                        .as_ref()
+                        .and_then(|g| g.specs.iter().find(|s| s.id == *spec_id))
+                    {
                         Some(s) => s.clone(),
-                        None => { app.status = "Spec not found in graph".into(); return vec![]; }
+                        None => {
+                            app.status = "Spec not found in graph".into();
+                            return vec![];
+                        }
                     };
                     vec![Effect::PersistSpec(spec)]
                 }
-                Draft::Ac { ac_id, pending_review_mode, pending_risk_level, pending_intent, .. } => {
+                Draft::Ac {
+                    ac_id,
+                    pending_review_mode,
+                    pending_risk_level,
+                    pending_intent,
+                    ..
+                } => {
                     if let Some(ref mut graph) = app.graph {
-                        if let Some(a) = graph.acceptance_criteria.iter_mut().find(|a| a.id == *ac_id) {
+                        if let Some(a) = graph
+                            .acceptance_criteria
+                            .iter_mut()
+                            .find(|a| a.id == *ac_id)
+                        {
                             a.review_mode = *pending_review_mode;
                             a.risk_level = *pending_risk_level;
                             if let Some(intent) = pending_intent {
@@ -294,9 +325,16 @@ pub fn update(app: &mut AppState, action: AppAction) -> Vec<Effect> {
                             }
                         }
                     }
-                    let ac = match app.graph.as_ref().and_then(|g| g.acceptance_criteria.iter().find(|a| a.id == *ac_id)) {
+                    let ac = match app
+                        .graph
+                        .as_ref()
+                        .and_then(|g| g.acceptance_criteria.iter().find(|a| a.id == *ac_id))
+                    {
                         Some(a) => a.clone(),
-                        None => { app.status = "AC not found in graph".into(); return vec![]; }
+                        None => {
+                            app.status = "AC not found in graph".into();
+                            return vec![];
+                        }
                     };
                     vec![Effect::PersistAc(ac)]
                 }
@@ -320,5 +358,120 @@ pub fn update(app: &mut AppState, action: AppAction) -> Vec<Effect> {
             );
             vec![]
         }
+
+        AppAction::VerifySelected => verify_selected(app),
+
+        AppAction::VerifyAll => vec![Effect::VerifyAll],
+    }
+}
+
+fn verify_selected(app: &mut AppState) -> Vec<Effect> {
+    let Some(item) = app.tree_items.get(app.selected_tree) else {
+        app.status = "Nothing selected to verify".into();
+        return vec![];
+    };
+
+    if item.parent_spec_id.is_some() {
+        return vec![Effect::VerifyAc(item.id.clone())];
+    }
+    if item.is_spec {
+        return vec![Effect::VerifySpec(item.id.clone())];
+    }
+    let Some(level) = level_from_tree_label(&item.label) else {
+        app.status = "Selected row cannot be verified".into();
+        return vec![];
+    };
+    vec![Effect::VerifyLevel(level)]
+}
+
+fn level_from_tree_label(label: &str) -> Option<SpecLevel> {
+    match label {
+        "Product" => Some(SpecLevel::Product),
+        "System" => Some(SpecLevel::System),
+        "Module" => Some(SpecLevel::Module),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tree::TreeItem;
+
+    fn app_with_tree(item: TreeItem) -> AppState {
+        let mut app = AppState::new(vec![]);
+        app.screen = Screen::Specs;
+        app.tree_items = vec![item];
+        app
+    }
+
+    #[test]
+    fn verify_selected_dispatches_ac_effect() {
+        let mut app = app_with_tree(TreeItem {
+            indent: 2,
+            label: "ac".into(),
+            id: "AC1".into(),
+            is_spec: false,
+            expanded: false,
+            has_children: false,
+            parent_spec_id: Some("S1".into()),
+        });
+
+        let effects = update(&mut app, AppAction::VerifySelected);
+
+        assert_eq!(effects, vec![Effect::VerifyAc("AC1".into())]);
+    }
+
+    #[test]
+    fn verify_selected_dispatches_spec_effect() {
+        let mut app = app_with_tree(TreeItem {
+            indent: 1,
+            label: "spec".into(),
+            id: "S1".into(),
+            is_spec: true,
+            expanded: false,
+            has_children: true,
+            parent_spec_id: None,
+        });
+
+        let effects = update(&mut app, AppAction::VerifySelected);
+
+        assert_eq!(effects, vec![Effect::VerifySpec("S1".into())]);
+    }
+
+    #[test]
+    fn verify_selected_dispatches_level_effect() {
+        let mut app = app_with_tree(TreeItem {
+            indent: 0,
+            label: "Product".into(),
+            id: String::new(),
+            is_spec: false,
+            expanded: false,
+            has_children: true,
+            parent_spec_id: None,
+        });
+
+        let effects = update(&mut app, AppAction::VerifySelected);
+
+        assert_eq!(effects, vec![Effect::VerifyLevel(SpecLevel::Product)]);
+    }
+
+    #[test]
+    fn verify_all_dispatches_all_effect() {
+        let mut app = AppState::new(vec![]);
+
+        let effects = update(&mut app, AppAction::VerifyAll);
+
+        assert_eq!(effects, vec![Effect::VerifyAll]);
+    }
+
+    #[test]
+    fn verify_selected_without_tree_item_reports_status() {
+        let mut app = AppState::new(vec![]);
+
+        let effects = update(&mut app, AppAction::VerifySelected);
+
+        assert!(effects.is_empty());
+        assert_eq!(app.status, "Nothing selected to verify");
     }
 }

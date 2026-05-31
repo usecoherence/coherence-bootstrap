@@ -8,6 +8,7 @@ use std::process::{Command, Stdio};
 use mysql::Conn;
 
 use crate::ac_code_link_store;
+use crate::ac_verification_store;
 use crate::models::{AcCodeLinkWithLocation, AcCodeRelationKind, CodeLocation, CodeLocationKind};
 use crate::spec_store;
 
@@ -190,11 +191,13 @@ pub fn verify_acceptance_criterion(
         links.push(eval_verified_link(ac_id, row)?);
     }
 
-    Ok(AcVerifyAcRunResult {
+    let result = AcVerifyAcRunResult {
         ac_id: ac_id.to_string(),
         no_verification_links,
         links,
-    })
+    };
+    ac_verification_store::put_ac_verification_result(conn, &result)?;
+    Ok(result)
 }
 
 fn eval_verified_link(
@@ -327,6 +330,7 @@ mod tests {
     use mysql::Conn;
 
     use crate::ac_code_link_store;
+    use crate::ac_verification_store;
     use crate::ac_verify::{verify_acceptance_criterion, verify_spec, AcVerifyLinkStatus};
     use crate::db::{self, ConnectionConfig};
     use crate::migrations;
@@ -478,6 +482,10 @@ mod tests {
         assert_eq!(got.links[0].status, AcVerifyLinkStatus::Passed);
         assert_eq!(got.exit_code(), 0);
         assert_eq!(got.overall_status_label(), "passed");
+        let latest = ac_verification_store::get_ac_verification_latest(&mut conn, &ac_id)
+            .expect("latest")
+            .expect("recorded");
+        assert_eq!(latest.overall_status.as_label(), "passed");
     }
 
     #[test]
@@ -670,6 +678,10 @@ mod tests {
             .ac_results
             .iter()
             .any(|r| r.ac_id == ac_pass && r.overall_status_label() == "passed"));
+        let latest = ac_verification_store::get_ac_verification_latest(&mut conn, &ac_pass)
+            .expect("latest")
+            .expect("recorded");
+        assert_eq!(latest.overall_status.as_label(), "passed");
     }
 
     #[test]

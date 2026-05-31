@@ -10,6 +10,7 @@ extern crate self as coherence_core_db;
 pub mod ac_code_link_store;
 pub mod ac_materialize_codeintel_ids;
 pub mod ac_test_layout;
+pub mod ac_verification_store;
 pub mod ac_verify;
 pub mod cli;
 pub mod commands;
@@ -25,6 +26,10 @@ pub mod test_world_guard;
 pub mod codeintel_repo {
     pub use crate::ac_code_link_store::{
         get_code_location, list_code_links_for_ac, put_ac_code_link, put_code_location,
+    };
+    pub use crate::ac_verification_store::{
+        get_ac_verification_latest, list_ac_verification_link_latest, AcVerificationLatest,
+        AcVerificationLinkLatest,
     };
     pub use crate::ac_verify::{
         verify_acceptance_criterion, verify_spec, AcVerifyAcRunResult, AcVerifyLinkRunRecord,

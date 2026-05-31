@@ -4,11 +4,13 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph, Wrap};
 use ratatui::Frame;
 
+use coherence_core_db::ac_verify::AcVerifyOverallStatus;
+
 use crate::app::{AppState, Screen};
 use crate::edit::Draft;
 use crate::theme::Theme;
 
-pub fn ui(frame: &mut Frame, app: &AppState, theme: &Theme) {
+pub fn ui(frame: &mut Frame, app: &mut AppState, theme: &Theme) {
     let [title_area, main_area, status_area] = Layout::vertical([
         Constraint::Length(1),
         Constraint::Fill(1),
@@ -25,11 +27,9 @@ pub fn ui(frame: &mut Frame, app: &AppState, theme: &Theme) {
             if app.edit_mode {
                 render_detail(frame, main_area, app, theme);
             } else {
-                let [left, right] = Layout::horizontal([
-                    Constraint::Percentage(40),
-                    Constraint::Percentage(60),
-                ])
-                .areas(main_area);
+                let [left, right] =
+                    Layout::horizontal([Constraint::Percentage(40), Constraint::Percentage(60)])
+                        .areas(main_area);
                 render_tree(frame, left, app, theme);
                 render_detail(frame, right, app, theme);
             }
@@ -39,9 +39,7 @@ pub fn ui(frame: &mut Frame, app: &AppState, theme: &Theme) {
     frame.render_widget(
         Paragraph::new(Line::from(Span::styled(
             &app.status,
-            Style::default()
-                .fg(theme.status_fg)
-                .bg(theme.status_bg),
+            Style::default().fg(theme.status_fg).bg(theme.status_bg),
         ))),
         status_area,
     );
@@ -55,9 +53,9 @@ fn title_line(app: &AppState, theme: &Theme) -> Line<'static> {
             if app.edit_mode {
                 " [s] status  [l] level  [r] review  [k] risk  [e] editor  [Enter] save  [Esc] cancel"
             } else if app.focus_tree {
-                " [↑↓] nav  [Enter] expand/open  [p] project  [d] DB  [e] edit  [Esc] back  [q] quit"
+                " [↑↓] nav  [Enter] expand/open  [v] verify  [V] all  [p] project  [d] DB  [e] edit  [q] quit"
             } else {
-                " [↑↓] scroll  [Enter/Esc] back to tree  [e] edit  [p] project  [d] DB  [q] quit"
+                " [↑↓] scroll  [Enter/Esc] back to tree  [v] verify  [V] all  [e] edit  [q] quit"
             }
         }
     };
@@ -88,9 +86,7 @@ fn render_project_picker(frame: &mut Frame, area: Rect, app: &AppState, theme: &
         .enumerate()
         .map(|(i, (path, slug))| {
             let style = if i == app.selected_project {
-                Style::default()
-                    .bg(theme.selected_bg)
-                    .fg(theme.selected_fg)
+                Style::default().bg(theme.selected_bg).fg(theme.selected_fg)
             } else {
                 Style::default().fg(theme.env_fg)
             };
@@ -102,8 +98,7 @@ fn render_project_picker(frame: &mut Frame, area: Rect, app: &AppState, theme: &
         .collect();
 
     frame.render_widget(
-        List::new(items)
-            .block(Block::default().borders(Borders::ALL).title(" Projects ")),
+        List::new(items).block(Block::default().borders(Borders::ALL).title(" Projects ")),
         area,
     );
 }
@@ -115,9 +110,7 @@ fn render_env_picker(frame: &mut Frame, area: Rect, app: &AppState, theme: &Them
         .enumerate()
         .map(|(i, env)| {
             let style = if i == app.selected_env {
-                Style::default()
-                    .bg(theme.selected_bg)
-                    .fg(theme.selected_fg)
+                Style::default().bg(theme.selected_bg).fg(theme.selected_fg)
             } else {
                 Style::default().fg(theme.env_fg)
             };
@@ -126,13 +119,16 @@ fn render_env_picker(frame: &mut Frame, area: Rect, app: &AppState, theme: &Them
         .collect();
 
     frame.render_widget(
-        List::new(items)
-            .block(Block::default().borders(Borders::ALL).title(" Environment ")),
+        List::new(items).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" Environment "),
+        ),
         area,
     );
 }
 
-fn render_tree(frame: &mut Frame, area: Rect, app: &AppState, theme: &Theme) {
+fn render_tree(frame: &mut Frame, area: Rect, app: &mut AppState, theme: &Theme) {
     let border_color = if app.focus_tree {
         theme.border_focused
     } else {
@@ -145,10 +141,19 @@ fn render_tree(frame: &mut Frame, area: Rect, app: &AppState, theme: &Theme) {
         " Specs (inactive) "
     };
 
+    let viewport_height = area.height.saturating_sub(2) as usize;
+    app.ensure_tree_selection_visible(viewport_height);
+    let visible_start = app.tree_scroll.min(app.tree_items.len());
+    let visible_end = visible_start
+        .saturating_add(viewport_height)
+        .min(app.tree_items.len());
+
     let items: Vec<ListItem> = app
         .tree_items
         .iter()
         .enumerate()
+        .skip(visible_start)
+        .take(visible_end.saturating_sub(visible_start))
         .map(|(i, item)| {
             let prefix = if item.has_children {
                 if item.expanded {
@@ -160,7 +165,15 @@ fn render_tree(frame: &mut Frame, area: Rect, app: &AppState, theme: &Theme) {
                 "  "
             };
             let indent = "  ".repeat(item.indent);
-            let label = format!("{}{prefix}{}", indent, item.label);
+            let marker = if item.parent_spec_id.is_some() {
+                format!(
+                    "{} ",
+                    verification_marker(app.verification_statuses.get(&item.id).copied())
+                )
+            } else {
+                String::new()
+            };
+            let label = format!("{}{marker}{prefix}{}", indent, item.label);
 
             let fg = if item.indent == 0 {
                 theme.level_header_fg
@@ -171,15 +184,23 @@ fn render_tree(frame: &mut Frame, area: Rect, app: &AppState, theme: &Theme) {
             };
 
             let style = if i == app.selected_tree {
-                Style::default()
-                    .bg(theme.selected_bg)
-                    .fg(theme.selected_fg)
+                Style::default().bg(theme.selected_bg).fg(theme.selected_fg)
             } else {
                 Style::default().fg(fg)
             };
             ListItem::new(Line::from(Span::styled(label, style)))
         })
         .collect();
+
+    let title = if app.tree_items.len() > viewport_height && viewport_height > 0 {
+        format!(
+            "{title} {}/{} ",
+            app.selected_tree.saturating_add(1),
+            app.tree_items.len()
+        )
+    } else {
+        title.to_string()
+    };
 
     frame.render_widget(
         List::new(items).block(
@@ -225,15 +246,34 @@ fn render_detail(frame: &mut Frame, area: Rect, app: &AppState, theme: &Theme) {
         match spec {
             Some(s) => {
                 let (level, status, desc) = match spec_draft {
-                    Some(Draft::Spec { pending_level, pending_status, pending_description, .. }) => {
+                    Some(Draft::Spec {
+                        pending_level,
+                        pending_status,
+                        pending_description,
+                        ..
+                    }) => {
                         let d = pending_description.as_deref().unwrap_or(&s.description);
                         (pending_level.as_db_str(), pending_status.as_db_str(), d)
                     }
-                    _ => (s.level.as_db_str(), s.status.as_db_str(), &s.description as &str),
+                    _ => (
+                        s.level.as_db_str(),
+                        s.status.as_db_str(),
+                        &s.description as &str,
+                    ),
                 };
-                let concerns = graph.acceptance_criteria.iter()
+                let concerns = graph
+                    .acceptance_criteria
+                    .iter()
                     .filter(|a| a.spec_id == s.id)
-                    .map(|a| format!("      ├ {} — {} (risk={} review={})", a.slug, a.title, a.risk_level.as_db_str(), a.review_mode.as_db_str()))
+                    .map(|a| {
+                        format!(
+                            "      ├ {} — {} (risk={} review={})",
+                            a.slug,
+                            a.title,
+                            a.risk_level.as_db_str(),
+                            a.review_mode.as_db_str()
+                        )
+                    })
                     .collect::<Vec<_>>()
                     .join("\n");
                 format!(
@@ -248,20 +288,26 @@ fn render_detail(frame: &mut Frame, area: Rect, app: &AppState, theme: &Theme) {
                       {}\n\
                      {}\n\
                      ┗{:━^80}┛",
-                    " Spec ", s.id, s.slug, s.title,
-                    level, status, "",
+                    " Spec ",
+                    s.id,
+                    s.slug,
+                    s.title,
+                    level,
+                    status,
+                    "",
                     textwrap_indent(desc, "┃  "),
-                    if concerns.is_empty() { String::new() } else { format!("┃\n┃  Acceptance Criteria:\n{concerns}\n") },
+                    if concerns.is_empty() {
+                        String::new()
+                    } else {
+                        format!("┃\n┃  Acceptance Criteria:\n{concerns}\n")
+                    },
                     ""
                 )
             }
             None => "Spec not found".into(),
         }
     } else if let Some(ref ac_id) = app.detail_ac_id {
-        let ac = graph
-            .acceptance_criteria
-            .iter()
-            .find(|a| a.id == *ac_id);
+        let ac = graph.acceptance_criteria.iter().find(|a| a.id == *ac_id);
         let ac_draft = app.draft.as_ref().and_then(|d| match d {
             Draft::Ac { ac_id: did, .. } if did == ac_id => Some(d),
             _ => None,
@@ -269,17 +315,40 @@ fn render_detail(frame: &mut Frame, area: Rect, app: &AppState, theme: &Theme) {
         match ac {
             Some(a) => {
                 let (review_mode, risk_level, intent_changes, intent) = match ac_draft {
-                    Some(Draft::Ac { pending_review_mode, pending_risk_level, pending_intent, .. }) => {
+                    Some(Draft::Ac {
+                        pending_review_mode,
+                        pending_risk_level,
+                        pending_intent,
+                        ..
+                    }) => {
                         let i = pending_intent.as_deref().unwrap_or(&a.intent);
-                        let ch = if pending_intent.is_some() { "  [modified]" } else { "" };
-                        (pending_review_mode.as_db_str(), pending_risk_level.as_db_str(), ch, i)
+                        let ch = if pending_intent.is_some() {
+                            "  [modified]"
+                        } else {
+                            ""
+                        };
+                        (
+                            pending_review_mode.as_db_str(),
+                            pending_risk_level.as_db_str(),
+                            ch,
+                            i,
+                        )
                     }
-                    _ => (a.review_mode.as_db_str(), a.risk_level.as_db_str(), "", &a.intent as &str),
+                    _ => (
+                        a.review_mode.as_db_str(),
+                        a.risk_level.as_db_str(),
+                        "",
+                        &a.intent as &str,
+                    ),
                 };
-                let concerns_str = a.concerns.iter()
+                let concerns_str = a
+                    .concerns
+                    .iter()
                     .map(|c| c.as_db_str())
                     .collect::<Vec<_>>()
                     .join(", ");
+                let verification =
+                    verification_description(app.verification_statuses.get(&a.id).copied());
                 format!(
                     "┌ {:━^78}┐\n\
                      ┃  ID         │ {}    \n\
@@ -289,12 +358,21 @@ fn render_detail(frame: &mut Frame, area: Rect, app: &AppState, theme: &Theme) {
                      ┃  Review     │ {}    \n\
                      ┃  Risk       │ {}    \n\
                      ┃  Concerns   │ {}    \n\
+                     ┃  Verify     │ {}    \n\
                      ┣{:━^80}┨\n\
                      ┃  Intent:{intent_changes}    \n\
                      {}\n\
                      ┗{:━^80}┛",
-                    " Acceptance Criterion ", a.id, a.spec_id, a.slug, a.title,
-                    review_mode, risk_level, concerns_str, "",
+                    " Acceptance Criterion ",
+                    a.id,
+                    a.spec_id,
+                    a.slug,
+                    a.title,
+                    review_mode,
+                    risk_level,
+                    concerns_str,
+                    verification,
+                    "",
                     textwrap_indent(intent, "┃  "),
                     ""
                 )
@@ -324,4 +402,65 @@ fn textwrap_indent(text: &str, prefix: &str) -> String {
         .map(|line| format!("{prefix}{line}"))
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+fn verification_marker(status: Option<AcVerifyOverallStatus>) -> &'static str {
+    match status {
+        Some(AcVerifyOverallStatus::Passed) => "[+]",
+        Some(AcVerifyOverallStatus::Failed) => "[!]",
+        Some(AcVerifyOverallStatus::Skipped) => "[?]",
+        Some(AcVerifyOverallStatus::NoVerification) => "[-]",
+        None => "[ ]",
+    }
+}
+
+fn verification_description(status: Option<AcVerifyOverallStatus>) -> String {
+    match status {
+        Some(AcVerifyOverallStatus::Passed) => "[+] passed".to_string(),
+        Some(AcVerifyOverallStatus::Failed) => "[!] failed".to_string(),
+        Some(AcVerifyOverallStatus::Skipped) => {
+            "[?] linked test missing/skipped or not materialized".to_string()
+        }
+        Some(AcVerifyOverallStatus::NoVerification) => "[-] no verified_by link".to_string(),
+        None => "[ ] never run".to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn verification_marker_distinguishes_all_ac_states() {
+        assert_eq!(
+            verification_marker(Some(AcVerifyOverallStatus::Passed)),
+            "[+]"
+        );
+        assert_eq!(
+            verification_marker(Some(AcVerifyOverallStatus::Failed)),
+            "[!]"
+        );
+        assert_eq!(
+            verification_marker(Some(AcVerifyOverallStatus::Skipped)),
+            "[?]"
+        );
+        assert_eq!(
+            verification_marker(Some(AcVerifyOverallStatus::NoVerification)),
+            "[-]"
+        );
+        assert_eq!(verification_marker(None), "[ ]");
+    }
+
+    #[test]
+    fn verification_description_explains_not_run_and_missing_links() {
+        assert!(verification_description(None).contains("never run"));
+        assert!(
+            verification_description(Some(AcVerifyOverallStatus::NoVerification))
+                .contains("no verified_by")
+        );
+        assert!(
+            verification_description(Some(AcVerifyOverallStatus::Skipped))
+                .contains("missing/skipped")
+        );
+    }
 }
