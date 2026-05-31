@@ -2,10 +2,10 @@
 	test-world-reset fmt clippy install-local install-local-force install-local-check print-bin-name \
 	cleanup-user-scoped
 
-BIN_NAME ?= coherence-core-db
+BIN_NAME ?= coherence-bootstrap
 INSTALL_ROOT ?= $(HOME)/.local
 INSTALL_BIN_DIR := $(INSTALL_ROOT)/bin
-CRATE_PATH ?= crates/coherence-core-db
+CRATE_PATH ?= .
 
 tool:
 	@./scripts/tool $(filter-out $@,$(MAKECMDGOALS))

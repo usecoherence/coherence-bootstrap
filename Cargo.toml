@@ -1,9 +1,14 @@
 [package]
 name = "coherence-core-db-bootstrap"
+version = "0.1.0"
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 authors.workspace = true
+
+[[bin]]
+name = "coherence-bootstrap"
+path = "src/main.rs"
 
 [workspace]
 members = ["crates/coherence-core-db", "crates/coherence-core-db-tui", "crates/coherence-test-world"]
@@ -27,7 +32,9 @@ expect_used = "warn"
 [workspace.dependencies]
 toml = "0.8.19"
 
-[dev-dependencies]
+[dependencies]
 coherence-core-db = { path = "crates/coherence-core-db" }
 coherence-core-db-tui = { path = "crates/coherence-core-db-tui" }
+
+[dev-dependencies]
 coherence-test-world = { path = "crates/coherence-test-world" }

@@ -153,7 +153,7 @@ dependencies = [
 
 [[package]]
 name = "coherence-core-db-bootstrap"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "coherence-core-db",
  "coherence-core-db-tui",
