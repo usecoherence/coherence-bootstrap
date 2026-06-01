@@ -1,0 +1,181 @@
+#!/usr/bin/env python3
+"""Generate a reverse-spec code inventory for bootstrap spec recovery.
+
+Outputs live under .coherence/runs/<run-id>/ so this stays evidence-like and
+does not create root docs. SCIP is the coverage backbone; rust-analyzer symbols
+provide a lightweight review queue until we add a full SCIP decoder.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+import time
+from collections import Counter
+from pathlib import Path
+
+
+SYMBOL_RE = re.compile(
+    r'StructureNode \{ parent: (?P<parent>[^,]+), label: "(?P<label>(?:\\"|[^"])*)", '
+    r"navigation_range: (?P<nav_start>\d+)\.\.(?P<nav_end>\d+), "
+    r"node_range: (?P<node_start>\d+)\.\.(?P<node_end>\d+), "
+    r"kind: SymbolKind\((?P<kind>[^)]+)\), detail: (?P<detail>.*), deprecated: (?P<deprecated>true|false) \}"
+)
+
+
+def run(args: list[str], *, cwd: Path, stdin: str | None = None) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        args,
+        cwd=cwd,
+        input=stdin,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+
+def byte_offset_to_line(text: str, offset: int) -> int:
+    return text[:offset].count("\n") + 1
+
+
+def rust_files(root: Path) -> list[Path]:
+    dirs = [root / "src", root / "crates", root / "tests"]
+    files: list[Path] = []
+    for directory in dirs:
+        if directory.exists():
+            files.extend(directory.rglob("*.rs"))
+    return sorted({path for path in files if "/target/" not in str(path)})
+
+
+def classify(rel_path: str, label: str, kind: str, parent: str | None) -> tuple[str, str]:
+    if parent is not None:
+        return "internal", "nested symbol/local implementation detail"
+    if "/tests/" in f"/{rel_path}" or rel_path.startswith("tests/"):
+        return "evidence", "test surface"
+    if "/commands/" in f"/{rel_path}" and kind == "Function":
+        if label in {"run", "run_impl"} or label.endswith(("_add", "_list", "_show")):
+            return "behavior_candidate", "CLI command behavior entrypoint"
+        return "evidence", "CLI command helper"
+    if rel_path.endswith("/main.rs") or rel_path.endswith("/cli.rs"):
+        return "behavior_candidate", "binary or CLI dispatch surface"
+    if rel_path.endswith("/ui.rs") or rel_path.endswith("/update.rs") or rel_path.endswith("/action.rs"):
+        return "behavior_candidate", "TUI interaction surface"
+    if rel_path.endswith("/repository.rs") or rel_path.endswith("/effects.rs"):
+        return "evidence", "TUI effect/repository evidence"
+    if rel_path.endswith("/models.rs") or rel_path.endswith("/spec_store.rs"):
+        return "evidence", "domain model or persistence evidence"
+    if kind in {"Struct", "Enum", "Trait"}:
+        return "evidence", "public type candidate"
+    return "internal", "default first-pass classification"
+
+
+def parse_symbols(root: Path, path: Path) -> list[dict[str, object]]:
+    text = path.read_text(encoding="utf-8")
+    proc = run(["rust-analyzer", "symbols"], cwd=root, stdin=text)
+    if proc.returncode != 0:
+        return [
+            {
+                "file_path": str(path.relative_to(root)),
+                "error": proc.stderr.strip(),
+                "classification": "inventory_error",
+                "reviewed": False,
+            }
+        ]
+    rel_path = str(path.relative_to(root))
+    out: list[dict[str, object]] = []
+    for line in proc.stdout.splitlines():
+        match = SYMBOL_RE.match(line)
+        if not match:
+            continue
+        parent_raw = match.group("parent")
+        parent = None if parent_raw == "None" else parent_raw.removeprefix("Some(").removesuffix(")")
+        label = bytes(match.group("label"), "utf-8").decode("unicode_escape")
+        kind = match.group("kind")
+        node_start = int(match.group("node_start"))
+        classification, reason = classify(rel_path, label, kind, parent)
+        out.append(
+            {
+                "file_path": rel_path,
+                "line": byte_offset_to_line(text, node_start),
+                "label": label,
+                "kind": kind,
+                "detail": match.group("detail"),
+                "parent": parent,
+                "classification": classification,
+                "classification_reason": reason,
+                "reviewed": False,
+                "candidate_spec": None,
+                "candidate_ac": None,
+                "notes": None,
+            }
+        )
+    return out
+
+
+def write_jsonl(path: Path, rows: list[dict[str, object]]) -> None:
+    with path.open("w", encoding="utf-8") as handle:
+        for row in rows:
+            handle.write(json.dumps(row, sort_keys=True) + "\n")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--run-id", default=f"reverse-spec-inventory-{int(time.time())}")
+    parser.add_argument("--skip-scip", action="store_true")
+    args = parser.parse_args()
+
+    root = Path.cwd()
+    out_dir = root / ".coherence" / "runs" / args.run_id
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    if not args.skip_scip:
+        scip_out = out_dir / "index.scip"
+        proc = run(
+            ["rust-analyzer", "scip", str(root), "--output", str(scip_out)],
+            cwd=root,
+        )
+        (out_dir / "scip.stderr.txt").write_text(proc.stderr, encoding="utf-8")
+        if proc.returncode != 0:
+            print(proc.stderr, file=sys.stderr)
+            return proc.returncode
+
+    file_rows = []
+    symbol_rows: list[dict[str, object]] = []
+    for path in rust_files(root):
+        rel_path = str(path.relative_to(root))
+        symbols = parse_symbols(root, path)
+        symbol_rows.extend(symbols)
+        file_rows.append(
+            {
+                "file_path": rel_path,
+                "symbol_count": len(symbols),
+                "reviewed": False,
+            }
+        )
+
+    write_jsonl(out_dir / "files.jsonl", file_rows)
+    write_jsonl(out_dir / "symbols.jsonl", symbol_rows)
+
+    by_class = Counter(str(row.get("classification")) for row in symbol_rows)
+    by_kind = Counter(str(row.get("kind")) for row in symbol_rows if row.get("kind"))
+    summary = {
+        "run_id": args.run_id,
+        "root": str(root),
+        "scip_index": str(out_dir / "index.scip"),
+        "files": len(file_rows),
+        "symbols": len(symbol_rows),
+        "classification_counts": dict(sorted(by_class.items())),
+        "kind_counts": dict(sorted(by_kind.items())),
+        "next_step": "Review symbols.jsonl rows classified as behavior_candidate, starting with spec_cmd.rs.",
+    }
+    (out_dir / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8")
+    print(json.dumps(summary, indent=2, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
