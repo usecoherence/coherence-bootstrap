@@ -20,6 +20,8 @@ jobs:
         run: |
           curl -fsSL https://github.com/dolthub/dolt/releases/latest/download/install.sh | sudo bash
           dolt version
+          dolt config --global --add user.email "ci@example.invalid"
+          dolt config --global --add user.name "CI"
       - name: Start dolt
         run: |
           mkdir -p /tmp/coherence
