@@ -14,7 +14,7 @@ fn with_isolated_env(cmd: &mut Command) {
 
 #[test]
 fn verify_ac_requires_ac_id() {
-    let mut cmd = Command::new(&coherence_bin());
+    let mut cmd = Command::new(coherence_bin());
     cmd.arg("verify-ac");
     with_isolated_env(&mut cmd);
     let out = cmd.output().expect("verify-ac without id");
@@ -36,7 +36,7 @@ fn verify_ac_requires_ac_id() {
 
 #[test]
 fn verify_ac_accepts_ac_id_positional() {
-    let mut cmd = Command::new(&coherence_bin());
+    let mut cmd = Command::new(coherence_bin());
     cmd.arg("verify-ac").arg("NONEXISTENT-AC-1");
     with_isolated_env(&mut cmd);
     let out = cmd.output().expect("verify-ac with positional id");
@@ -53,7 +53,7 @@ fn verify_ac_accepts_ac_id_positional() {
 
 #[test]
 fn verify_ac_accepts_ac_id_flag() {
-    let mut cmd = Command::new(&coherence_bin());
+    let mut cmd = Command::new(coherence_bin());
     cmd.arg("verify-ac").arg("--ac-id").arg("NONEXISTENT-AC-2");
     with_isolated_env(&mut cmd);
     let out = cmd.output().expect("verify-ac with --ac-id flag");
@@ -70,7 +70,7 @@ fn verify_ac_accepts_ac_id_flag() {
 
 #[test]
 fn verify_ac_output_contains_overall_line() {
-    let mut cmd = Command::new(&coherence_bin());
+    let mut cmd = Command::new(coherence_bin());
     cmd.arg("verify-ac").arg("ANY-AC-FORMAT-TEST");
     with_isolated_env(&mut cmd);
     let out = cmd.output().expect("verify-ac");
@@ -83,7 +83,7 @@ fn verify_ac_output_contains_overall_line() {
 
 #[test]
 fn verify_ac_exits_zero_for_nonexistent_ac() {
-    let mut cmd = Command::new(&coherence_bin());
+    let mut cmd = Command::new(coherence_bin());
     cmd.arg("verify-ac").arg("NONEXISTENT-AC-EXIT-TEST");
     with_isolated_env(&mut cmd);
     let out = cmd.output().expect("verify-ac");

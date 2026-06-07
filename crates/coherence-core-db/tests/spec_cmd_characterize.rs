@@ -14,7 +14,7 @@ fn with_isolated_env(cmd: &mut Command) {
 
 #[test]
 fn spec_add_requires_slug_flag() {
-    let mut cmd = Command::new(&coherence_bin());
+    let mut cmd = Command::new(coherence_bin());
     cmd.arg("spec").arg("add").arg("--title").arg("Test Spec");
     with_isolated_env(&mut cmd);
     let out = cmd.output().expect("spec add without --slug");
@@ -32,7 +32,7 @@ fn spec_add_requires_slug_flag() {
 
 #[test]
 fn spec_add_requires_title_flag() {
-    let mut cmd = Command::new(&coherence_bin());
+    let mut cmd = Command::new(coherence_bin());
     cmd.arg("spec").arg("add").arg("--slug").arg("test-slug");
     with_isolated_env(&mut cmd);
     let out = cmd.output().expect("spec add without --title");
@@ -57,7 +57,7 @@ fn spec_add_description_is_optional() {
             .unwrap()
             .as_millis()
     );
-    let mut cmd = Command::new(&coherence_bin());
+    let mut cmd = Command::new(coherence_bin());
     cmd.arg("spec")
         .arg("add")
         .arg("--slug")
@@ -91,7 +91,7 @@ fn spec_add_returns_created_identity() {
             .unwrap()
             .as_millis()
     );
-    let mut cmd = Command::new(&coherence_bin());
+    let mut cmd = Command::new(coherence_bin());
     cmd.arg("spec")
         .arg("add")
         .arg("--slug")
@@ -115,7 +115,7 @@ fn spec_add_returns_created_identity() {
 
 #[test]
 fn spec_list_requires_no_args() {
-    let mut cmd = Command::new(&coherence_bin());
+    let mut cmd = Command::new(coherence_bin());
     cmd.arg("spec").arg("list").arg("extra-arg");
     with_isolated_env(&mut cmd);
     let out = cmd.output().expect("spec list with args");
@@ -128,7 +128,7 @@ fn spec_list_requires_no_args() {
 
 #[test]
 fn spec_show_requires_id() {
-    let mut cmd = Command::new(&coherence_bin());
+    let mut cmd = Command::new(coherence_bin());
     cmd.arg("spec").arg("show");
     with_isolated_env(&mut cmd);
     let out = cmd.output().expect("spec show without id");
@@ -141,7 +141,7 @@ fn spec_show_requires_id() {
 
 #[test]
 fn unknown_spec_subcommand_exits_nonzero() {
-    let mut cmd = Command::new(&coherence_bin());
+    let mut cmd = Command::new(coherence_bin());
     cmd.arg("spec").arg("unknown-subcommand");
     with_isolated_env(&mut cmd);
     let out = cmd.output().expect("unknown spec subcommand");

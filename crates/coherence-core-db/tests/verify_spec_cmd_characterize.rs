@@ -17,7 +17,7 @@ fn with_isolated_env(cmd: &mut Command) {
 
 #[test]
 fn verify_spec_requires_spec_id() {
-    let mut cmd = Command::new(&coherence_bin());
+    let mut cmd = Command::new(coherence_bin());
     cmd.arg("verify-spec");
     with_isolated_env(&mut cmd);
     let out = cmd.output().expect("verify-spec without id");
@@ -39,7 +39,7 @@ fn verify_spec_requires_spec_id() {
 
 #[test]
 fn verify_spec_accepts_spec_id_positional() {
-    let mut cmd = Command::new(&coherence_bin());
+    let mut cmd = Command::new(coherence_bin());
     cmd.arg("verify-spec").arg("NONEXISTENT-SPEC-1");
     with_isolated_env(&mut cmd);
     let out = cmd.output().expect("verify-spec with positional id");
@@ -56,7 +56,7 @@ fn verify_spec_accepts_spec_id_positional() {
 
 #[test]
 fn verify_spec_accepts_spec_id_flag() {
-    let mut cmd = Command::new(&coherence_bin());
+    let mut cmd = Command::new(coherence_bin());
     cmd.arg("verify-spec")
         .arg("--spec-id")
         .arg("NONEXISTENT-SPEC-2");
@@ -75,7 +75,7 @@ fn verify_spec_accepts_spec_id_flag() {
 
 #[test]
 fn verify_spec_exits_nonzero_for_nonexistent_spec() {
-    let mut cmd = Command::new(&coherence_bin());
+    let mut cmd = Command::new(coherence_bin());
     cmd.arg("verify-spec").arg("NONEXISTENT-SPEC-EXIT-TEST");
     with_isolated_env(&mut cmd);
     let out = cmd.output().expect("verify-spec");
@@ -88,7 +88,7 @@ fn verify_spec_exits_nonzero_for_nonexistent_spec() {
 
 #[test]
 fn verify_spec_error_contains_spec_not_found() {
-    let mut cmd = Command::new(&coherence_bin());
+    let mut cmd = Command::new(coherence_bin());
     cmd.arg("verify-spec").arg("NONEXISTENT-SPEC-ERROR-TEST");
     with_isolated_env(&mut cmd);
     let out = cmd.output().expect("verify-spec");

@@ -14,7 +14,7 @@ fn with_isolated_env(cmd: &mut Command) {
 
 #[test]
 fn ac_add_requires_spec_id() {
-    let mut cmd = Command::new(&coherence_bin());
+    let mut cmd = Command::new(coherence_bin());
     cmd.arg("ac").arg("add").arg("--title").arg("Test AC");
     with_isolated_env(&mut cmd);
     let out = cmd.output().expect("ac add without --spec-id");
@@ -32,7 +32,7 @@ fn ac_add_requires_spec_id() {
 
 #[test]
 fn ac_add_requires_title() {
-    let mut cmd = Command::new(&coherence_bin());
+    let mut cmd = Command::new(coherence_bin());
     cmd.arg("ac").arg("add").arg("--spec-id").arg("TEST-SPEC-1");
     with_isolated_env(&mut cmd);
     let out = cmd.output().expect("ac add without --title");
@@ -57,7 +57,7 @@ fn ac_add_validates_spec_exists_before_creating() {
             .unwrap()
             .as_millis()
     );
-    let mut cmd = Command::new(&coherence_bin());
+    let mut cmd = Command::new(coherence_bin());
     cmd.arg("ac")
         .arg("add")
         .arg("--spec-id")
@@ -80,7 +80,7 @@ fn ac_add_validates_spec_exists_before_creating() {
 
 #[test]
 fn ac_list_requires_spec_id() {
-    let mut cmd = Command::new(&coherence_bin());
+    let mut cmd = Command::new(coherence_bin());
     cmd.arg("ac").arg("list");
     with_isolated_env(&mut cmd);
     let out = cmd.output().expect("ac list without --spec-id");
@@ -93,7 +93,7 @@ fn ac_list_requires_spec_id() {
 
 #[test]
 fn ac_list_rejects_extra_args() {
-    let mut cmd = Command::new(&coherence_bin());
+    let mut cmd = Command::new(coherence_bin());
     cmd.arg("ac")
         .arg("list")
         .arg("--spec-id")
@@ -110,7 +110,7 @@ fn ac_list_rejects_extra_args() {
 
 #[test]
 fn ac_show_requires_id() {
-    let mut cmd = Command::new(&coherence_bin());
+    let mut cmd = Command::new(coherence_bin());
     cmd.arg("ac").arg("show");
     with_isolated_env(&mut cmd);
     let out = cmd.output().expect("ac show without id");
@@ -123,7 +123,7 @@ fn ac_show_requires_id() {
 
 #[test]
 fn unknown_ac_subcommand_exits_nonzero() {
-    let mut cmd = Command::new(&coherence_bin());
+    let mut cmd = Command::new(coherence_bin());
     cmd.arg("ac").arg("unknown-subcommand");
     with_isolated_env(&mut cmd);
     let out = cmd.output().expect("unknown ac subcommand");
