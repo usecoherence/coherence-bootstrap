@@ -18,8 +18,8 @@ jobs:
           components: rustfmt, clippy
       - name: Install dolt
         run: |
-          curl -fsSL https://github.com/dolthub/dolt/releases/download/v2.1.4/dolt-linux-amd64.tar.gz | tar xzO dolt-linux-amd64/dolt > /tmp/dolt
-          sudo mv /tmp/dolt /usr/local/bin/dolt
+          curl -fsSL https://github.com/dolthub/dolt/releases/download/v2.1.4/dolt_2.1.4_linux_amd64.tar.gz | tar xz
+          sudo mv dolt_2.1.4_linux_amd64/dolt /usr/local/bin/
           sudo chmod +x /usr/local/bin/dolt
           dolt version
       - name: Start dolt
