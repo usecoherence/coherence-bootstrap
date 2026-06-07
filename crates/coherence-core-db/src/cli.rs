@@ -11,6 +11,7 @@ pub fn run(args: &[String]) -> i32 {
         "migrate" => commands::migrate::run(),
         "db-ping" => commands::db_ping::run(),
         "db-list-databases" => commands::db_list_databases::run(),
+        "db" => commands::db_cmd::run(&args[2..]),
         "drop-isolated-test-db" => commands::drop_isolated_test_db::run(),
         "m0-smoke" => commands::m0_smoke::run(),
         "m1-spec-smoke" => commands::m1_spec_smoke::run(),
@@ -42,7 +43,8 @@ fn print_help() {
            doctor     Check runtime assumptions\n\
            migrate    Run migrations via migration library\n\
             db-ping    Verify MySQL-protocol readiness (socket first, then TCP)\n\
-            db-list-databases  List all databases on the Dolt server\n\
+            db-list-databases  List all databases on the Dolt server
+            db              DBA operations: db truncate, db export-jsonl, db import-jsonl\n\
            drop-isolated-test-db  Drop a coherence_test_* DB on user-scoped server (ADR-0004)\n\
            m0-smoke       Run minimal Rust -> Dolt DB vertical slice\n\
            m1-spec-smoke  Run M1 spec store smoke (Spec / AC / SpecRelation)\n\

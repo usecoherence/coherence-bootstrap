@@ -193,7 +193,9 @@ pub fn update(app: &mut AppState, action: AppAction) -> Vec<Effect> {
                     *pending_level = match pending_level {
                         SpecLevel::Product => SpecLevel::System,
                         SpecLevel::System => SpecLevel::Module,
-                        SpecLevel::Module => SpecLevel::Product,
+                        SpecLevel::Module => SpecLevel::Component,
+                        SpecLevel::Component => SpecLevel::Foundation,
+                        SpecLevel::Foundation => SpecLevel::Product,
                     };
                     app.status = format!("Level → {}", pending_level.as_db_str());
                 }
@@ -389,6 +391,8 @@ fn level_from_tree_label(label: &str) -> Option<SpecLevel> {
         "Product" => Some(SpecLevel::Product),
         "System" => Some(SpecLevel::System),
         "Module" => Some(SpecLevel::Module),
+        "Component" => Some(SpecLevel::Component),
+        "Foundation" => Some(SpecLevel::Foundation),
         _ => None,
     }
 }

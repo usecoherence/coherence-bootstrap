@@ -18,12 +18,16 @@ pub fn build_tree(items: &mut Vec<TreeItem>, graph: &SpecGraph) {
     let mut has_product = false;
     let mut has_system = false;
     let mut has_module = false;
+    let mut has_component = false;
+    let mut has_foundation = false;
 
     for spec in &graph.specs {
         match spec.level {
             SpecLevel::Product => has_product = true,
             SpecLevel::System => has_system = true,
             SpecLevel::Module => has_module = true,
+            SpecLevel::Component => has_component = true,
+            SpecLevel::Foundation => has_foundation = true,
         }
     }
 
@@ -31,6 +35,8 @@ pub fn build_tree(items: &mut Vec<TreeItem>, graph: &SpecGraph) {
         ("Product", has_product),
         ("System", has_system),
         ("Module", has_module),
+        ("Component", has_component),
+        ("Foundation", has_foundation),
     ] {
         if !has {
             continue;

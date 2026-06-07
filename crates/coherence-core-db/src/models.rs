@@ -3,6 +3,8 @@ pub enum SpecLevel {
     Product,
     System,
     Module,
+    Component,
+    Foundation,
 }
 
 impl SpecLevel {
@@ -12,6 +14,8 @@ impl SpecLevel {
             Self::Product => "product",
             Self::System => "system",
             Self::Module => "module",
+            Self::Component => "component",
+            Self::Foundation => "foundation",
         }
     }
 
@@ -21,6 +25,8 @@ impl SpecLevel {
             "product" => Some(Self::Product),
             "system" => Some(Self::System),
             "module" => Some(Self::Module),
+            "component" => Some(Self::Component),
+            "foundation" => Some(Self::Foundation),
             _ => None,
         }
     }

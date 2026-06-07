@@ -1,8 +1,12 @@
 pub mod ac_cmd;
 pub mod ac_tests_cmd;
 pub mod cli_parse;
+pub mod db_cmd;
+pub mod db_export_jsonl;
+pub mod db_import_jsonl;
 pub mod db_list_databases;
 pub mod db_ping;
+pub mod db_truncate;
 pub mod doctor;
 pub mod drop_isolated_test_db;
 pub mod evidence_sample_cmd;
