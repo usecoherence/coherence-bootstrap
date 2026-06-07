@@ -28,7 +28,7 @@ pub fn run(args: &[String]) -> i32 {
                         .map(String::as_str)
                         .unwrap_or_default()
                         .to_string(),
-                )
+                );
             }
             "--in" => {
                 in_path = Some(
@@ -36,7 +36,7 @@ pub fn run(args: &[String]) -> i32 {
                         .map(String::as_str)
                         .unwrap_or_default()
                         .to_string(),
-                )
+                );
             }
             "--confirm" => confirm = true,
             other => {
