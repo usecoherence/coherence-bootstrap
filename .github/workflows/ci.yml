@@ -10,11 +10,30 @@ jobs:
     runs-on: ubuntu-latest
     env:
       COHERENCE_DB_PROFILE: test
+      COHERENCE_ENV: test
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+      - name: Install dolt
+        run: |
+          if ! command -v dolt >/dev/null 2>&1; then
+            go install github.com/dolthub/dolt/go/cmd/dolt@latest
+          fi
+          dolt version
+      - name: Start dolt
+        run: |
+          mkdir -p /run/user/1000/coherence
+          nohup dolt sql-server \
+            --data-dir /home/runner \
+            --host 127.0.0.1 \
+            --port 33306 \
+            --socket /run/user/1000/coherence/dolt.sock \
+            >>/tmp/dolt.log 2>&1 &
+          echo "$!" > /tmp/dolt.pid
+          sleep 3
+          echo "Dolt started, pid: $(cat /tmp/dolt.pid)"
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: make test-isolated
