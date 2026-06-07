@@ -36,5 +36,5 @@ jobs:
           echo "DOLT_PORT=33306" >> $GITHUB_ENV
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
-      - run: make test-isolated
+      - run: make test-isolated -- --test-threads=1
       - run: make tool check-policy
