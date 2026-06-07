@@ -2,7 +2,7 @@
 //! spec metadata **and** codeintel linkage (`codeintel_*` tables), plus shell-based verification.
 //! Canonical narrative (command flow, table owners, non-goals): see `AGENTS.md` § M1 module
 //! ownership — do not duplicate that essay here; module comments summarize slice boundaries only.
-//! 
+//!
 #[cfg(test)]
 mod ac_tests_materialize_integration;
 

@@ -31,7 +31,8 @@ impl Evidence {
     }
 
     pub fn snapshot_file(mut self, path: &str, content: &str) -> Self {
-        self.file_snapshots.insert(path.to_string(), content.to_string());
+        self.file_snapshots
+            .insert(path.to_string(), content.to_string());
         self
     }
 
@@ -42,20 +43,17 @@ impl Evidence {
             "exit_code": self.exit_code,
             "file_snapshots": self.file_snapshots,
         });
-        let json = serde_json::to_string_pretty(&meta)
-            .map_err(|e| format!("serialize evidence: {e}"))?;
-        std::fs::create_dir_all(dir)
-            .map_err(|e| format!("create evidence dir: {e}"))?;
+        let json =
+            serde_json::to_string_pretty(&meta).map_err(|e| format!("serialize evidence: {e}"))?;
+        std::fs::create_dir_all(dir).map_err(|e| format!("create evidence dir: {e}"))?;
         std::fs::write(dir.join("evidence.json"), &json)
             .map_err(|e| format!("write evidence: {e}"))?;
         for (path, content) in &self.file_snapshots {
             let target = dir.join("snapshots").join(path);
             if let Some(parent) = target.parent() {
-                std::fs::create_dir_all(parent)
-                    .map_err(|e| format!("create snapshot dir: {e}"))?;
+                std::fs::create_dir_all(parent).map_err(|e| format!("create snapshot dir: {e}"))?;
             }
-            std::fs::write(&target, content)
-                .map_err(|e| format!("write snapshot {path}: {e}"))?;
+            std::fs::write(&target, content).map_err(|e| format!("write snapshot {path}: {e}"))?;
         }
         Ok(())
     }
@@ -247,7 +245,10 @@ mod tests {
     fn evaluate_skipped_when_no_exit_code() {
         let e = Evidence::new();
         let result = AcTest::pass_with(e);
-        assert_eq!(result, VerificationResult::Skipped("No command executed".into()));
+        assert_eq!(
+            result,
+            VerificationResult::Skipped("No command executed".into())
+        );
     }
 
     #[test]
@@ -256,13 +257,14 @@ mod tests {
             stdout: "hello".into(),
             stderr: String::new(),
             exit_code: Some(0),
-            file_snapshots: HashMap::from([
-                ("config.toml".into(), "key=val".into()),
-            ]),
+            file_snapshots: HashMap::from([("config.toml".into(), "key=val".into())]),
         };
-        let dir = std::env::temp_dir().join(format!("evidence_test_{}", std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_or(0, |d| d.as_nanos())));
+        let dir = std::env::temp_dir().join(format!(
+            "evidence_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |d| d.as_nanos())
+        ));
         evidence.write_to_dir(&dir).unwrap();
         assert!(dir.join("evidence.json").exists());
         assert!(dir.join("snapshots/config.toml").exists());

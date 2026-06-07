@@ -1,5 +1,5 @@
-use coherence_core_db::ac_verify::{verify_spec, AcVerifyLinkStatus};
 use crate::commands::cli_parse::parse_args;
+use coherence_core_db::ac_verify::{verify_spec, AcVerifyLinkStatus};
 use coherence_core_db::db::{connect, ConnectionConfig};
 use coherence_core_db::migrations;
 

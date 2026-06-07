@@ -1,7 +1,10 @@
 use std::process::Command;
 
 pub fn run(args: &[String]) -> i32 {
-    if args.iter().any(|arg| matches!(arg.as_str(), "-h" | "--help")) {
+    if args
+        .iter()
+        .any(|arg| matches!(arg.as_str(), "-h" | "--help"))
+    {
         print_help();
         return 0;
     }

@@ -5,7 +5,9 @@
 
 use mysql::prelude::Queryable;
 
-use coherence_core_db::db::{self, ConnectionConfig, user_scoped_dolt_from_manifest, mysql_quote_identifier};
+use coherence_core_db::db::{
+    self, mysql_quote_identifier, user_scoped_dolt_from_manifest, ConnectionConfig,
+};
 use coherence_core_db::project_manifest;
 
 const VALID_ENVS: &[&str] = &["dev", "test", "prod"];

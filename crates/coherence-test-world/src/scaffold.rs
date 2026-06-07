@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use std::fs;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
 pub struct Scaffold {
@@ -15,7 +15,8 @@ impl Scaffold {
     pub fn write_file(&self, rel_path: &str, content: &str) -> Result<(), String> {
         let path = self.root.join(rel_path);
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|e| format!("create dir {}: {e}", parent.display()))?;
+            fs::create_dir_all(parent)
+                .map_err(|e| format!("create dir {}: {e}", parent.display()))?;
         }
         fs::write(&path, content).map_err(|e| format!("write {}: {e}", path.display()))
     }
@@ -60,9 +61,13 @@ impl Drop for Scaffold {
 
 fn tempfile_dir(prefix: &str) -> Result<PathBuf, String> {
     let mut path = std::env::temp_dir();
-    path.push(format!("{}_{}", prefix, std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |d| d.as_nanos())));
+    path.push(format!(
+        "{}_{}",
+        prefix,
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_nanos())
+    ));
     fs::create_dir_all(&path).map_err(|e| format!("create temp dir: {e}"))?;
     Ok(path)
 }

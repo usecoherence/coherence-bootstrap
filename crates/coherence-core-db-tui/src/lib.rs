@@ -19,7 +19,7 @@
     clippy::single_match_else,
     clippy::too_many_lines,
     clippy::uninlined_format_args,
-    clippy::wildcard_enum_match_arm,
+    clippy::wildcard_enum_match_arm
 )]
 
 pub mod action;
@@ -30,8 +30,8 @@ pub mod project_discovery;
 pub mod repository;
 pub mod theme;
 pub mod tree;
-pub mod update;
 pub mod ui;
+pub mod update;
 
 pub use action::{key_to_action, AppAction};
 pub use app::{AppState, Screen};
@@ -63,9 +63,7 @@ fn run_loop(mut terminal: ratatui::DefaultTerminal, app: &mut app::AppState) -> 
             .draw(|frame| ui::ui(frame, app, &theme::THEME))
             .map_err(|e| format!("draw: {e}"))?;
 
-        if !event::poll(std::time::Duration::from_millis(100))
-            .map_err(|e| format!("poll: {e}"))?
-        {
+        if !event::poll(std::time::Duration::from_millis(100)).map_err(|e| format!("poll: {e}"))? {
             continue;
         }
 

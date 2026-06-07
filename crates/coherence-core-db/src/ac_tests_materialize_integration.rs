@@ -21,8 +21,10 @@ fn coherence_core_db_test_bin() -> PathBuf {
     if let Ok(p) = std::env::var("CARGO_BIN_EXE_coherence-core-db") {
         return PathBuf::from(p);
     }
-    let target = std::env::var_os("CARGO_TARGET_DIR")
-        .map_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target"), PathBuf::from);
+    let target = std::env::var_os("CARGO_TARGET_DIR").map_or_else(
+        || Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target"),
+        PathBuf::from,
+    );
     target.join("debug").join("coherence-core-db")
 }
 
@@ -72,10 +74,7 @@ fn materialize_rust_cli_upserts_codeintel_rows() {
     let rel_path = ours.file_path.clone();
     #[allow(clippy::case_sensitive_file_extension_comparisons)]
     let is_ok = rel_path.starts_with("tests/ac_") && rel_path.ends_with(".rs");
-    assert!(
-        is_ok,
-        "unexpected layout path {rel_path}"
-    );
+    assert!(is_ok, "unexpected layout path {rel_path}");
 
     let loc_id = code_location_id_for_materialized_ac_test("AC-MAT-CLI-1", ".", rel_path.as_str());
 

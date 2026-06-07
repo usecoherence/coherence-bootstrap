@@ -479,7 +479,7 @@ mod tests {
     #[test]
     fn write_rejects_project_hash_on_schema_v1() {
         let tmp = TempDir::new().unwrap();
-let bad = ProjectManifest {
+        let bad = ProjectManifest {
             version: 1,
             project_slug: "x".to_string(),
             dolt_db_name: None,

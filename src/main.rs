@@ -12,7 +12,11 @@ fn run(args: &[String]) -> i32 {
             0
         }
         "tui" => {
-            if args.iter().skip(2).any(|arg| matches!(arg.as_str(), "-h" | "--help")) {
+            if args
+                .iter()
+                .skip(2)
+                .any(|arg| matches!(arg.as_str(), "-h" | "--help"))
+            {
                 print_tui_help();
                 return 0;
             }

@@ -167,7 +167,11 @@ impl<'a> AppAssertions<'a> {
         assert!(
             graph.specs.iter().any(|spec| spec.id == spec_id),
             "expected loaded spec {spec_id}, loaded specs: {:?}",
-            graph.specs.iter().map(|spec| spec.id.as_str()).collect::<Vec<_>>()
+            graph
+                .specs
+                .iter()
+                .map(|spec| spec.id.as_str())
+                .collect::<Vec<_>>()
         );
         self
     }
@@ -192,13 +196,13 @@ impl<'a> AppAssertions<'a> {
             panic!("under_spec() must follow loaded_ac(<id>)");
         };
         let graph = self.loaded_graph();
-        let Some(ac) = graph
-            .acceptance_criteria
-            .iter()
-            .find(|ac| ac.id == ac_id) else {
-                panic!("loaded_ac() already asserted AC {ac_id} exists");
-            };
-        assert_eq!(ac.spec_id, spec_id, "expected AC {ac_id} under spec {spec_id}");
+        let Some(ac) = graph.acceptance_criteria.iter().find(|ac| ac.id == ac_id) else {
+            panic!("loaded_ac() already asserted AC {ac_id} exists");
+        };
+        assert_eq!(
+            ac.spec_id, spec_id,
+            "expected AC {ac_id} under spec {spec_id}"
+        );
         self
     }
 
@@ -207,7 +211,11 @@ impl<'a> AppAssertions<'a> {
         assert!(
             !graph.specs.iter().any(|spec| spec.id == spec_id),
             "expected missing spec {spec_id}, loaded specs: {:?}",
-            graph.specs.iter().map(|spec| spec.id.as_str()).collect::<Vec<_>>()
+            graph
+                .specs
+                .iter()
+                .map(|spec| spec.id.as_str())
+                .collect::<Vec<_>>()
         );
         self
     }
@@ -277,7 +285,12 @@ fn create_seeded_dolt(
         seed_spec(&dolt, &dbs.dev, spec_id, "Dev Only Spec")?;
     }
     if include_project_env_ac {
-        seed_spec(&dolt, &dbs.test, PROJECT_ENV_SPEC_ID, "Project Env Selection")?;
+        seed_spec(
+            &dolt,
+            &dbs.test,
+            PROJECT_ENV_SPEC_ID,
+            "Project Env Selection",
+        )?;
         seed_ac(&dolt, &dbs.test, PROJECT_ENV_AC_ID, PROJECT_ENV_SPEC_ID)?;
     }
     Ok(dolt)

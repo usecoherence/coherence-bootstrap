@@ -49,7 +49,7 @@ pub fn put_spec(conn: &mut Conn, spec: &Spec) -> Result<(), String> {
             "updated_at" => spec.updated_at.as_str(),
         },
     )
-        .map_err(|err| format!("failed to put spec {}: {err}", spec.id))
+    .map_err(|err| format!("failed to put spec {}: {err}", spec.id))
 }
 
 pub fn get_spec(conn: &mut Conn, spec_id: &str) -> Result<Option<Spec>, String> {

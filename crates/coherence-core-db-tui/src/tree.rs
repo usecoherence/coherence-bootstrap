@@ -53,11 +53,7 @@ pub fn build_tree(items: &mut Vec<TreeItem>, graph: &SpecGraph) {
     }
 }
 
-pub fn toggle_expand(
-    items: &mut Vec<TreeItem>,
-    idx: usize,
-    graph: &SpecGraph,
-) {
+pub fn toggle_expand(items: &mut Vec<TreeItem>, idx: usize, graph: &SpecGraph) {
     if idx >= items.len() {
         return;
     }
@@ -92,13 +88,14 @@ pub fn toggle_expand(
                     "System" => SpecLevel::System,
                     _ => SpecLevel::Module,
                 };
-                let acs_by_spec: HashMap<&str, usize> = graph
-                    .acceptance_criteria
-                    .iter()
-                    .fold(HashMap::new(), |mut acc, ac| {
-                        *acc.entry(ac.spec_id.as_str()).or_insert(0) += 1;
-                        acc
-                    });
+                let acs_by_spec: HashMap<&str, usize> =
+                    graph
+                        .acceptance_criteria
+                        .iter()
+                        .fold(HashMap::new(), |mut acc, ac| {
+                            *acc.entry(ac.spec_id.as_str()).or_insert(0) += 1;
+                            acc
+                        });
 
                 let mut pos = insert_at;
                 for spec in &graph.specs {
@@ -159,10 +156,7 @@ pub fn toggle_expand(
     }
 }
 
-pub fn update_preview(
-    items: &[TreeItem],
-    idx: usize,
-) -> (Option<String>, Option<String>) {
+pub fn update_preview(items: &[TreeItem], idx: usize) -> (Option<String>, Option<String>) {
     if idx >= items.len() {
         return (None, None);
     }

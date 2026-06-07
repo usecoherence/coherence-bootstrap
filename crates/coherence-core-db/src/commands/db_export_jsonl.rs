@@ -6,10 +6,13 @@
 
 #![allow(clippy::too_many_lines, clippy::expect_used)]
 
-use std::io::Write;
-use mysql::prelude::Queryable;
-use crate::db::{connect_without_database, user_scoped_dolt_from_manifest, mysql_quote_identifier, ConnectionConfig};
+use crate::db::{
+    connect_without_database, mysql_quote_identifier, user_scoped_dolt_from_manifest,
+    ConnectionConfig,
+};
 use crate::project_manifest;
+use mysql::prelude::Queryable;
+use std::io::Write;
 
 pub fn run(args: &[String]) -> i32 {
     let mut args = args.iter();
@@ -18,8 +21,22 @@ pub fn run(args: &[String]) -> i32 {
 
     while let Some(arg) = args.next() {
         match arg.as_str() {
-            "--env" => target_env = Some(args.next().map(String::as_str).unwrap_or_default().to_string()),
-            "--out" => out_path = Some(args.next().map(String::as_str).unwrap_or_default().to_string()),
+            "--env" => {
+                target_env = Some(
+                    args.next()
+                        .map(String::as_str)
+                        .unwrap_or_default()
+                        .to_string(),
+                )
+            }
+            "--out" => {
+                out_path = Some(
+                    args.next()
+                        .map(String::as_str)
+                        .unwrap_or_default()
+                        .to_string(),
+                )
+            }
             other => {
                 eprintln!("export-jsonl: unknown flag: {other}");
                 return 1;
@@ -39,7 +56,8 @@ pub fn run(args: &[String]) -> i32 {
         }
     };
 
-    let out_path = out_path.unwrap_or_else(|| ".coherence/exports/bootstrap-specs.jsonl".to_string());
+    let out_path =
+        out_path.unwrap_or_else(|| ".coherence/exports/bootstrap-specs.jsonl".to_string());
 
     let manifest = project_manifest::try_read_project_manifest_from_cwd();
     if !user_scoped_dolt_from_manifest(&manifest) {
@@ -149,9 +167,9 @@ pub fn run(args: &[String]) -> i32 {
     }
 
     // 4. acceptance_criterion_concerns
-    let concerns: Vec<(String, String)> = conn.query(
-        "SELECT ac_id, concern_kind FROM acceptance_criterion_concerns ORDER BY 1"
-    ).expect("export: query failed");
+    let concerns: Vec<(String, String)> = conn
+        .query("SELECT ac_id, concern_kind FROM acceptance_criterion_concerns ORDER BY 1")
+        .expect("export: query failed");
 
     for (ac_id, concern_kind) in concerns {
         let rec = serde_json::json!({
@@ -168,7 +186,8 @@ pub fn run(args: &[String]) -> i32 {
         "SELECT id, repo_path, file_path, kind, symbol, test_command, created_at, updated_at FROM codeintel_code_locations ORDER BY id"
     ).expect("export: query failed");
 
-    for (id, repo_path, file_path, kind, symbol, test_command, created_at, updated_at) in locations {
+    for (id, repo_path, file_path, kind, symbol, test_command, created_at, updated_at) in locations
+    {
         let rec = serde_json::json!({
             "type": "codeintel_code_location",
             "id": id,

@@ -3,7 +3,7 @@
 
 use mysql::prelude::Queryable;
 
-use coherence_core_db::db::{self, ConnectionConfig, user_scoped_dolt_from_manifest};
+use coherence_core_db::db::{self, user_scoped_dolt_from_manifest, ConnectionConfig};
 use coherence_core_db::project_manifest;
 
 fn configured_test_db_prefix() -> String {
@@ -13,9 +13,7 @@ fn configured_test_db_prefix() -> String {
 pub fn run() -> i32 {
     let manifest = project_manifest::try_read_project_manifest_from_cwd();
     if !user_scoped_dolt_from_manifest(&manifest) {
-        eprintln!(
-            "drop-isolated-test-db: skipped (dolt_mode is not user-scoped in project.toml)"
-        );
+        eprintln!("drop-isolated-test-db: skipped (dolt_mode is not user-scoped in project.toml)");
         return 0;
     }
     let config = match ConnectionConfig::from_env() {

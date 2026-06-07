@@ -77,7 +77,9 @@ impl Draft {
             } => {
                 pending_review_mode != original_review_mode
                     || pending_risk_level != original_risk_level
-                    || pending_intent.as_ref().is_some_and(|i| i != original_intent)
+                    || pending_intent
+                        .as_ref()
+                        .is_some_and(|i| i != original_intent)
             }
         }
     }
@@ -86,7 +88,8 @@ impl Draft {
         let mut errors = Vec::new();
         match self {
             Self::Spec {
-                pending_description, ..
+                pending_description,
+                ..
             } => {
                 if let Some(desc) = pending_description {
                     if desc.trim().is_empty() {
@@ -94,9 +97,7 @@ impl Draft {
                     }
                 }
             }
-            Self::Ac {
-                pending_intent, ..
-            } => {
+            Self::Ac { pending_intent, .. } => {
                 if let Some(intent) = pending_intent {
                     if intent.trim().is_empty() {
                         errors.push("Intent must not be empty".into());

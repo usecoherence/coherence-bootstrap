@@ -16,7 +16,8 @@ pub fn run(args: &[String]) -> i32 {
     let tail = &args[1..];
     match sub {
         "catalog-preflight" => {
-            match coherence_core_db::db::manifest_catalog_preflight_for_connect("catalog-preflight") {
+            match coherence_core_db::db::manifest_catalog_preflight_for_connect("catalog-preflight")
+            {
                 Ok(()) => {
                     println!("catalog-preflight: ok");
                     0

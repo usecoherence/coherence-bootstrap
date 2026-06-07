@@ -6,10 +6,13 @@
 
 #![allow(clippy::too_many_lines)]
 
-use std::io::BufRead;
-use mysql::prelude::Queryable;
-use crate::db::{connect_without_database, user_scoped_dolt_from_manifest, mysql_quote_identifier, ConnectionConfig};
+use crate::db::{
+    connect_without_database, mysql_quote_identifier, user_scoped_dolt_from_manifest,
+    ConnectionConfig,
+};
 use crate::project_manifest;
+use mysql::prelude::Queryable;
+use std::io::BufRead;
 
 pub fn run(args: &[String]) -> i32 {
     let mut args = args.iter();
@@ -19,8 +22,22 @@ pub fn run(args: &[String]) -> i32 {
 
     while let Some(arg) = args.next() {
         match arg.as_str() {
-            "--env" => target_env = Some(args.next().map(String::as_str).unwrap_or_default().to_string()),
-            "--in" => in_path = Some(args.next().map(String::as_str).unwrap_or_default().to_string()),
+            "--env" => {
+                target_env = Some(
+                    args.next()
+                        .map(String::as_str)
+                        .unwrap_or_default()
+                        .to_string(),
+                )
+            }
+            "--in" => {
+                in_path = Some(
+                    args.next()
+                        .map(String::as_str)
+                        .unwrap_or_default()
+                        .to_string(),
+                )
+            }
             "--confirm" => confirm = true,
             other => {
                 eprintln!("import-jsonl: unknown flag: {other}");

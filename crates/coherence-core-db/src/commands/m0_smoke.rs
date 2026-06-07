@@ -1,4 +1,6 @@
-use coherence_core_db::db::{connect, counts, insert_acceptance_criterion, insert_spec, ConnectionConfig};
+use coherence_core_db::db::{
+    connect, counts, insert_acceptance_criterion, insert_spec, ConnectionConfig,
+};
 use coherence_core_db::migrations;
 use coherence_core_db::models::{AcceptanceCriterion, Spec};
 use coherence_core_db::test_world_guard;

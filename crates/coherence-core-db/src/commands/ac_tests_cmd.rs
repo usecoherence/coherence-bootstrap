@@ -3,12 +3,12 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::commands::cli_parse::parse_args;
 use coherence_core_db::ac_code_link_store;
 use coherence_core_db::ac_materialize_codeintel_ids::{
     ac_link_id_for_verified_by_file, code_location_id_for_materialized_ac_test,
 };
 use coherence_core_db::ac_test_layout::{expected_rust_ac_test_files, ExpectedAcTestFile};
-use crate::commands::cli_parse::parse_args;
 use coherence_core_db::db::{connect, ConnectionConfig};
 use coherence_core_db::migrations;
 use coherence_core_db::models::{AcCodeLink, AcCodeRelationKind, CodeLocation, SpecGraph};

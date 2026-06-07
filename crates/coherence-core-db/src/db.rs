@@ -41,7 +41,9 @@ pub struct ConnectionConfig {
 }
 
 #[must_use]
-pub fn user_scoped_dolt_from_manifest(manifest: &Option<project_manifest::ProjectManifest>) -> bool {
+pub fn user_scoped_dolt_from_manifest(
+    manifest: &Option<project_manifest::ProjectManifest>,
+) -> bool {
     match manifest.as_ref() {
         Some(m) => match m.dolt_mode.as_deref() {
             Some(mode) => matches!(mode, "user-scoped" | "user_scoped" | "user"),
@@ -594,11 +596,8 @@ mod connection_config_manifest_tests {
         tmp
     }
 
-    const ENV_FOR_CONNECTION_TESTS: &[&str] = &[
-        "DOLT_DB",
-        "COHERENCE_PROJECT_SLUG",
-        "COHERENCE_ENV",
-    ];
+    const ENV_FOR_CONNECTION_TESTS: &[&str] =
+        &["DOLT_DB", "COHERENCE_PROJECT_SLUG", "COHERENCE_ENV"];
 
     #[test]
     fn explicit_dolt_db_env_overrides_manifest() {
