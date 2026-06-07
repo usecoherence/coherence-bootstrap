@@ -22,16 +22,18 @@ jobs:
           dolt version
       - name: Start dolt
         run: |
-          mkdir -p /run/user/1000/coherence
+          mkdir -p /tmp/coherence
           nohup dolt sql-server \
-            --data-dir /home/runner \
+            --data-dir /tmp \
             --host 127.0.0.1 \
             --port 33306 \
-            --socket /run/user/1000/coherence/dolt.sock \
+            --socket /tmp/coherence/dolt.sock \
             >>/tmp/dolt.log 2>&1 &
           echo "$!" > /tmp/dolt.pid
           sleep 3
           echo "Dolt started, pid: $(cat /tmp/dolt.pid)"
+          echo "DOLT_SOCKET=/tmp/coherence/dolt.sock" >> $GITHUB_ENV
+          echo "DOLT_PORT=33306" >> $GITHUB_ENV
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: make test-isolated
