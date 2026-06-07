@@ -51,7 +51,7 @@ Override for one shell session only: `export COHERENCE_POST_COMMIT_INSTALL_LOCAL
 
 ## Repository rules
 
-- Do not create root-level Markdown files except `AGENTS.md`.
+- Do not create root-level Markdown files except `AGENTS.md` and `README.md`.
 - Do not edit `docs/` manually.
 - `docs/` is read-only generated output from future spec export commands.
 - Specs, ACs, plans, and review contracts should be changed through tool commands once implemented.

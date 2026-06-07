@@ -5,9 +5,9 @@ status=0
 
 while IFS= read -r path; do
   case "$path" in
-    ./AGENTS.md) ;;
+    ./AGENTS.md | ./README.md) ;;
     *)
-      echo "policy violation: root Markdown file is forbidden: $path" >&2
+      echo "policy violation: root Markdown file is forbidden except AGENTS.md and README.md: $path" >&2
       status=1
       ;;
   esac

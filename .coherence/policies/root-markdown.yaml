@@ -7,4 +7,5 @@ policy:
       operations: ["create", "write", "delete", "rename"]
       except:
         - "AGENTS.md"
-  reason: "Root Markdown files become context dumps. Keep durable docs in spec store and export them."
+        - "README.md"
+  reason: "Root Markdown files become context dumps. Keep durable docs in spec store and export them; keep README.md for repository landing context."

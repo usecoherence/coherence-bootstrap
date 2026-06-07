@@ -107,5 +107,5 @@ Task tracking:
 
 Rules:
   docs/ is generated/read-only
-  root Markdown is forbidden except AGENTS.md
+  root Markdown is forbidden except AGENTS.md and README.md
 EOF
