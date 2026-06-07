@@ -17,7 +17,7 @@ check:
 test: test-isolated
 
 test-isolated:
-	@./scripts/with-isolated-test-profile cargo test --workspace
+	@./scripts/with-isolated-test-profile cargo test --workspace $(CARGO_TEST_ARGS)
 
 # Mutating smoke uses with-isolated-test-profile (COHERENCE_DB_PROFILE=test, COHERENCE_ENV=test); guard in test_world_guard.rs.
 smoke-isolated smoke:
