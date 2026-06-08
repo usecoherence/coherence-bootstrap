@@ -1,4 +1,4 @@
-.PHONY: tool check test test-isolated smoke smoke-isolated \
+.PHONY: tool check build test test-isolated smoke smoke-isolated \
 	test-world-reset fmt clippy install-local install-local-force install-local-check print-bin-name \
 	cleanup-user-scoped
 
@@ -12,6 +12,9 @@ tool:
 
 check:
 	@$(MAKE) tool run
+
+build:
+	@cargo build --workspace --locked
 
 # Isolated-by-default: workspace tests never run without explicit test-world profile.
 test: test-isolated
@@ -48,11 +51,11 @@ install-local-check:
 		echo "WARNING: '$(BIN_NAME)' is already on PATH at $$(command -v "$(BIN_NAME)")"; \
 	fi
 
-install-local: install-local-check
+install-local: install-local-check build
 	@cargo install --path "$(CRATE_PATH)" --root "$(INSTALL_ROOT)" --locked
 	@echo "Installed $(BIN_NAME) to $(INSTALL_BIN_DIR)/$(BIN_NAME)"
 
-install-local-force:
+install-local-force: build
 	@mkdir -p "$(INSTALL_BIN_DIR)"
 	@cargo install --path "$(CRATE_PATH)" --root "$(INSTALL_ROOT)" --locked --force
 	@echo "Installed (forced) $(BIN_NAME) to $(INSTALL_BIN_DIR)/$(BIN_NAME)"

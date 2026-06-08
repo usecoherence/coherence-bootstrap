@@ -2,8 +2,9 @@
 //! Subcommands: truncate, export-jsonl, import-jsonl, list-databases
 
 pub fn run(args: &[String]) -> i32 {
-    let sub = args.first().map_or("", String::as_str);
-    let tail = &args[1..];
+    let (sub, tail) = args
+        .split_first()
+        .map_or(("", &[][..]), |(sub, tail)| (sub.as_str(), tail));
     match sub {
         "truncate" => super::db_truncate::run(tail),
         "export-jsonl" => super::db_export_jsonl::run(tail),
@@ -13,5 +14,15 @@ pub fn run(args: &[String]) -> i32 {
             eprintln!("db: unknown subcommand: {other} (expected truncate, export-jsonl, import-jsonl, list-databases)");
             1
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn db_without_subcommand_does_not_panic() {
+        assert_eq!(run(&[]), 1);
     }
 }

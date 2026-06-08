@@ -47,22 +47,31 @@ fn print_tui_help() {
 }
 
 fn print_help() {
-    println!(
-        "coherence-bootstrap\n\n\
+    println!("{}", help_text());
+}
+
+fn help_text() -> &'static str {
+    "coherence-bootstrap\n\n\
          Facade entrypoint for the bootstrap coherence stack.\n\n\
          Commands:\n\
-           tui            Launch the TUI in-process\n\
-           spec           Delegate to coherence-core-db spec\n\
-           ac             Delegate to coherence-core-db ac\n\
-           ac-tests       Delegate to coherence-core-db ac-tests\n\
-           verify-ac      Delegate to coherence-core-db verify-ac\n\
-           verify-spec    Delegate to coherence-core-db verify-spec\n\
-           project        Delegate to coherence-core-db project\n\
-           doctor         Delegate to coherence-core-db doctor\n\
-           migrate        Delegate to coherence-core-db migrate\n\
-           help           Show this help\n\n\
+            tui            Launch the TUI in-process\n\
+            spec           Delegate to coherence-core-db spec\n\
+            ac             Delegate to coherence-core-db ac\n\
+            ac-tests       Delegate to coherence-core-db ac-tests\n\
+            db             DBA operations: truncate, export-jsonl, import-jsonl, list-databases\n\
+            db-ping        Delegate to coherence-core-db db-ping\n\
+            db-list-databases  Delegate to coherence-core-db db-list-databases\n\
+            drop-isolated-test-db  Delegate to coherence-core-db drop-isolated-test-db\n\
+            verify-ac      Delegate to coherence-core-db verify-ac\n\
+            verify-spec    Delegate to coherence-core-db verify-spec\n\
+            evidence-sample  Delegate to coherence-core-db evidence-sample\n\
+            project        Delegate to coherence-core-db project\n\
+            doctor         Delegate to coherence-core-db doctor\n\
+            migrate        Delegate to coherence-core-db migrate\n\
+            m0-smoke       Delegate to coherence-core-db m0-smoke\n\
+            m1-spec-smoke  Delegate to coherence-core-db m1-spec-smoke\n\
+            help           Show this help\n\n\
          Most non-TUI commands use the same syntax as coherence-core-db."
-    );
 }
 
 #[cfg(test)]
@@ -89,5 +98,14 @@ mod tests {
             "--help".to_string(),
         ];
         assert_eq!(run(&args), 0);
+    }
+
+    #[test]
+    fn help_lists_db_import_export_operations() {
+        let help = help_text();
+        assert!(help.contains("db"));
+        assert!(help.contains("truncate"));
+        assert!(help.contains("export-jsonl"));
+        assert!(help.contains("import-jsonl"));
     }
 }

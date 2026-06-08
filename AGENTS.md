@@ -44,7 +44,7 @@ Skip for a single commit: `GIT_HOOK_SKIP_COHERENCE_BUILD=1 git commit ...`
 
 | Mode | Configure | Effect |
 |------|-----------|--------|
-| **Debug (default)** | nothing else | `cargo build -p coherence-core-db` → **`target/debug/coherence-core-db`** |
+| **Debug (default)** | nothing else | `make build` → workspace crates plus **`target/debug/coherence-bootstrap`** |
 | **Install to `~/.local/bin`** | `git config --local coherence.postCommitInstallLocal true` | `make install-local-force` (same as manual install; slower per commit) |
 
 Override for one shell session only: `export COHERENCE_POST_COMMIT_INSTALL_LOCAL=1` (truthy: `1`, `true`, `yes`, `on`).

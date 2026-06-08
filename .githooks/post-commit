@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # After each commit: refresh the CLI binary.
-# Default: incremental cargo build -> target/debug/...
+# Default: incremental workspace build -> target/debug/...
 # Optional: install to ~/.local/bin via make install-local-force (slower).
 set -euo pipefail
 if [[ -n "${GIT_HOOK_SKIP_COHERENCE_BUILD:-}" ]]; then
@@ -32,10 +32,10 @@ if $want_install_local; then
     echo "post-commit: make install-local-force failed (~/.local/bin copy may be stale)." >&2
   fi
 else
-  if cargo build -p coherence-core-db --locked -q; then
+  if make build; then
     :
   else
-    echo "post-commit: cargo build -p coherence-core-db failed (debug binary may be stale)." >&2
+    echo "post-commit: make build failed (debug binaries may be stale)." >&2
   fi
 fi
 exit 0

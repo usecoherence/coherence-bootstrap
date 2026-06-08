@@ -17,6 +17,7 @@ Planning:
   make tool plan         HITL planning loop [stub]
 
 Implementation:
+  make build            cargo build --workspace --locked (workspace crates + coherence-bootstrap)
   make tool run          fmt/check/test/policy checks (workspace tests run under isolated profile)
   make test-isolated      cargo test workspace (explicit isolated profile helper)
   make smoke / smoke-isolated   m0 + m1 Dolt smoke (isolated-by-default wrappers)
