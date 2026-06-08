@@ -17,7 +17,265 @@ So this is how I'm gonnna do it.
 
 Reviewing 250 ACs is much easier than 10k LoC.
 
-# WIP Specs aka "Normalized Spec Tree Decisions v3"
+## Install On macOS Without Docker
+
+This path installs the local bootstrap binary and uses a normal Dolt runtime on your Mac.
+
+Prerequisites:
+
+```bash
+brew install dolt git
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+Open a new shell after `rustup`, or load Cargo into the current one:
+
+```bash
+source "$HOME/.cargo/env"
+```
+
+Build and install `coherence-bootstrap` into `~/.local/bin`:
+
+```bash
+make install-local-force
+```
+
+Make sure your shell can find it:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+coherence-bootstrap help
+```
+
+Initialize this checkout's catalog and start Dolt:
+
+```bash
+make tool bootstrap
+make tool doctor
+```
+
+If `doctor` reports Dolt is not reachable, start it explicitly:
+
+```bash
+make tool dolt-start
+make tool migrate
+make tool doctor
+```
+
+Run the basic quality gate:
+
+```bash
+make tool run CARGO_TEST_ARGS="-- --test-threads=1"
+```
+
+After that you can use the same CLI/TUI flow as the demo container:
+
+```bash
+coherence-bootstrap spec list
+coherence-bootstrap tui
+```
+
+Notes:
+
+- `~/.local/bin` is not always on macOS `PATH`; add `export PATH="$HOME/.local/bin:$PATH"` to your shell profile if needed.
+- Rust is needed for install/build and for the current Rust AC-test verification path.
+- Dolt is required at runtime because the catalog is a Dolt SQL database.
+
+## Load The Bootstrap Spec Catalog
+
+The committed bootstrap spec export is here:
+
+```text
+.coherence/exports/bootstrap-specs.jsonl
+```
+
+Coherence does not use one global mutable spec database for every project. Each project gets its own logical Dolt database/catalog. When `DOLT_DB` is not set, the catalog name is derived from that project's `.coherence/project.toml` binding, including the project slug, a short hash tied to the project path, and the selected environment tier (`dev`, `test`, or `prod`).
+
+That means the bootstrap specs and your demo app specs should normally live in different catalogs:
+
+- Use this repository checkout when you want to inspect or modify the bootstrap catalog export.
+- Use a separate demo/project directory when you want to try creating your own first spec and AC.
+- Do not import `.coherence/exports/bootstrap-specs.jsonl` into a throwaway demo project unless you intentionally want that demo project's catalog to contain the bootstrap specs.
+- Do not create throwaway demo specs in this repository's normal `dev` catalog unless you intend to export or clean them up afterward.
+
+If you initialized a fresh catalog and want to load these specs into it, import the JSONL export:
+
+```bash
+coherence-bootstrap db import-jsonl \
+  --env dev \
+  --in .coherence/exports/bootstrap-specs.jsonl \
+  --confirm
+```
+
+Then inspect or edit it:
+
+```bash
+coherence-bootstrap spec list
+coherence-bootstrap tui
+```
+
+After adding or changing specs/ACs, write the catalog back to the export file:
+
+```bash
+coherence-bootstrap db export-jsonl \
+  --env dev \
+  --out .coherence/exports/bootstrap-specs.jsonl
+```
+
+If you want to reset the dev catalog to exactly what is in the export, truncate first and then import:
+
+```bash
+coherence-bootstrap db truncate --env dev --confirm
+coherence-bootstrap db import-jsonl \
+  --env dev \
+  --in .coherence/exports/bootstrap-specs.jsonl \
+  --confirm
+```
+
+## First Demo: From Requirement To Verified AC
+
+This path is for a person seeing Coherence for the first time. It is also written so an agent can follow it literally.
+
+Use a separate throwaway project directory for this demo if you are not intentionally editing the bootstrap specs. Catalog identity is per project path/binding, so a demo project gets its own Dolt logical database instead of mixing with this repository's bootstrap catalog.
+
+The demo container contains `coherence-bootstrap`, Dolt, Git, Bash, and the Rust toolchain needed by the current Rust AC-test verifier. Start it from this repository:
+
+```bash
+make demo-container-shell
+```
+
+You should now be inside the container at `/workspace`. The entrypoint already started `dolt sql-server` for this container session.
+
+1. Initialize the mounted project catalog.
+
+```bash
+git config --global --add safe.directory /workspace
+coherence-bootstrap project init
+coherence-bootstrap migrate
+coherence-bootstrap doctor
+```
+
+2. Turn one requirement into a spec.
+
+Requirement: "The demo app prints a human-readable greeting."
+
+```bash
+coherence-bootstrap spec add \
+  --id SPEC-demo-greeting \
+  --slug product/demo-greeting \
+  --title "Demo Greeting" \
+  --level product \
+  --status draft \
+  --description "The demo app exposes a simple greeting behavior."
+```
+
+3. Turn the testable claim into an acceptance criterion.
+
+```bash
+coherence-bootstrap ac add \
+  --id AC--demo-greeting-prints-message \
+  --spec-id SPEC-demo-greeting \
+  --slug prints-message \
+  --title "prints greeting message" \
+  --intent "Running the demo greeting behavior produces Hello, Coherence!"
+```
+
+4. Inspect the catalog.
+
+```bash
+coherence-bootstrap spec list
+coherence-bootstrap ac list --spec-id SPEC-demo-greeting
+```
+
+5. Open the TUI and edit the spec.
+
+```bash
+coherence-bootstrap tui
+```
+
+In the TUI:
+
+- Press `Enter` on the project.
+- Press `Enter` on `dev`.
+- Use arrows to select `Product`, press `Enter` to expand it.
+- Select `SPEC-demo-greeting`.
+- Press `e` to enter edit mode.
+- Press `s` to cycle status, or `l` to cycle level.
+- Press `Enter` to save.
+- Press `q` to quit.
+
+6. Materialize the Rust AC test skeleton.
+
+```bash
+coherence-bootstrap ac-tests materialize-rust \
+  --workspace /workspace \
+  --ac-id AC--demo-greeting-prints-message
+```
+
+This creates one file:
+
+```text
+tests/ac_prints-message.rs
+```
+
+It also records a `verified_by` codeintel link for that AC. The current MVP verifier uses the generated command `cargo test -p coherence-core-db-bootstrap validates_prints_message`.
+
+7. Write the first test.
+
+Open `tests/ac_prints-message.rs` and replace the generated `todo!(...)` with a real assertion:
+
+```rust
+//! AC: AC--demo-greeting-prints-message
+//! Generated by coherence-core-db MVP AC test layout.
+
+#[test]
+fn validates_prints_message() {
+    let greeting = "Hello, Coherence!";
+    assert_eq!(greeting, "Hello, Coherence!");
+}
+```
+
+8. Let Coherence verify the AC through the catalog link.
+
+```bash
+coherence-bootstrap verify-ac AC--demo-greeting-prints-message
+```
+
+Expected outcome: `OVERALL passed` and a `LINK ... passed` row. You can also verify every AC under the spec:
+
+```bash
+coherence-bootstrap verify-spec SPEC-demo-greeting
+```
+
+9. Optional cleanup for this demo file.
+
+```bash
+rm -f tests/ac_prints-message.rs
+```
+
+# WIP Coherence Specs aka "Normalized Spec Tree Decisions v3"
+
+This section is a working snapshot of the bootstrap spec catalog recovered from the existing codebase. The live/exportable catalog lives in `.coherence/exports/bootstrap-specs.jsonl`; this README section explains the recovery shape and current tree at a human-readable level.
+
+The reverse-engineering goal was not to document every function. The goal was to answer: "what behavior does this codebase already promise, and at which abstraction level should each promise live?" We used a taxonomy first, then routed discovered behavior into that taxonomy.
+
+The recovery flow was roughly:
+
+- Build an inventory from the codebase: files, symbols, commands, tests, persistence surfaces, and observable behaviors.
+- Convert that inventory into a ledger of candidate specs and candidate ACs.
+- Apply the taxonomy below: `FOUNDATION -> MODULE -> COMPONENT -> SYSTEM -> PRODUCT`.
+- Group flat findings into coherent specs instead of one spec per code detail.
+- Promote user-visible or contract-level claims into ACs.
+- Mark test infrastructure or implementation-only details as evidence-only/demoted instead of product promises.
+- Keep higher-level specs focused on their own level: a product AC should not re-test a foundation DB invariant if that invariant already belongs to a foundation AC.
+
+This gives a useful behavioral inventory without requiring every reviewer to read the whole codebase. The process is intentionally repeatable: the same codebase, the same taxonomy, and the same routing rules should converge toward a similar spec tree.
+
+Current committed catalog export:
+
+```text
+.coherence/exports/bootstrap-specs.jsonl
+```
 
 **Source:** `normalized_inventory.md` / ledger files
 **Taxonomy:** 5-level (PRODUCT → SYSTEM → MODULE → COMPONENT → FOUNDATION)

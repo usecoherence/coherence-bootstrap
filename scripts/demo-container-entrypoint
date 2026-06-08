@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+mkdir -p "${COHERENCE_DOLT_DATA_DIR}" "${COHERENCE_DOLT_RUNTIME_DIR}"
+
+if [ ! -S "${DOLT_SOCKET}" ]; then
+  dolt sql-server \
+    --data-dir "${COHERENCE_DOLT_DATA_DIR}" \
+    --host "${DOLT_HOST:-127.0.0.1}" \
+    --port "${DOLT_PORT:-33306}" \
+    --socket "${DOLT_SOCKET}" \
+    >"${COHERENCE_DOLT_RUNTIME_DIR}/dolt.log" 2>&1 &
+  echo "$!" >"${COHERENCE_DOLT_RUNTIME_DIR}/dolt.pid"
+
+  for _ in $(seq 1 50); do
+    if [ -S "${DOLT_SOCKET}" ]; then
+      break
+    fi
+    sleep 0.1
+  done
+fi
+
+if [ ! -S "${DOLT_SOCKET}" ]; then
+  echo "coherence-demo-entrypoint: Dolt socket did not appear at ${DOLT_SOCKET}" >&2
+  cat "${COHERENCE_DOLT_RUNTIME_DIR}/dolt.log" >&2 || true
+  exit 1
+fi
+
+exec "$@"

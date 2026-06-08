@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+slug="${COHERENCE_BOOTSTRAP_SLUG:-$(basename "$PWD")}"
+slug="${slug// /-}"
+
+git config --global --add safe.directory "$PWD"
+
+if ! git rev-parse --show-toplevel >/dev/null 2>&1; then
+  git init
+fi
+
+if [ ! -f .coherence/project.toml ]; then
+  coherence-bootstrap project init --slug "${slug}"
+else
+  coherence-bootstrap project init
+fi
+
+coherence-bootstrap migrate
+coherence-bootstrap doctor
+
+coherence-bootstrap spec add \
+  --id SPEC-demo-app \
+  --slug product/demo-app \
+  --title "Demo App" \
+  --level product \
+  --status draft || true
+
+coherence-bootstrap ac add \
+  --id AC--demo-app-renders-hello \
+  --spec-id SPEC-demo-app \
+  --slug renders-hello \
+  --title "demo app renders hello" \
+  --intent "The demo app exposes one visible hello-world behavior" || true
+
+coherence-bootstrap spec list
+coherence-bootstrap ac list --spec-id SPEC-demo-app
+
+echo "demo-container-smoke: ok"

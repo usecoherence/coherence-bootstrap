@@ -1,11 +1,13 @@
 .PHONY: tool check build test test-isolated smoke smoke-isolated \
 	test-world-reset fmt clippy install-local install-local-force install-local-check print-bin-name \
-	cleanup-user-scoped
+	cleanup-user-scoped demo-container-build demo-container-smoke demo-container-shell
 
 BIN_NAME ?= coherence-bootstrap
 INSTALL_ROOT ?= $(HOME)/.local
 INSTALL_BIN_DIR := $(INSTALL_ROOT)/bin
 CRATE_PATH ?= .
+DEMO_IMAGE ?= coherence-bootstrap-demo:local
+DEMO_WORKSPACE ?= $(CURDIR)
 
 tool:
 	@./scripts/tool $(filter-out $@,$(MAKECMDGOALS))
@@ -72,6 +74,16 @@ cleanup-user-scoped:
 	@echo "Cleaning user-scoped runtime dir..."
 	@rm -rf /run/user/1000/coherence/*
 	@echo "cleanup-user-scoped: done"
+
+demo-container-build:
+	@docker build -t "$(DEMO_IMAGE)" .
+
+demo-container-smoke: demo-container-build
+	@tmp_dir=$$(mktemp -d /tmp/coherence-bootstrap-demo-smoke.XXXXXX); \
+		docker run --rm -v "$$tmp_dir:/workspace" "$(DEMO_IMAGE)" coherence-demo-smoke
+
+demo-container-shell: demo-container-build
+	@docker run --rm -it -v "$(DEMO_WORKSPACE):/workspace" "$(DEMO_IMAGE)" bash
 
 %:
 	@:

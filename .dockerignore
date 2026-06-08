@@ -1,0 +1,9 @@
+target/
+.git/
+.dolt/
+.agent-runs/
+.coherence/runs/
+.coherence/run/
+**/*.sock
+**/*.pid
+**/*.log
