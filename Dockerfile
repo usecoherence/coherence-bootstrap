@@ -19,8 +19,10 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /opt/coherence-install/bin/coherence-bootstrap /usr/local/bin/coherence-bootstrap
+COPY .coherence/exports/bootstrap-specs.jsonl /opt/coherence-bootstrap/bootstrap-specs.jsonl
 COPY scripts/demo-container-entrypoint /usr/local/bin/coherence-demo-entrypoint
 COPY scripts/demo-container-init /usr/local/bin/coherence-demo-init
+COPY scripts/demo-container-setup /usr/local/bin/coherence-demo-setup
 COPY scripts/demo-container-smoke /usr/local/bin/coherence-demo-smoke
 
 ENV COHERENCE_DOLT_DATA_DIR=/var/lib/coherence/dolt \

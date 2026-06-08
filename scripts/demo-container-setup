@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+bootstrap_export="/opt/coherence-bootstrap/bootstrap-specs.jsonl"
+
+mkdir -p /coherence-specs /workspace
+
+(
+  cd /coherence-specs
+  COHERENCE_BOOTSTRAP_SLUG=coherence_specs coherence-demo-init
+  coherence-bootstrap db import-jsonl \
+    --env dev \
+    --in "${bootstrap_export}" \
+    --confirm
+)
+
+(
+  cd /workspace
+  COHERENCE_BOOTSTRAP_SLUG="${COHERENCE_BOOTSTRAP_SLUG:-workspace}" coherence-demo-init
+)
+
+cat <<'EOF'
+coherence-demo-setup: ready
+
+Demo projects:
+  /coherence-specs  imported bootstrap Coherence specs
+  /workspace        empty/minimal project for your own demo specs
+
+Try:
+  cd /coherence-specs && coherence-bootstrap spec list
+  cd /workspace && coherence-bootstrap spec list
+  coherence-bootstrap tui
+EOF

@@ -7,7 +7,7 @@ INSTALL_ROOT ?= $(HOME)/.local
 INSTALL_BIN_DIR := $(INSTALL_ROOT)/bin
 CRATE_PATH ?= .
 DEMO_IMAGE ?= coherence-bootstrap-demo:local
-DEMO_WORKSPACE ?= $(CURDIR)
+DEMO_WORKSPACE ?=
 
 tool:
 	@./scripts/tool $(filter-out $@,$(MAKECMDGOALS))
@@ -83,7 +83,11 @@ demo-container-smoke: demo-container-build
 		docker run --rm -v "$$tmp_dir:/workspace" "$(DEMO_IMAGE)" coherence-demo-smoke
 
 demo-container-shell: demo-container-build
-	@docker run --rm -it -v "$(DEMO_WORKSPACE):/workspace" "$(DEMO_IMAGE)" bash -c 'coherence-demo-init && exec bash'
+	@if [ -n "$(DEMO_WORKSPACE)" ]; then \
+		docker run --rm -it -v "$(DEMO_WORKSPACE):/workspace" "$(DEMO_IMAGE)" bash -c 'coherence-demo-setup && exec bash'; \
+	else \
+		docker run --rm -it "$(DEMO_IMAGE)" bash -c 'coherence-demo-setup && exec bash'; \
+	fi
 
 %:
 	@:

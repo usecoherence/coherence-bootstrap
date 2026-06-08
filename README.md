@@ -138,24 +138,40 @@ This path is for a person seeing Coherence for the first time. It is also writte
 
 Use a separate throwaway project directory for this demo if you are not intentionally editing the bootstrap specs. Catalog identity is per project path/binding, so a demo project gets its own Dolt logical database instead of mixing with this repository's bootstrap catalog.
 
-The demo container contains `coherence-bootstrap`, Dolt, Git, Bash, and the Rust toolchain needed by the current Rust AC-test verifier. Start it from this repository:
+The demo container contains `coherence-bootstrap`, Dolt, Git, Bash, the Rust toolchain needed by the current Rust AC-test verifier, and a copy of the committed bootstrap spec export. Start it from this repository:
 
 ```bash
 make demo-container-shell
 ```
 
-You should now be inside the container at `/workspace`. The entrypoint started `dolt sql-server`, and `make demo-container-shell` ran `coherence-demo-init` to initialize and migrate the mounted project's catalog before opening the shell.
+You should now be inside the container at `/workspace`. The entrypoint started `dolt sql-server`, and `make demo-container-shell` ran `coherence-demo-setup` before opening the shell.
 
-1. Confirm the mounted project catalog is ready.
+The setup creates two separate project directories:
+
+- `/coherence-specs`: a Coherence project with the committed bootstrap specs imported into its `dev` catalog.
+- `/workspace`: a separate empty/minimal Coherence project for your own first spec and AC.
+
+These are two different project paths with two different `.coherence/project.toml` bindings, so they resolve to different Dolt logical databases when `DOLT_DB` is unset. The TUI discovers them by path.
+
+If you want `/workspace` to be a host directory instead of an ephemeral in-container project, pass it explicitly:
 
 ```bash
+DEMO_WORKSPACE=/path/to/my/project make demo-container-shell
+```
+
+1. Confirm both catalogs are ready.
+
+```bash
+cd /coherence-specs
+coherence-bootstrap spec list
+cd /workspace
 coherence-bootstrap doctor
 ```
 
 If you started the image manually with raw `docker run ... bash`, run this first:
 
 ```bash
-coherence-demo-init
+coherence-demo-setup
 ```
 
 2. Turn one requirement into a spec.
