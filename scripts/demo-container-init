@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+slug="${COHERENCE_BOOTSTRAP_SLUG:-$(basename "$PWD")}"
+slug="${slug// /-}"
+
+git config --global --add safe.directory "$PWD"
+
+if ! git rev-parse --show-toplevel >/dev/null 2>&1; then
+  git init
+fi
+
+if [ ! -f .coherence/project.toml ]; then
+  coherence-bootstrap project init --slug "${slug}"
+else
+  coherence-bootstrap project init
+fi
+
+coherence-bootstrap migrate
+
+echo "coherence-demo-init: ready"

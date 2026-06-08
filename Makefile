@@ -83,7 +83,7 @@ demo-container-smoke: demo-container-build
 		docker run --rm -v "$$tmp_dir:/workspace" "$(DEMO_IMAGE)" coherence-demo-smoke
 
 demo-container-shell: demo-container-build
-	@docker run --rm -it -v "$(DEMO_WORKSPACE):/workspace" "$(DEMO_IMAGE)" bash
+	@docker run --rm -it -v "$(DEMO_WORKSPACE):/workspace" "$(DEMO_IMAGE)" bash -c 'coherence-demo-init && exec bash'
 
 %:
 	@:

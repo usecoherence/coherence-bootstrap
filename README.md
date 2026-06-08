@@ -144,15 +144,18 @@ The demo container contains `coherence-bootstrap`, Dolt, Git, Bash, and the Rust
 make demo-container-shell
 ```
 
-You should now be inside the container at `/workspace`. The entrypoint already started `dolt sql-server` for this container session.
+You should now be inside the container at `/workspace`. The entrypoint started `dolt sql-server`, and `make demo-container-shell` ran `coherence-demo-init` to initialize and migrate the mounted project's catalog before opening the shell.
 
-1. Initialize the mounted project catalog.
+1. Confirm the mounted project catalog is ready.
 
 ```bash
-git config --global --add safe.directory /workspace
-coherence-bootstrap project init
-coherence-bootstrap migrate
 coherence-bootstrap doctor
+```
+
+If you started the image manually with raw `docker run ... bash`, run this first:
+
+```bash
+coherence-demo-init
 ```
 
 2. Turn one requirement into a spec.
