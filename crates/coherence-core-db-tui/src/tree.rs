@@ -83,10 +83,8 @@ pub fn toggle_expand(items: &mut Vec<TreeItem>, idx: usize, graph: &SpecGraph) {
         match indent {
             0 => {
                 let level_name = items[idx].label.clone();
-                let target_level = match level_name.as_str() {
-                    "Product" => SpecLevel::Product,
-                    "System" => SpecLevel::System,
-                    _ => SpecLevel::Module,
+                let Some(target_level) = level_from_label(&level_name) else {
+                    return;
                 };
                 let acs_by_spec: HashMap<&str, usize> =
                     graph
@@ -156,6 +154,17 @@ pub fn toggle_expand(items: &mut Vec<TreeItem>, idx: usize, graph: &SpecGraph) {
     }
 }
 
+fn level_from_label(label: &str) -> Option<SpecLevel> {
+    match label {
+        "Product" => Some(SpecLevel::Product),
+        "System" => Some(SpecLevel::System),
+        "Module" => Some(SpecLevel::Module),
+        "Component" => Some(SpecLevel::Component),
+        "Foundation" => Some(SpecLevel::Foundation),
+        _ => None,
+    }
+}
+
 pub fn update_preview(items: &[TreeItem], idx: usize) -> (Option<String>, Option<String>) {
     if idx >= items.len() {
         return (None, None);
@@ -210,6 +219,26 @@ mod tests {
         assert_eq!(items.len(), 2);
         assert_eq!(items[1].label, "s1  ");
         assert!(items[1].is_spec);
+    }
+
+    #[test]
+    fn toggle_expand_expands_component_and_foundation_specs() {
+        let mut component = Spec::new("S1", "component spec");
+        component.level = SpecLevel::Component;
+        let mut foundation = Spec::new("S2", "foundation spec");
+        foundation.level = SpecLevel::Foundation;
+        let graph = make_graph(vec![component, foundation], vec![]);
+        let mut items = Vec::new();
+        build_tree(&mut items, &graph);
+
+        assert_eq!(items[0].label, "Component");
+        assert_eq!(items[1].label, "Foundation");
+
+        toggle_expand(&mut items, 0, &graph);
+        assert_eq!(items[1].label, "s1  ");
+
+        toggle_expand(&mut items, 2, &graph);
+        assert_eq!(items[3].label, "s2  ");
     }
 
     #[test]
