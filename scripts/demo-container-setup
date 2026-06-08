@@ -2,11 +2,13 @@
 set -euo pipefail
 
 bootstrap_export="/opt/coherence-bootstrap/bootstrap-specs.jsonl"
+bootstrap_project="${COHERENCE_BOOTSTRAP_SPECS_DIR:-/root/git/coherence-bootstrap}"
+demo_project="${COHERENCE_DEMO_PROJECT_DIR:-/root/git/demo}"
 
-mkdir -p /coherence-specs /workspace
+mkdir -p "${bootstrap_project}" "${demo_project}"
 
 (
-  cd /coherence-specs
+  cd "${bootstrap_project}"
   COHERENCE_BOOTSTRAP_SLUG=coherence_specs coherence-demo-init
   coherence-bootstrap db import-jsonl \
     --env dev \
@@ -15,19 +17,19 @@ mkdir -p /coherence-specs /workspace
 )
 
 (
-  cd /workspace
-  COHERENCE_BOOTSTRAP_SLUG="${COHERENCE_BOOTSTRAP_SLUG:-workspace}" coherence-demo-init
+  cd "${demo_project}"
+  COHERENCE_BOOTSTRAP_SLUG="${COHERENCE_BOOTSTRAP_SLUG:-demo}" coherence-demo-init
 )
 
-cat <<'EOF'
+cat <<EOF
 coherence-demo-setup: ready
 
 Demo projects:
-  /coherence-specs  imported bootstrap Coherence specs
-  /workspace        empty/minimal project for your own demo specs
+  ${bootstrap_project}  imported bootstrap Coherence specs
+  ${demo_project}       empty/minimal project for your own demo specs
 
 Try:
-  cd /coherence-specs && coherence-bootstrap spec list
-  cd /workspace && coherence-bootstrap spec list
+  cd ${bootstrap_project} && coherence-bootstrap spec list
+  cd ${demo_project} && coherence-bootstrap spec list
   coherence-bootstrap tui
 EOF

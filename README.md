@@ -144,16 +144,16 @@ The demo container contains `coherence-bootstrap`, Dolt, Git, Bash, the Rust too
 make demo-container-shell
 ```
 
-You should now be inside the container at `/workspace`. The entrypoint started `dolt sql-server`, and `make demo-container-shell` ran `coherence-demo-setup` before opening the shell.
+You should now be inside the container at `/root/git/demo`. The entrypoint started `dolt sql-server`, and `make demo-container-shell` ran `coherence-demo-setup` before opening the shell.
 
 The setup creates two separate project directories:
 
-- `/coherence-specs`: a Coherence project with the committed bootstrap specs imported into its `dev` catalog.
-- `/workspace`: a separate empty/minimal Coherence project for your own first spec and AC.
+- `/root/git/coherence-bootstrap`: a Coherence project with the committed bootstrap specs imported into its `dev` catalog.
+- `/root/git/demo`: a separate empty/minimal Coherence project for your own first spec and AC.
 
-These are two different project paths with two different `.coherence/project.toml` bindings, so they resolve to different Dolt logical databases when `DOLT_DB` is unset. The TUI discovers them by path.
+These are two different project paths with two different `.coherence/project.toml` bindings, so they resolve to different Dolt logical databases when `DOLT_DB` is unset. The TUI discovers projects by path under `~/git`, so running `coherence-bootstrap tui` from anywhere in the container should show both.
 
-If you want `/workspace` to be a host directory instead of an ephemeral in-container project, pass it explicitly:
+If you want `/root/git/demo` to be a host directory instead of an ephemeral in-container project, pass it explicitly:
 
 ```bash
 DEMO_WORKSPACE=/path/to/my/project make demo-container-shell
@@ -162,9 +162,9 @@ DEMO_WORKSPACE=/path/to/my/project make demo-container-shell
 1. Confirm both catalogs are ready.
 
 ```bash
-cd /coherence-specs
+cd /root/git/coherence-bootstrap
 coherence-bootstrap spec list
-cd /workspace
+cd /root/git/demo
 coherence-bootstrap doctor
 ```
 
@@ -227,7 +227,7 @@ In the TUI:
 
 ```bash
 coherence-bootstrap ac-tests materialize-rust \
-  --workspace /workspace \
+  --workspace /root/git/demo \
   --ac-id AC--demo-greeting-prints-message
 ```
 

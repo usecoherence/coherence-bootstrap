@@ -84,9 +84,9 @@ demo-container-smoke: demo-container-build
 
 demo-container-shell: demo-container-build
 	@if [ -n "$(DEMO_WORKSPACE)" ]; then \
-		docker run --rm -it -v "$(DEMO_WORKSPACE):/workspace" "$(DEMO_IMAGE)" bash -c 'coherence-demo-setup && exec bash'; \
+		docker run --rm -it -v "$(DEMO_WORKSPACE):/root/git/demo" "$(DEMO_IMAGE)" bash -c 'coherence-demo-setup && cd /root/git/demo && exec bash'; \
 	else \
-		docker run --rm -it "$(DEMO_IMAGE)" bash -c 'coherence-demo-setup && exec bash'; \
+		docker run --rm -it "$(DEMO_IMAGE)" bash -c 'coherence-demo-setup && cd /root/git/demo && exec bash'; \
 	fi
 
 %:
