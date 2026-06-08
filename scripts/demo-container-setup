@@ -19,6 +19,25 @@ mkdir -p "${bootstrap_project}" "${demo_project}"
 (
   cd "${demo_project}"
   COHERENCE_BOOTSTRAP_SLUG="${COHERENCE_BOOTSTRAP_SLUG:-demo}" coherence-demo-init
+  mkdir -p src
+  if [ ! -f Cargo.toml ]; then
+    cat >Cargo.toml <<'EOF'
+[package]
+name = "coherence-core-db-bootstrap"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+path = "src/lib.rs"
+EOF
+  fi
+  if [ ! -f src/lib.rs ]; then
+    cat >src/lib.rs <<'EOF'
+pub fn greeting() -> &'static str {
+    "Hello, Coherence!"
+}
+EOF
+  fi
 )
 
 cat <<EOF

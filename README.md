@@ -149,9 +149,11 @@ You should now be inside the container at `/root/git/demo`. The entrypoint start
 The setup creates two separate project directories:
 
 - `/root/git/coherence-bootstrap`: a Coherence project with the committed bootstrap specs imported into its `dev` catalog.
-- `/root/git/demo`: a separate empty/minimal Coherence project for your own first spec and AC.
+- `/root/git/demo`: a separate minimal Coherence/Rust project for your own first spec and AC.
 
 These are two different project paths with two different `.coherence/project.toml` bindings, so they resolve to different Dolt logical databases when `DOLT_DB` is unset. The TUI discovers projects by path under `~/git`, so running `coherence-bootstrap tui` from anywhere in the container should show both.
+
+The demo project includes a tiny Rust package named `coherence-core-db-bootstrap` because the current MVP AC materializer links Rust AC tests with `cargo test -p coherence-core-db-bootstrap <test_name>`.
 
 If you want `/root/git/demo` to be a host directory instead of an ephemeral in-container project, pass it explicitly:
 
