@@ -163,8 +163,8 @@ pub fn run(args: &[String]) -> i32 {
                 let slug = json_str(&value["slug"]);
                 let title = json_str(&value["title"]);
                 let intent = json_str(&value["intent"]);
-                let review_mode = json_str(&value["review_mode"]);
-                let risk_level = json_str(&value["risk_level"]);
+                let review_mode = normalize_review_mode(&json_str(&value["review_mode"]));
+                let risk_level = normalize_risk_level(&json_str(&value["risk_level"]));
                 let created_at = json_str(&value["created_at"]);
                 let updated_at = json_str(&value["updated_at"]);
 
@@ -264,6 +264,35 @@ fn json_str(v: &serde_json::Value) -> String {
     v.as_str().unwrap_or("").to_string()
 }
 
+fn normalize_review_mode(value: &str) -> String {
+    match value {
+        "" | "default" => "manual".to_string(),
+        other => other.to_string(),
+    }
+}
+
+fn normalize_risk_level(value: &str) -> String {
+    match value {
+        "" | "default" => "medium".to_string(),
+        other => other.to_string(),
+    }
+}
+
 fn escape(s: &str) -> String {
     s.replace('\\', "\\\\").replace('\'', "''")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn import_normalizes_legacy_default_ac_classification() {
+        assert_eq!(normalize_review_mode("default"), "manual");
+        assert_eq!(normalize_review_mode(""), "manual");
+        assert_eq!(normalize_review_mode("hybrid"), "hybrid");
+        assert_eq!(normalize_risk_level("default"), "medium");
+        assert_eq!(normalize_risk_level(""), "medium");
+        assert_eq!(normalize_risk_level("high"), "high");
+    }
 }
