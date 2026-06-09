@@ -18,7 +18,7 @@ resolver = "2"
 edition = "2021"
 license = "Apache-2.0"
 rust-version = "1.76"
-authors = ["Nikolay Konovalov"]
+authors = ["Nikolai Konovalov"]
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
