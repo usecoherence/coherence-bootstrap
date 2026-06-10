@@ -353,14 +353,22 @@ fn tcp_opts_no_db(config: &ConnectionConfig) -> OptsBuilder {
 pub fn connect_without_database(
     config: &ConnectionConfig,
 ) -> Result<(Conn, ConnectionMode), String> {
-    match Conn::new(socket_opts_no_db(config)) {
+    connect_with_fallback(config, socket_opts_no_db(config), tcp_opts_no_db(config))
+}
+
+fn connect_with_fallback(
+    config: &ConnectionConfig,
+    socket: OptsBuilder,
+    tcp: OptsBuilder,
+) -> Result<(Conn, ConnectionMode), String> {
+    match Conn::new(socket) {
         Ok(conn) => Ok((conn, ConnectionMode::Socket)),
         Err(socket_err) => {
             eprintln!(
                 "connection: socket failed at {} ({socket_err})",
                 config.socket_path.display()
             );
-            match Conn::new(tcp_opts_no_db(config)) {
+            match Conn::new(tcp) {
                 Ok(conn) => Ok((conn, ConnectionMode::TcpFallback)),
                 Err(tcp_err) => Err(format!(
                     "connection failed: socket={} then tcp={}:{} ({tcp_err})",
@@ -452,24 +460,7 @@ pub fn ensure_project_database(config: &ConnectionConfig) -> Result<(), String> 
 }
 
 pub fn connect(config: &ConnectionConfig) -> Result<(Conn, ConnectionMode), String> {
-    match Conn::new(socket_opts(config)) {
-        Ok(conn) => Ok((conn, ConnectionMode::Socket)),
-        Err(socket_err) => {
-            eprintln!(
-                "connection: socket failed at {} ({socket_err})",
-                config.socket_path.display()
-            );
-            match Conn::new(tcp_opts(config)) {
-                Ok(conn) => Ok((conn, ConnectionMode::TcpFallback)),
-                Err(tcp_err) => Err(format!(
-                    "connection failed: socket={} then tcp={}:{} ({tcp_err})",
-                    config.socket_path.display(),
-                    config.host,
-                    config.port,
-                )),
-            }
-        }
-    }
+    connect_with_fallback(config, socket_opts(config), tcp_opts(config))
 }
 
 pub fn insert_spec(conn: &mut Conn, spec: &Spec) -> Result<(), String> {
