@@ -310,16 +310,10 @@ pub fn effective_dolt_catalog_name(
         .filter(|s| !s.is_empty());
 
     loop {
-        let suffix: String = match &hash_owned {
-            Some(h) => format!("_{h}_{env_seg}"),
-            None => format!("_{env_seg}"),
-        };
+        let suffix = catalog_suffix(hash_owned.as_deref(), env_seg);
 
         if suffix.len() > DOLT_DB_NAME_MAX_LEN {
-            if let Some(ref mut h) = hash_owned {
-                if h.pop().is_none() {
-                    hash_owned = None;
-                }
+            if shorten_hash_segment(&mut hash_owned) {
                 continue;
             }
             return Err(format!(
@@ -338,12 +332,9 @@ pub fn effective_dolt_catalog_name(
                         .to_string(),
                 );
             }
-            if let Some(ref mut h) = hash_owned {
-                if h.pop().is_some() {
-                    continue;
-                }
+            if shorten_hash_segment(&mut hash_owned) {
+                continue;
             }
-            hash_owned = None;
             continue;
         }
 
@@ -351,6 +342,24 @@ pub fn effective_dolt_catalog_name(
         debug_assert!(name.len() <= DOLT_DB_NAME_MAX_LEN);
         return Ok(name);
     }
+}
+
+fn catalog_suffix(hash: Option<&str>, env_seg: &str) -> String {
+    match hash {
+        Some(h) => format!("_{h}_{env_seg}"),
+        None => format!("_{env_seg}"),
+    }
+}
+
+fn shorten_hash_segment(hash: &mut Option<String>) -> bool {
+    let Some(h) = hash else {
+        return false;
+    };
+    if h.pop().is_some() {
+        return true;
+    }
+    *hash = None;
+    true
 }
 
 fn trim_segment_to_fit(segment: &mut String, max_len: usize) {
