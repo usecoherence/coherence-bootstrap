@@ -1,9 +1,9 @@
 This is bootstrap for [Coherence](https://usecoherence.dev/).
 
-[![CodeScene Average Code Health](https://codescene.io/projects/81147/status-badges/average-code-health)](https://codescene.io/projects/81147)
-[![CodeScene Hotspot Code Health](https://codescene.io/projects/81147/status-badges/hotspot-code-health)](https://codescene.io/projects/81147)
-[![CodeScene Missed Goals](https://codescene.io/projects/81147/status-badges/missed-goals)](https://codescene.io/projects/81147)
-[![CodeScene System Mastery](https://codescene.io/projects/81147/status-badges/system-mastery)](https://codescene.io/projects/81147)
+[![CodeScene Average Code Health](https://img.shields.io/badge/CodeScene%20Avg%20Health-8.93-brightgreen)](https://codescene.io/projects/81147)
+[![CodeScene Hotspot Code Health](https://img.shields.io/badge/CodeScene%20Hotspot%20Health-7.93-yellowgreen)](https://codescene.io/projects/81147)
+[![CodeScene Missed Goals](https://img.shields.io/badge/CodeScene%20Missed%20Goals-see%20report-blue)](https://codescene.io/projects/81147)
+[![CodeScene System Mastery](https://img.shields.io/badge/CodeScene%20System%20Mastery-100%25-brightgreen)](https://codescene.io/projects/81147)
 
 Coherence makes it easy to write / maintain claims which are also known as Acceptance Criteria or ACs.
 
