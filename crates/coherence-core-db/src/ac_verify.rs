@@ -176,15 +176,13 @@ pub fn verify_acceptance_criterion(
     ac_id: &str,
 ) -> Result<AcVerifyAcRunResult, String> {
     let rows = ac_code_link_store::list_code_links_for_ac(conn, ac_id)?;
-    let verified: Vec<&AcCodeLinkWithLocation> = rows
+    let mut links = Vec::new();
+    let mut no_verification_links = true;
+    for row in rows
         .iter()
         .filter(|r| r.link.relation_kind == AcCodeRelationKind::VerifiedBy)
-        .collect();
-
-    let no_verification_links = verified.is_empty();
-
-    let mut links = Vec::new();
-    for row in verified {
+    {
+        no_verification_links = false;
         links.push(eval_verified_link(ac_id, row)?);
     }
 
