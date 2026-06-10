@@ -8,17 +8,21 @@ if [ -f .env ]; then
   set +a
 fi
 
-missing=()
-if [ -z "${CS_ONPREM_URL:-}" ]; then
-  missing+=(CS_ONPREM_URL)
+# The cloud CLI path uses codescene.io implicitly. CS_ONPREM_URL is only for
+# self-hosted Enterprise; setting it to the cloud host currently fails license
+# discovery with a 404.
+if [ "${CS_ONPREM_URL:-}" = "https://codescene.io" ]; then
+  unset CS_ONPREM_URL
 fi
+
+missing=()
 if [ -z "${CS_ACCESS_TOKEN:-}" ]; then
   missing+=(CS_ACCESS_TOKEN)
 fi
 
 if [ "${#missing[@]}" -gt 0 ]; then
   printf 'codescene: missing required environment variable(s): %s\n' "${missing[*]}" >&2
-  printf 'codescene: copy .env.example to .env and fill CodeScene URL/token.\n' >&2
+  printf 'codescene: copy .env.example to .env and fill CS_ACCESS_TOKEN.\n' >&2
   exit 2
 fi
 

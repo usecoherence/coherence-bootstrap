@@ -140,13 +140,16 @@ This repo has thin wrappers for the modern CodeScene CLI (`cs`). Secrets stay in
 cp .env.example .env
 ```
 
-Fill these values in `.env`.
-
-For CodeScene Cloud/open-source projects, use `https://codescene.io` as `CS_ONPREM_URL`. Despite the variable name, you do not need to self-host CodeScene unless you are using an Enterprise on-prem installation.
+Fill this value in `.env` for CodeScene Cloud/open-source projects:
 
 ```bash
-CS_ONPREM_URL=https://codescene.io
 CS_ACCESS_TOKEN=your-token
+```
+
+For self-hosted CodeScene Enterprise only, also set:
+
+```bash
+CS_ONPREM_URL=https://your.codescene.example
 ```
 
 Install or verify the CLI:
