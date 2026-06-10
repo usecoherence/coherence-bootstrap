@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if command -v cs >/dev/null 2>&1; then
+  cs version
+  exit 0
+fi
+
+curl -fsSL https://downloads.codescene.io/enterprise/cli/install-cs-tool.sh | sh
+
+if ! command -v cs >/dev/null 2>&1; then
+  export PATH="${HOME}/.local/bin:${PATH}"
+fi
+
+cs version

@@ -1,6 +1,7 @@
 .PHONY: tool check build test test-isolated smoke smoke-isolated \
 	test-world-reset fmt clippy install-local install-local-force install-local-check print-bin-name \
-	cleanup-user-scoped demo-container-build demo-container-smoke demo-container-shell
+	cleanup-user-scoped demo-container-build demo-container-smoke demo-container-shell \
+	codescene-install codescene-delta codescene-delta-staged
 
 BIN_NAME ?= coherence-bootstrap
 INSTALL_ROOT ?= $(HOME)/.local
@@ -88,6 +89,15 @@ demo-container-shell: demo-container-build
 	else \
 		docker run --rm -it "$(DEMO_IMAGE)" bash -c 'coherence-demo-setup && cd /root/git/demo && exec bash'; \
 	fi
+
+codescene-install:
+	@./scripts/codescene-install
+
+codescene-delta:
+	@./scripts/codescene-delta $${CODESCENE_BASE:-origin/master}
+
+codescene-delta-staged:
+	@./scripts/codescene-env cs delta --staged
 
 %:
 	@:

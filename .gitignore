@@ -7,6 +7,7 @@
 /.coherence/review/
 /.dolt/run/
 .DS_Store
+.env
 *.log
 __pycache__/
 

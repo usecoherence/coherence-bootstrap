@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! command -v cs >/dev/null 2>&1; then
+  printf 'codescene: cs CLI not found. Run `make codescene-install` first.\n' >&2
+  exit 127
+fi
+
+base="${1:-origin/master}"
+shift || true
+
+scripts/codescene-env cs delta "${base}" "$@"

@@ -132,6 +132,47 @@ coherence-bootstrap db import-jsonl \
   --confirm
 ```
 
+## CodeScene CLI
+
+This repo has thin wrappers for the modern CodeScene CLI (`cs`). Secrets stay in local `.env`; only `.env.example` is committed.
+
+```bash
+cp .env.example .env
+```
+
+Fill these values in `.env`:
+
+```bash
+CS_ONPREM_URL=https://your.codescene.example
+CS_ACCESS_TOKEN=your-token
+```
+
+`CODESCENE_PAT` is accepted as a backward-compatible alias for `CS_ACCESS_TOKEN`.
+
+Install or verify the CLI:
+
+```bash
+make codescene-install
+```
+
+Run delta analysis against `origin/master`:
+
+```bash
+make codescene-delta
+```
+
+Run only staged changes:
+
+```bash
+make codescene-delta-staged
+```
+
+Override the base branch/ref:
+
+```bash
+CODESCENE_BASE=origin/main make codescene-delta
+```
+
 ## First Demo: From Requirement To Verified AC
 
 This path is for a person seeing Coherence for the first time. It is also written so an agent can follow it literally.
