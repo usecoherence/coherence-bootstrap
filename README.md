@@ -144,6 +144,7 @@ Fill this value in `.env` for CodeScene Cloud/open-source projects:
 
 ```bash
 CS_ACCESS_TOKEN=your-token
+CS_PROJECT_ID=81147
 ```
 
 For self-hosted CodeScene Enterprise only, also set:
@@ -175,6 +176,20 @@ Override the base branch/ref:
 ```bash
 CODESCENE_BASE=origin/main make codescene-delta
 ```
+
+The `cs` CLI is diff/file-oriented. For a full repository snapshot, use the CodeScene REST API wrapper:
+
+```bash
+make codescene-full
+```
+
+It triggers a full analysis when the API accepts it, then downloads the latest project analysis artifacts into an ignored local directory:
+
+```text
+.coherence/review/codescene/<timestamp>/
+```
+
+The snapshot includes `issues.json`, `files-by-code-health.json`, `technical-debt.json`, `hotspots.json`, `components.json`, and analysis metadata.
 
 ## First Demo: From Requirement To Verified AC
 

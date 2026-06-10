@@ -1,7 +1,7 @@
 .PHONY: tool check build test test-isolated smoke smoke-isolated \
 	test-world-reset fmt clippy install-local install-local-force install-local-check print-bin-name \
 	cleanup-user-scoped demo-container-build demo-container-smoke demo-container-shell \
-	codescene-install codescene-delta codescene-delta-staged
+	codescene-install codescene-delta codescene-delta-staged codescene-full
 
 BIN_NAME ?= coherence-bootstrap
 INSTALL_ROOT ?= $(HOME)/.local
@@ -98,6 +98,9 @@ codescene-delta:
 
 codescene-delta-staged:
 	@./scripts/codescene-env cs delta --staged
+
+codescene-full:
+	@./scripts/codescene-full
 
 %:
 	@:

@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ -f .env ]; then
+  set -a
+  # shellcheck disable=SC1091
+  . ./.env
+  set +a
+fi
+
+if [ "${CS_ONPREM_URL:-}" = "https://codescene.io" ]; then
+  unset CS_ONPREM_URL
+fi
+
+missing=()
+if [ -z "${CS_ACCESS_TOKEN:-}" ]; then
+  missing+=(CS_ACCESS_TOKEN)
+fi
+if [ -z "${CS_PROJECT_ID:-}" ]; then
+  missing+=(CS_PROJECT_ID)
+fi
+
+if [ "${#missing[@]}" -gt 0 ]; then
+  printf 'codescene-full: missing required environment variable(s): %s\n' "${missing[*]}" >&2
+  printf 'codescene-full: copy .env.example to .env and fill CS_ACCESS_TOKEN and CS_PROJECT_ID.\n' >&2
+  exit 2
+fi
+
+api_url="${CS_API_URL:-https://api.codescene.io/v2}"
+project_id="${CS_PROJECT_ID}"
+page_size="${CS_PAGE_SIZE:-500}"
+run_id="$(date -u +%Y%m%dT%H%M%SZ)"
+out_dir="${CODESCENE_OUT_DIR:-.coherence/review/codescene/${run_id}}"
+
+mkdir -p "${out_dir}"
+
+curl_common=(
+  --silent
+  --show-error
+  --fail
+  --header "Accept: application/json"
+  --header "Authorization: Bearer ${CS_ACCESS_TOKEN}"
+)
+
+api_get() {
+  local path="$1"
+  local out="$2"
+  curl "${curl_common[@]}" "${api_url}${path}" >"${out}"
+}
+
+api_post_optional() {
+  local path="$1"
+  local out="$2"
+  local status
+  status="$({ curl \
+    --silent \
+    --show-error \
+    --output "${out}" \
+    --write-out '%{http_code}' \
+    --request POST \
+    --header "Content-Type: application/json" \
+    --header "Authorization: Bearer ${CS_ACCESS_TOKEN}" \
+    "${api_url}${path}" || true; } 2>"${out}.stderr")"
+
+  if [ "${status}" -lt 200 ] || [ "${status}" -ge 300 ]; then
+    printf 'codescene-full: POST %s returned HTTP %s; continuing with latest analysis fetch.\n' "${path}" "${status}" >&2
+    return 1
+  fi
+}
+
+pretty_json() {
+  local file="$1"
+  if command -v jq >/dev/null 2>&1; then
+    local tmp="${file}.tmp"
+    jq . "${file}" >"${tmp}" && mv "${tmp}" "${file}"
+  fi
+}
+
+printf 'codescene-full: writing artifacts to %s\n' "${out_dir}"
+
+api_get "/projects/${project_id}" "${out_dir}/project.json"
+pretty_json "${out_dir}/project.json"
+
+# The documented endpoint is /projects/{id}/run-analysis. If scheduling is
+# disabled or permissions differ, we still collect the latest available data.
+api_post_optional "/projects/${project_id}/run-analysis" "${out_dir}/run-analysis.json" || true
+
+api_get "/projects/${project_id}/analyses/latest" "${out_dir}/analysis-latest.json"
+api_get "/projects/${project_id}/analyses/latest/issues?page=1&page_size=${page_size}" "${out_dir}/issues.json"
+api_get "/projects/${project_id}/analyses/latest/files?page=1&page_size=${page_size}&order_by=code_health&fields=path,code_health" "${out_dir}/files-by-code-health.json"
+api_get "/projects/${project_id}/analyses/latest/technical-debt" "${out_dir}/technical-debt.json"
+api_get "/projects/${project_id}/analyses/latest/technical-debt?refactoring_targets=true" "${out_dir}/hotspots.json"
+api_get "/projects/${project_id}/analyses/latest/components" "${out_dir}/components.json"
+
+for f in "${out_dir}"/*.json; do
+  pretty_json "${f}"
+done
+
+cat >"${out_dir}/README.txt" <<EOF
+CodeScene full repository snapshot
+
+Project id: ${project_id}
+API URL: ${api_url}
+Generated at: ${run_id}
+
+Files:
+  project.json                Project metadata
+  run-analysis.json           Trigger response, if accepted
+  analysis-latest.json        Latest full analysis metadata
+  issues.json                 Latest analysis issues, first ${page_size} rows
+  files-by-code-health.json   Worst files ordered by code health, first ${page_size} rows
+  technical-debt.json         Technical debt summary/friction
+  hotspots.json               Refactoring targets/hotspots
+  components.json             Architectural components
+EOF
+
+if command -v jq >/dev/null 2>&1; then
+  printf '\nSummary:\n'
+  printf '  issues: '
+  jq 'if type == "array" then length elif has("items") then .items | length elif has("issues") then .issues | length else "unknown" end' "${out_dir}/issues.json"
+  printf '  files: '
+  jq 'if type == "array" then length elif has("items") then .items | length elif has("files") then .files | length else "unknown" end' "${out_dir}/files-by-code-health.json"
+fi
+
+printf 'codescene-full: done: %s\n' "${out_dir}"
