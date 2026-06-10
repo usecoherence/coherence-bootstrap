@@ -79,24 +79,21 @@ impl AcVerifyAcRunResult {
     /// Per-AC rollup for reporting and spec-level counts.
     #[must_use]
     pub fn overall_status(&self) -> AcVerifyOverallStatus {
-        if self.no_verification_links {
-            return AcVerifyOverallStatus::NoVerification;
-        }
-        if self
+        let has_failed = self
             .links
             .iter()
-            .any(|r| matches!(r.status, AcVerifyLinkStatus::Failed { .. }))
-        {
-            return AcVerifyOverallStatus::Failed;
-        }
-        if self
+            .any(|r| matches!(r.status, AcVerifyLinkStatus::Failed { .. }));
+        let has_passed = self
             .links
             .iter()
-            .any(|r| matches!(r.status, AcVerifyLinkStatus::Passed))
-        {
-            return AcVerifyOverallStatus::Passed;
+            .any(|r| matches!(r.status, AcVerifyLinkStatus::Passed));
+
+        match (self.no_verification_links, has_failed, has_passed) {
+            (true, _, _) => AcVerifyOverallStatus::NoVerification,
+            (_, true, _) => AcVerifyOverallStatus::Failed,
+            (_, _, true) => AcVerifyOverallStatus::Passed,
+            _ => AcVerifyOverallStatus::Skipped,
         }
-        AcVerifyOverallStatus::Skipped
     }
 
     #[must_use]
@@ -144,19 +141,7 @@ pub fn verify_spec(conn: &mut Conn, spec_id: &str) -> Result<VerifySpecRunResult
         ac_results.push(verify_acceptance_criterion(conn, &ac.id)?);
     }
 
-    let mut passed = 0usize;
-    let mut failed = 0usize;
-    let mut skipped = 0usize;
-    let mut no_verification = 0usize;
-
-    for r in &ac_results {
-        match r.overall_status() {
-            AcVerifyOverallStatus::Passed => passed += 1,
-            AcVerifyOverallStatus::Failed => failed += 1,
-            AcVerifyOverallStatus::Skipped => skipped += 1,
-            AcVerifyOverallStatus::NoVerification => no_verification += 1,
-        }
-    }
+    let (passed, failed, skipped, no_verification) = count_overall_statuses(&ac_results);
 
     Ok(VerifySpecRunResult {
         spec_id: spec_id.to_string(),
@@ -167,6 +152,18 @@ pub fn verify_spec(conn: &mut Conn, spec_id: &str) -> Result<VerifySpecRunResult
         no_verification,
         ac_results,
     })
+}
+
+fn count_overall_statuses(ac_results: &[AcVerifyAcRunResult]) -> (usize, usize, usize, usize) {
+    ac_results.iter().fold(
+        (0usize, 0usize, 0usize, 0usize),
+        |(passed, failed, skipped, no_verification), r| match r.overall_status() {
+            AcVerifyOverallStatus::Passed => (passed + 1, failed, skipped, no_verification),
+            AcVerifyOverallStatus::Failed => (passed, failed + 1, skipped, no_verification),
+            AcVerifyOverallStatus::Skipped => (passed, failed, skipped + 1, no_verification),
+            AcVerifyOverallStatus::NoVerification => (passed, failed, skipped, no_verification + 1),
+        },
+    )
 }
 
 /// Loads links via COREDB-11, filters `verified_by` + runnable kinds, runs `test_command` via `sh -c`.
