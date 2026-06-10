@@ -1,5 +1,10 @@
 This is bootstrap for [Coherence](https://usecoherence.dev/).
 
+[![CodeScene Average Code Health](https://codescene.io/projects/81147/status-badges/average-code-health)](https://codescene.io/projects/81147)
+[![CodeScene Hotspot Code Health](https://codescene.io/projects/81147/status-badges/hotspot-code-health)](https://codescene.io/projects/81147)
+[![CodeScene Missed Goals](https://codescene.io/projects/81147/status-badges/missed-goals)](https://codescene.io/projects/81147)
+[![CodeScene System Mastery](https://codescene.io/projects/81147/status-badges/system-mastery)](https://codescene.io/projects/81147)
+
 Coherence makes it easy to write / maintain claims which are also known as Acceptance Criteria or ACs.
 
 The goal of this bootstrap is to provide minimal framework I can use to write the full system.
