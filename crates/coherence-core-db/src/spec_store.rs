@@ -10,6 +10,28 @@ use crate::models::{
     SpecRelation, SpecStatus,
 };
 
+type SpecRow = (
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+);
+type AcceptanceCriterionRow = (
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+);
+
 pub fn put_spec(conn: &mut Conn, spec: &Spec) -> Result<(), String> {
     conn.exec_drop(
         r"INSERT INTO specs (
@@ -53,16 +75,7 @@ pub fn put_spec(conn: &mut Conn, spec: &Spec) -> Result<(), String> {
 }
 
 pub fn get_spec(conn: &mut Conn, spec_id: &str) -> Result<Option<Spec>, String> {
-    let row: Option<(
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-    )> = conn
+    let row: Option<SpecRow> = conn
         .exec_first(
             r"SELECT id, slug, title, description, level, status, created_at, updated_at
               FROM specs
@@ -76,16 +89,7 @@ pub fn get_spec(conn: &mut Conn, spec_id: &str) -> Result<Option<Spec>, String> 
 }
 
 pub fn list_specs(conn: &mut Conn) -> Result<Vec<Spec>, String> {
-    let rows: Vec<(
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-    )> = conn
+    let rows: Vec<SpecRow> = conn
         .query(
             r"SELECT id, slug, title, description, level, status, created_at, updated_at
               FROM specs
@@ -101,17 +105,7 @@ pub fn list_specs(conn: &mut Conn) -> Result<Vec<Spec>, String> {
 pub fn load_spec_graph(conn: &mut Conn) -> Result<SpecGraph, String> {
     let specs = list_specs(conn)?;
 
-    let ac_rows: Vec<(
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-    )> = conn
+    let ac_rows: Vec<AcceptanceCriterionRow> = conn
         .query(
             r"SELECT id, spec_id, slug, title, intent, review_mode, risk_level, created_at, updated_at
               FROM acceptance_criteria
@@ -244,17 +238,7 @@ pub fn get_acceptance_criterion(
     conn: &mut Conn,
     ac_id: &str,
 ) -> Result<Option<AcceptanceCriterion>, String> {
-    let row: Option<(
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-    )> = conn
+    let row: Option<AcceptanceCriterionRow> = conn
         .exec_first(
             r"SELECT id, spec_id, slug, title, intent, review_mode, risk_level, created_at, updated_at
               FROM acceptance_criteria
@@ -276,17 +260,7 @@ pub fn list_acceptance_criteria_for_spec(
     conn: &mut Conn,
     spec_id: &str,
 ) -> Result<Vec<AcceptanceCriterion>, String> {
-    let rows: Vec<(
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-    )> = conn
+    let rows: Vec<AcceptanceCriterionRow> = conn
         .exec(
             r"SELECT id, spec_id, slug, title, intent, review_mode, risk_level, created_at, updated_at
               FROM acceptance_criteria
@@ -396,18 +370,7 @@ fn concerns_for_ac(conn: &mut Conn, ac_id: &str) -> Result<Vec<ConcernKind>, Str
         .collect()
 }
 
-fn spec_from_row(
-    row: (
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-    ),
-) -> Result<Spec, String> {
+fn spec_from_row(row: SpecRow) -> Result<Spec, String> {
     let (id, slug, title, description, level, status, created_at, updated_at) = row;
     let level =
         SpecLevel::from_db_str(&level).ok_or_else(|| format!("unknown spec level: {level}"))?;
@@ -426,17 +389,7 @@ fn spec_from_row(
 }
 
 fn acceptance_criterion_from_row(
-    row: (
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-    ),
+    row: AcceptanceCriterionRow,
 ) -> Result<AcceptanceCriterion, String> {
     let (id, spec_id, slug, title, intent, review_mode, risk_level, created_at, updated_at) = row;
     let review_mode = ReviewMode::from_db_str(&review_mode)
