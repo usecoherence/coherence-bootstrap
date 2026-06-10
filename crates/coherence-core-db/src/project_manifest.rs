@@ -276,12 +276,7 @@ pub fn dolt_db_name_for_bind(
     }
     let suffix = format!("_{short}");
     let max_base = DOLT_DB_NAME_MAX_LEN.saturating_sub(suffix.len());
-    if base.len() > max_base {
-        base.truncate(max_base);
-        while base.ends_with('_') {
-            base.pop();
-        }
-    }
+    trim_segment_to_fit(&mut base, max_base);
     if base.is_empty() {
         return Err(
             "project_slug is too long to fit a stable dolt_db_name (max 64 characters)".to_string(),
@@ -334,12 +329,7 @@ pub fn effective_dolt_catalog_name(
 
         let max_base = DOLT_DB_NAME_MAX_LEN.saturating_sub(suffix.len());
         let mut base = slug_full.clone();
-        if base.len() > max_base {
-            base.truncate(max_base);
-            while base.ends_with('_') {
-                base.pop();
-            }
-        }
+        trim_segment_to_fit(&mut base, max_base);
 
         if base.is_empty() {
             if max_base == 0 && hash_owned.is_none() {
@@ -360,6 +350,15 @@ pub fn effective_dolt_catalog_name(
         let name = format!("{base}{suffix}");
         debug_assert!(name.len() <= DOLT_DB_NAME_MAX_LEN);
         return Ok(name);
+    }
+}
+
+fn trim_segment_to_fit(segment: &mut String, max_len: usize) {
+    if segment.len() > max_len {
+        segment.truncate(max_len);
+    }
+    while segment.ends_with('_') {
+        segment.pop();
     }
 }
 
