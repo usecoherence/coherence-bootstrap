@@ -164,8 +164,7 @@ pub fn update(app: &mut AppState, action: AppAction) -> Vec<Effect> {
         }
 
         AppAction::CycleStatus => {
-            let Some(ref mut draft) = app.draft else {
-                app.status = "No active draft".into();
+            let Some(draft) = active_draft_mut(app) else {
                 return vec![];
             };
             match draft {
@@ -184,8 +183,7 @@ pub fn update(app: &mut AppState, action: AppAction) -> Vec<Effect> {
         }
 
         AppAction::CycleLevel => {
-            let Some(ref mut draft) = app.draft else {
-                app.status = "No active draft".into();
+            let Some(draft) = active_draft_mut(app) else {
                 return vec![];
             };
             match draft {
@@ -205,8 +203,7 @@ pub fn update(app: &mut AppState, action: AppAction) -> Vec<Effect> {
         }
 
         AppAction::CycleReviewMode => {
-            let Some(ref mut draft) = app.draft else {
-                app.status = "No active draft".into();
+            let Some(draft) = active_draft_mut(app) else {
                 return vec![];
             };
             match draft {
@@ -227,8 +224,7 @@ pub fn update(app: &mut AppState, action: AppAction) -> Vec<Effect> {
         }
 
         AppAction::CycleRiskLevel => {
-            let Some(ref mut draft) = app.draft else {
-                app.status = "No active draft".into();
+            let Some(draft) = active_draft_mut(app) else {
                 return vec![];
             };
             match draft {
@@ -277,69 +273,8 @@ pub fn update(app: &mut AppState, action: AppAction) -> Vec<Effect> {
                 app.status = "No changes to save".into();
                 return vec![];
             }
-            let effects = match &draft {
-                Draft::Spec {
-                    spec_id,
-                    pending_status,
-                    pending_level,
-                    pending_description,
-                    ..
-                } => {
-                    if let Some(ref mut graph) = app.graph {
-                        if let Some(s) = graph.specs.iter_mut().find(|s| s.id == *spec_id) {
-                            s.status = *pending_status;
-                            s.level = *pending_level;
-                            if let Some(desc) = pending_description {
-                                s.description = desc.clone();
-                            }
-                        }
-                    }
-                    let spec = match app
-                        .graph
-                        .as_ref()
-                        .and_then(|g| g.specs.iter().find(|s| s.id == *spec_id))
-                    {
-                        Some(s) => s.clone(),
-                        None => {
-                            app.status = "Spec not found in graph".into();
-                            return vec![];
-                        }
-                    };
-                    vec![Effect::PersistSpec(spec)]
-                }
-                Draft::Ac {
-                    ac_id,
-                    pending_review_mode,
-                    pending_risk_level,
-                    pending_intent,
-                    ..
-                } => {
-                    if let Some(ref mut graph) = app.graph {
-                        if let Some(a) = graph
-                            .acceptance_criteria
-                            .iter_mut()
-                            .find(|a| a.id == *ac_id)
-                        {
-                            a.review_mode = *pending_review_mode;
-                            a.risk_level = *pending_risk_level;
-                            if let Some(intent) = pending_intent {
-                                a.intent = intent.clone();
-                            }
-                        }
-                    }
-                    let ac = match app
-                        .graph
-                        .as_ref()
-                        .and_then(|g| g.acceptance_criteria.iter().find(|a| a.id == *ac_id))
-                    {
-                        Some(a) => a.clone(),
-                        None => {
-                            app.status = "AC not found in graph".into();
-                            return vec![];
-                        }
-                    };
-                    vec![Effect::PersistAc(ac)]
-                }
+            let Some(effects) = effects_for_saved_draft(app, &draft) else {
+                return vec![];
             };
             app.edit_mode = false;
             app.status = "Draft saved".into();
@@ -365,6 +300,98 @@ pub fn update(app: &mut AppState, action: AppAction) -> Vec<Effect> {
 
         AppAction::VerifyAll => vec![Effect::VerifyAll],
     }
+}
+
+fn active_draft_mut(app: &mut AppState) -> Option<&mut Draft> {
+    if app.draft.is_none() {
+        app.status = "No active draft".into();
+    }
+    app.draft.as_mut()
+}
+
+fn effects_for_saved_draft(app: &mut AppState, draft: &Draft) -> Option<Vec<Effect>> {
+    match draft {
+        Draft::Spec {
+            spec_id,
+            pending_status,
+            pending_level,
+            pending_description,
+            ..
+        } => save_entity(
+            app,
+            "Spec not found in graph",
+            |app| {
+                let Some(graph) = app.graph.as_mut() else {
+                    return;
+                };
+                let Some(spec) = graph.specs.iter_mut().find(|s| s.id == *spec_id) else {
+                    return;
+                };
+                spec.status = *pending_status;
+                spec.level = *pending_level;
+                if let Some(desc) = pending_description {
+                    spec.description = desc.clone();
+                }
+            },
+            |app| {
+                app.graph
+                    .as_ref()
+                    .and_then(|g| g.specs.iter().find(|s| s.id == *spec_id))
+                    .cloned()
+            },
+            Effect::PersistSpec,
+        ),
+        Draft::Ac {
+            ac_id,
+            pending_review_mode,
+            pending_risk_level,
+            pending_intent,
+            ..
+        } => save_entity(
+            app,
+            "AC not found in graph",
+            |app| {
+                let Some(graph) = app.graph.as_mut() else {
+                    return;
+                };
+                let Some(ac) = graph
+                    .acceptance_criteria
+                    .iter_mut()
+                    .find(|a| a.id == *ac_id)
+                else {
+                    return;
+                };
+                ac.review_mode = *pending_review_mode;
+                ac.risk_level = *pending_risk_level;
+                if let Some(intent) = pending_intent {
+                    ac.intent = intent.clone();
+                }
+            },
+            |app| {
+                app.graph
+                    .as_ref()
+                    .and_then(|g| g.acceptance_criteria.iter().find(|a| a.id == *ac_id))
+                    .cloned()
+            },
+            Effect::PersistAc,
+        ),
+    }
+}
+
+fn save_entity<T>(
+    app: &mut AppState,
+    missing_status: &str,
+    update_graph: impl FnOnce(&mut AppState),
+    load_saved: impl FnOnce(&AppState) -> Option<T>,
+    effect: impl FnOnce(T) -> Effect,
+) -> Option<Vec<Effect>> {
+    update_graph(app);
+    load_saved(app)
+        .map(|entity| vec![effect(entity)])
+        .or_else(|| {
+            app.status = missing_status.into();
+            None
+        })
 }
 
 fn verify_selected(app: &mut AppState) -> Vec<Effect> {
