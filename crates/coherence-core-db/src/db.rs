@@ -120,24 +120,9 @@ impl ConnectionConfig {
         let manifest = project_manifest::try_read_project_manifest_from_cwd();
         let user_scoped = user_scoped_dolt_from_manifest(&manifest);
         let coherence_env = project_manifest::coherence_env_from_std_env()?;
-        if let Some(ref m) = manifest {
-            if env::var_os(COHERENCE_PROJECT_SLUG_ENV).is_none()
-                && !m.project_slug.trim().is_empty()
-            {
-                env::set_var(COHERENCE_PROJECT_SLUG_ENV, m.project_slug.trim());
-            }
-        }
+        set_project_slug_env_from_manifest(manifest.as_ref());
 
-        let socket_path = env::var("DOLT_SOCKET").map_or_else(
-            |_| {
-                if user_scoped {
-                    user_scoped_socket_default_path()
-                } else {
-                    PathBuf::from(".dolt/dolt.sock")
-                }
-            },
-            PathBuf::from,
-        );
+        let socket_path = resolve_socket_path(user_scoped);
 
         let host = env::var("DOLT_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
 
@@ -156,6 +141,28 @@ impl ConnectionConfig {
             database,
         })
     }
+}
+
+fn set_project_slug_env_from_manifest(manifest: Option<&project_manifest::ProjectManifest>) {
+    let Some(m) = manifest else {
+        return;
+    };
+    if env::var_os(COHERENCE_PROJECT_SLUG_ENV).is_none() && !m.project_slug.trim().is_empty() {
+        env::set_var(COHERENCE_PROJECT_SLUG_ENV, m.project_slug.trim());
+    }
+}
+
+fn resolve_socket_path(user_scoped: bool) -> PathBuf {
+    env::var("DOLT_SOCKET").map_or_else(
+        |_| {
+            if user_scoped {
+                user_scoped_socket_default_path()
+            } else {
+                PathBuf::from(".dolt/dolt.sock")
+            }
+        },
+        PathBuf::from,
+    )
 }
 
 fn resolve_dolt_port(
