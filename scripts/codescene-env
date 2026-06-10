@@ -8,10 +8,6 @@ if [ -f .env ]; then
   set +a
 fi
 
-if [ -z "${CS_ACCESS_TOKEN:-}" ] && [ -n "${CODESCENE_PAT:-}" ]; then
-  export CS_ACCESS_TOKEN="${CODESCENE_PAT}"
-fi
-
 missing=()
 if [ -z "${CS_ONPREM_URL:-}" ]; then
   missing+=(CS_ONPREM_URL)

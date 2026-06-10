@@ -149,8 +149,6 @@ CS_ONPREM_URL=https://codescene.io
 CS_ACCESS_TOKEN=your-token
 ```
 
-`CODESCENE_PAT` is accepted as a backward-compatible alias for `CS_ACCESS_TOKEN`.
-
 Install or verify the CLI:
 
 ```bash
