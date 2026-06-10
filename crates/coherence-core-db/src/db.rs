@@ -91,18 +91,17 @@ fn read_repo_local_dolt_tcp_port_file() -> Option<u16> {
 /// generated **`dolt-start`** scripts), Refinery still needs the real TCP port. Repo-local
 /// **`dolt sql-server`** exposes the same instance on socket and TCP — query **`@@port`** over the
 /// socket so TCP migrations hit the same process as [`connect_without_database`].
-#[allow(clippy::ref_option)]
 fn try_repo_local_tcp_port_via_socket_probe(
     socket_path: &std::path::Path,
     user: &str,
-    password: &Option<String>,
+    password: Option<&String>,
 ) -> Option<u16> {
     if !socket_path.exists() {
         return None;
     }
     let opts = OptsBuilder::new()
         .user(Some(user.to_string()))
-        .pass(password.clone())
+        .pass(password.cloned())
         .db_name(None::<String>)
         .socket(Some(socket_path.to_string_lossy().to_string()));
     let mut conn = Conn::new(opts).ok()?;
@@ -145,33 +144,7 @@ impl ConnectionConfig {
         let user = env::var("DOLT_USER").unwrap_or_else(|_| "root".to_string());
         let password = env::var("DOLT_PASSWORD").ok();
 
-        let port = env::var("DOLT_PORT")
-            .ok()
-            .and_then(|value| value.parse::<u16>().ok())
-            .or_else(|| {
-                if user_scoped {
-                    None
-                } else {
-                    read_repo_local_dolt_tcp_port_file()
-                }
-            })
-            .or_else(|| {
-                if user_scoped {
-                    None
-                } else {
-                    try_repo_local_tcp_port_via_socket_probe(&socket_path, &user, &password)
-                }
-            })
-            .unwrap_or_else(|| {
-                if user_scoped {
-                    env::var("COHERENCE_DOLT_TCP_PORT")
-                        .ok()
-                        .and_then(|value| value.parse::<u16>().ok())
-                        .unwrap_or(USER_SCOPED_INTERNAL_TCP_PORT)
-                } else {
-                    3306
-                }
-            });
+        let port = resolve_dolt_port(user_scoped, &socket_path, &user, password.as_ref());
         let database = resolve_effective_database_name(manifest.as_ref(), coherence_env)?;
 
         Ok(Self {
@@ -182,6 +155,43 @@ impl ConnectionConfig {
             password,
             database,
         })
+    }
+}
+
+fn resolve_dolt_port(
+    user_scoped: bool,
+    socket_path: &std::path::Path,
+    user: &str,
+    password: Option<&String>,
+) -> u16 {
+    env::var("DOLT_PORT")
+        .ok()
+        .and_then(|value| value.parse::<u16>().ok())
+        .or_else(|| repo_local_dolt_port(user_scoped, socket_path, user, password))
+        .unwrap_or_else(|| default_dolt_port(user_scoped))
+}
+
+fn repo_local_dolt_port(
+    user_scoped: bool,
+    socket_path: &std::path::Path,
+    user: &str,
+    password: Option<&String>,
+) -> Option<u16> {
+    if user_scoped {
+        return None;
+    }
+    read_repo_local_dolt_tcp_port_file()
+        .or_else(|| try_repo_local_tcp_port_via_socket_probe(socket_path, user, password))
+}
+
+fn default_dolt_port(user_scoped: bool) -> u16 {
+    if user_scoped {
+        env::var("COHERENCE_DOLT_TCP_PORT")
+            .ok()
+            .and_then(|value| value.parse::<u16>().ok())
+            .unwrap_or(USER_SCOPED_INTERNAL_TCP_PORT)
+    } else {
+        3306
     }
 }
 
