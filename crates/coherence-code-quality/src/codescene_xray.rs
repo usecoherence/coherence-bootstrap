@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::process::Command;
 
 use serde_json::Value;
@@ -5,6 +6,27 @@ use serde_json::Value;
 const CS_API_URL: &str = "https://api.codescene.io/v2";
 
 type FileDataResult = (Value, i64, Option<f64>, Option<f64>);
+
+struct ApiConfig {
+    url: String,
+    project_id: String,
+    token: String,
+}
+
+impl ApiConfig {
+    fn from_env() -> Option<Self> {
+        let token = std::env::var("CS_ACCESS_TOKEN").ok()?;
+        let project_id = std::env::var("CS_PROJECT_ID").ok()?;
+        if token.is_empty() || project_id.is_empty() {
+            return None;
+        }
+        Some(Self {
+            url: CS_API_URL.to_string(),
+            project_id,
+            token,
+        })
+    }
+}
 
 #[derive(Debug)]
 pub struct XrayFileMetrics {
@@ -51,7 +73,7 @@ pub struct XrayReport {
 
 /// # Errors
 /// Returns `Err` if `cs review` fails or the REST API call fails.
-pub fn run_xray(file_path: &str) -> Result<XrayReport, String> {
+pub fn run_xray(file_path: &Path) -> Result<XrayReport, String> {
     let (score, issues) = run_cs_review(file_path)?;
     let metrics = fetch_file_metrics(file_path)?;
 
@@ -62,10 +84,10 @@ pub fn run_xray(file_path: &str) -> Result<XrayReport, String> {
     })
 }
 
-fn run_cs_review(file_path: &str) -> Result<(Option<String>, Vec<StructuralIssue>), String> {
+fn run_cs_review(file_path: &Path) -> Result<(Option<String>, Vec<StructuralIssue>), String> {
     let output = Command::new("cs")
         .arg("review")
-        .arg(file_path)
+        .arg(file_path.as_os_str())
         .arg("--output-format")
         .arg("json")
         .output()
@@ -130,7 +152,7 @@ fn parse_cs_review_output(json: &str) -> Result<(Option<String>, Vec<StructuralI
     Ok((score, issues))
 }
 
-fn repo_relative_path(file_path: &str) -> Option<String> {
+fn repo_relative_path(file_path: &Path) -> Option<String> {
     let output = Command::new("git")
         .arg("rev-parse")
         .arg("--show-toplevel")
@@ -144,11 +166,10 @@ fn repo_relative_path(file_path: &str) -> Option<String> {
     if root.is_empty() {
         return None;
     }
-    let abs = std::path::Path::new(file_path);
-    let abs = if abs.is_relative() {
-        std::env::current_dir().ok().map(|cwd| cwd.join(abs))
+    let abs = if file_path.is_relative() {
+        std::env::current_dir().ok().map(|cwd| cwd.join(file_path))
     } else {
-        Some(abs.to_path_buf())
+        Some(file_path.to_path_buf())
     }?;
     let abs_str = abs.to_string_lossy();
     let without_root = abs_str
@@ -158,38 +179,39 @@ fn repo_relative_path(file_path: &str) -> Option<String> {
     without_root
 }
 
-fn fetch_file_data(
-    api_url: &str,
-    project_id: &str,
-    token: &str,
-    suffix: &str,
-) -> Result<Option<FileDataResult>, String> {
-    let file_url = format!(
-        "{api_url}/projects/{project_id}/analyses/latest/files?page=1&page_size=500&fields=path,code_health,loc,change_frequency,number_of_defects,language,number_of_authors,code_health_rule_violations"
-    );
-
-    let file_output = Command::new("curl")
+fn curl_get(url: &str, token: &str) -> Result<Vec<u8>, String> {
+    let output = Command::new("curl")
         .arg("-s")
         .arg("--fail")
         .arg("--header")
         .arg("Accept: application/json")
         .arg("--header")
         .arg(format!("Authorization: Bearer {token}"))
-        .arg(&file_url)
+        .arg(url)
         .output()
         .map_err(|e| format!("curl failed: {e}"))?;
 
-    if !file_output.status.success() {
+    if !output.status.success() {
         return Err(format!(
             "API call failed: {}",
-            String::from_utf8_lossy(&file_output.stderr)
+            String::from_utf8_lossy(&output.stderr)
         ));
     }
 
-    let file_json: Value =
-        serde_json::from_slice(&file_output.stdout).map_err(|e| format!("API JSON parse: {e}"))?;
+    Ok(output.stdout)
+}
 
-    let file_entry = file_json
+fn fetch_file_entry(config: &ApiConfig, suffix: &str) -> Result<Option<Value>, String> {
+    let file_url = format!(
+        "{}/projects/{}/analyses/latest/files?page=1&page_size=500&fields=path,code_health,loc,change_frequency,number_of_defects,language,number_of_authors,code_health_rule_violations",
+        config.url, config.project_id
+    );
+
+    let body = curl_get(&file_url, &config.token)?;
+    let file_json: Value =
+        serde_json::from_slice(&body).map_err(|e| format!("API JSON parse: {e}"))?;
+
+    Ok(file_json
         .get("files")
         .and_then(Value::as_array)
         .and_then(|files| {
@@ -199,46 +221,59 @@ fn fetch_file_data(
                     .is_some_and(|p| p.ends_with(suffix))
             })
         })
-        .cloned();
+        .cloned())
+}
 
+fn fetch_tech_debt_data(
+    config: &ApiConfig,
+    suffix: &str,
+) -> (Option<i64>, Option<f64>, Option<f64>) {
     let td_url = format!(
-        "{api_url}/projects/{project_id}/analyses/latest/technical-debt?page=1&page_size=500"
+        "{}/projects/{}/analyses/latest/technical-debt?page=1&page_size=500",
+        config.url, config.project_id
     );
 
-    let td_output = Command::new("curl")
+    let output = Command::new("curl")
         .arg("-s")
         .arg("--fail")
         .arg("--header")
         .arg("Accept: application/json")
         .arg("--header")
-        .arg(format!("Authorization: Bearer {token}"))
+        .arg(format!("Authorization: Bearer {}", config.token))
         .arg(&td_url)
-        .output()
-        .map_err(|e| format!("curl (tech debt) failed: {e}"))?;
+        .output();
 
-    let (revisions, friction, friction_month) = if td_output.status.success() {
-        let td_json: Value =
-            serde_json::from_slice(&td_output.stdout).map_err(|e| format!("TD JSON parse: {e}"))?;
-
-        td_json
-            .get("result")
-            .and_then(Value::as_array)
-            .and_then(|results| {
-                results.iter().find(|r| {
-                    r.get("file_name")
-                        .and_then(Value::as_str)
-                        .is_some_and(|p| p.ends_with(suffix))
-                })
-            })
-            .map_or((None, None, None), |entry| {
-                let rev = entry.get("revisions").and_then(Value::as_i64);
-                let fric = entry.get("friction").and_then(Value::as_f64);
-                let fric_mo = entry.get("friction_last_month").and_then(Value::as_f64);
-                (rev, fric, fric_mo)
-            })
-    } else {
-        (None, None, None)
+    let td_output = match output {
+        Ok(o) if o.status.success() => o,
+        _ => return (None, None, None),
     };
+
+    let td_json: Value = match serde_json::from_slice(&td_output.stdout) {
+        Ok(v) => v,
+        Err(_) => return (None, None, None),
+    };
+
+    td_json
+        .get("result")
+        .and_then(Value::as_array)
+        .and_then(|results| {
+            results.iter().find(|r| {
+                r.get("file_name")
+                    .and_then(Value::as_str)
+                    .is_some_and(|p| p.ends_with(suffix))
+            })
+        })
+        .map_or((None, None, None), |entry| {
+            let rev = entry.get("revisions").and_then(Value::as_i64);
+            let fric = entry.get("friction").and_then(Value::as_f64);
+            let fric_mo = entry.get("friction_last_month").and_then(Value::as_f64);
+            (rev, fric, fric_mo)
+        })
+}
+
+fn fetch_file_data(config: &ApiConfig, suffix: &str) -> Result<Option<FileDataResult>, String> {
+    let file_entry = fetch_file_entry(config, suffix)?;
+    let (revisions, friction, friction_month) = fetch_tech_debt_data(config, suffix);
 
     Ok(file_entry.map(|entry| (entry, revisions.unwrap_or(0), friction, friction_month)))
 }
@@ -309,17 +344,14 @@ fn extract_file_metrics(
     }
 }
 
-fn fetch_file_metrics(file_path: &str) -> Result<Option<XrayFileMetrics>, String> {
-    let token = std::env::var("CS_ACCESS_TOKEN").unwrap_or_default();
-    let project_id = std::env::var("CS_PROJECT_ID").unwrap_or_default();
-
-    if token.is_empty() || project_id.is_empty() {
+fn fetch_file_metrics(file_path: &Path) -> Result<Option<XrayFileMetrics>, String> {
+    let Some(config) = ApiConfig::from_env() else {
         return Ok(None);
-    }
+    };
 
     let rel = repo_relative_path(file_path).unwrap_or_default();
 
-    let file_data = fetch_file_data(CS_API_URL, &project_id, &token, &rel)?;
+    let file_data = fetch_file_data(&config, &rel)?;
     Ok(
         file_data.map(|(entry, revisions, friction, friction_month)| {
             extract_file_metrics(&entry, revisions, friction, friction_month)
@@ -327,12 +359,7 @@ fn fetch_file_metrics(file_path: &str) -> Result<Option<XrayFileMetrics>, String
     )
 }
 
-#[allow(clippy::too_many_lines)]
-fn print_report(report: &XrayReport, file_path: &str) {
-    println!("╔═══════════════════════════════════════════════");
-    println!("║ CodeScene X-Ray: {file_path}");
-    println!("╚═══════════════════════════════════════════════");
-
+fn print_local_analysis(report: &XrayReport) {
     println!();
     println!("── Local Analysis ──────────────────────────────");
     if let Some(ref score) = report.local_score {
@@ -360,61 +387,73 @@ fn print_report(report: &XrayReport, file_path: &str) {
             }
         }
     }
+}
 
+fn print_server_metrics(report: &XrayReport) {
     println!();
     println!("── Server Metrics ──────────────────────────────");
 
-    if let Some(ref m) = report.metrics {
-        let loc_display = m.loc.as_deref().unwrap_or("?");
-        println!("  LOC:          {loc_display}");
-        println!("  Language:     {}", m.language.as_deref().unwrap_or("?"));
-        println!(
-            "  Change freq:  {}",
-            m.change_frequency.map_or("?".into(), |v| v.to_string())
-        );
-        println!(
-            "  Defects:      {}",
-            m.defects.map_or("?".into(), |v| v.to_string())
-        );
-        println!(
-            "  Authors:      {}",
-            m.authors.map_or("?".into(), |v| v.to_string())
-        );
-        println!(
-            "  Revisions:    {}",
-            m.revisions.map_or("?".into(), |v| v.to_string())
-        );
-        println!(
-            "  Friction:     {}",
-            m.friction.map_or("?".into(), |v| format!("{v:.3}"))
-        );
-        println!(
-            "  Friction/mo:  {}",
-            m.friction_month.map_or("?".into(), |v| format!("{v:.3}"))
-        );
-
-        if !m.code_smells.is_empty() {
-            println!("  Code smells:");
-            for smell in &m.code_smells {
-                let count = smell.count.map(|c| format!(" x{c}")).unwrap_or_default();
-                println!("    - {} ({}){count}", smell.name, smell.rule_set);
-            }
-        }
-
-        println!();
-        println!("  Code Health History:");
-        println!("    now:    {}", m.health_now.as_deref().unwrap_or("-"));
-        println!("    month:  {}", m.health_month.as_deref().unwrap_or("-"));
-        println!("    year:   {}", m.health_year.as_deref().unwrap_or("-"));
-    } else {
+    let Some(ref m) = report.metrics else {
         println!("  (set CS_ACCESS_TOKEN and CS_PROJECT_ID for server metrics)");
+        return;
+    };
+
+    let loc_display = m.loc.as_deref().unwrap_or("?");
+    println!("  LOC:          {loc_display}");
+    println!("  Language:     {}", m.language.as_deref().unwrap_or("?"));
+    println!(
+        "  Change freq:  {}",
+        m.change_frequency.map_or("?".into(), |v| v.to_string())
+    );
+    println!(
+        "  Defects:      {}",
+        m.defects.map_or("?".into(), |v| v.to_string())
+    );
+    println!(
+        "  Authors:      {}",
+        m.authors.map_or("?".into(), |v| v.to_string())
+    );
+    println!(
+        "  Revisions:    {}",
+        m.revisions.map_or("?".into(), |v| v.to_string())
+    );
+    println!(
+        "  Friction:     {}",
+        m.friction.map_or("?".into(), |v| format!("{v:.3}"))
+    );
+    println!(
+        "  Friction/mo:  {}",
+        m.friction_month.map_or("?".into(), |v| format!("{v:.3}"))
+    );
+
+    if !m.code_smells.is_empty() {
+        println!("  Code smells:");
+        for smell in &m.code_smells {
+            let count = smell.count.map(|c| format!(" x{c}")).unwrap_or_default();
+            println!("    - {} ({}){count}", smell.name, smell.rule_set);
+        }
     }
+
+    println!();
+    println!("  Code Health History:");
+    println!("    now:    {}", m.health_now.as_deref().unwrap_or("-"));
+    println!("    month:  {}", m.health_month.as_deref().unwrap_or("-"));
+    println!("    year:   {}", m.health_year.as_deref().unwrap_or("-"));
+}
+
+fn print_report(report: &XrayReport) {
+    println!("╔═══════════════════════════════════════════════");
+    println!("║ CodeScene X-Ray");
+    println!("╚═══════════════════════════════════════════════");
+
+    print_local_analysis(report);
+    print_server_metrics(report);
 
     println!();
 }
 
-fn trigger_analysis(api_url: &str, project_id: &str, token: &str) -> Result<i64, String> {
-    let url = format!("{api_url}/projects/{project_id}/run-analysis");
+fn trigger_analysis(config: &ApiConfig) -> Result<i64, String> {
+    let url = format!("{}/projects/{}/run-analysis", config.url, config.project_id);
 
     let output = Command::new("curl")
         .arg("-s")
@@ -424,7 +463,7 @@ fn trigger_analysis(api_url: &str, project_id: &str, token: &str) -> Result<i64,
         .arg("-H")
         .arg("Content-Type: application/json")
         .arg("-H")
-        .arg(format!("Authorization: Bearer {token}"))
+        .arg(format!("Authorization: Bearer {}", config.token))
         .arg(&url)
         .output()
         .map_err(|e| format!("curl (trigger) failed: {e}"))?;
@@ -444,13 +483,11 @@ fn trigger_analysis(api_url: &str, project_id: &str, token: &str) -> Result<i64,
         .ok_or_else(|| "trigger response missing id".to_string())
 }
 
-fn wait_for_analysis(
-    api_url: &str,
-    project_id: &str,
-    analysis_id: i64,
-    token: &str,
-) -> Result<(), String> {
-    let url = format!("{api_url}/projects/{project_id}/analyses/{analysis_id}");
+fn wait_for_analysis(config: &ApiConfig, analysis_id: i64) -> Result<(), String> {
+    let url = format!(
+        "{}/projects/{}/analyses/{analysis_id}",
+        config.url, config.project_id
+    );
 
     for _ in 0..120 {
         let output = Command::new("curl")
@@ -459,7 +496,7 @@ fn wait_for_analysis(
             .arg("-H")
             .arg("Accept: application/json")
             .arg("-H")
-            .arg(format!("Authorization: Bearer {token}"))
+            .arg(format!("Authorization: Bearer {}", config.token))
             .arg(&url)
             .output()
             .map_err(|e| format!("curl (poll) failed: {e}"))?;
@@ -488,24 +525,21 @@ fn wait_for_analysis(
     Err("timed out waiting for analysis to complete".to_string())
 }
 
-fn trigger_and_wait(api_url: &str) -> Result<(), String> {
-    let token = std::env::var("CS_ACCESS_TOKEN").unwrap_or_default();
-    let project_id = std::env::var("CS_PROJECT_ID").unwrap_or_default();
-    if token.is_empty() || project_id.is_empty() {
-        return Err("--trigger requires CS_ACCESS_TOKEN and CS_PROJECT_ID".to_string());
-    }
+fn trigger_and_wait() -> Result<(), String> {
+    let config = ApiConfig::from_env()
+        .ok_or_else(|| "--trigger requires CS_ACCESS_TOKEN and CS_PROJECT_ID".to_string())?;
     eprintln!("codescene-xray: triggering analysis...");
-    let analysis_id = trigger_analysis(api_url, &project_id, &token)?;
+    let analysis_id = trigger_analysis(&config)?;
     eprintln!("codescene-xray: analysis #{analysis_id} scheduled, waiting for completion...");
-    wait_for_analysis(api_url, &project_id, analysis_id, &token)?;
+    wait_for_analysis(&config, analysis_id)?;
     eprintln!("codescene-xray: analysis complete.{:>8}", "");
     Ok(())
 }
 
-fn run_impl(file_path: &str) -> i32 {
+fn display_xray(file_path: &Path) -> i32 {
     match run_xray(file_path) {
         Ok(report) => {
-            print_report(&report, file_path);
+            print_report(&report);
             0
         }
         Err(err) => {
@@ -525,7 +559,7 @@ pub fn run(args: &[String]) -> i32 {
             eprintln!("usage: coherence-bootstrap codescene-xray --trigger <file-path>");
             return 1;
         }
-        if let Err(e) = trigger_and_wait(CS_API_URL) {
+        if let Err(e) = trigger_and_wait() {
             eprintln!("codescene-xray: {e}");
             return 1;
         }
@@ -534,7 +568,7 @@ pub fn run(args: &[String]) -> i32 {
         &args[0]
     };
 
-    run_impl(file_path)
+    display_xray(Path::new(file_path))
 }
 
 #[cfg(test)]
