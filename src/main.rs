@@ -7,6 +7,20 @@ fn main() {
 fn run(args: &[String]) -> i32 {
     let command = args.get(1).map_or("help", String::as_str);
     match command {
+        "code-quality" => match args.get(2).map_or("help", String::as_str) {
+            "codescene-xray" => coherence_code_quality::codescene_xray::run(&args[3..]),
+            "help" | "--help" | "-h" => {
+                println!("{}", code_quality_help());
+                0
+            }
+            _ => {
+                eprintln!(
+                    "usage: coherence-bootstrap code-quality <subcommand>\n\n{}",
+                    code_quality_help()
+                );
+                1
+            }
+        },
         "help" | "--help" | "-h" => {
             print_help();
             0
@@ -46,6 +60,12 @@ fn print_tui_help() {
     );
 }
 
+fn code_quality_help() -> &'static str {
+    "code-quality subcommands:\n\
+         codescene-xray  File-level X-Ray report via CodeScene\n\
+         help            Show this help"
+}
+
 fn print_help() {
     println!("{}", help_text());
 }
@@ -54,6 +74,7 @@ fn help_text() -> &'static str {
     "coherence-bootstrap\n\n\
          Facade entrypoint for the bootstrap coherence stack.\n\n\
          Commands:\n\
+            code-quality   Code quality analysis tools (codescene-xray)\n\
             tui            Launch the TUI in-process\n\
             spec           Delegate to coherence-core-db spec\n\
             ac             Delegate to coherence-core-db ac\n\
@@ -66,8 +87,8 @@ fn help_text() -> &'static str {
             verify-spec    Delegate to coherence-core-db verify-spec\n\
             evidence-sample  Delegate to coherence-core-db evidence-sample\n\
             project        Delegate to coherence-core-db project\n\
-            doctor         Delegate to coherence-core-db doctor\n\
-            migrate        Delegate to coherence-core-db migrate\n\
+             doctor         Delegate to coherence-core-db doctor\n\
+             migrate        Delegate to coherence-core-db migrate\n\
             m0-smoke       Delegate to coherence-core-db m0-smoke\n\
             m1-spec-smoke  Delegate to coherence-core-db m1-spec-smoke\n\
             help           Show this help\n\n\
@@ -96,6 +117,31 @@ mod tests {
             "coherence-bootstrap".to_string(),
             "tui".to_string(),
             "--help".to_string(),
+        ];
+        assert_eq!(run(&args), 0);
+    }
+
+    #[test]
+    fn help_lists_code_quality() {
+        let help = help_text();
+        assert!(help.contains("code-quality"));
+    }
+
+    #[test]
+    fn code_quality_help_works() {
+        let args = vec![
+            "coherence-bootstrap".to_string(),
+            "code-quality".to_string(),
+            "help".to_string(),
+        ];
+        assert_eq!(run(&args), 0);
+    }
+
+    #[test]
+    fn code_quality_no_subcommand_shows_help() {
+        let args = vec![
+            "coherence-bootstrap".to_string(),
+            "code-quality".to_string(),
         ];
         assert_eq!(run(&args), 0);
     }

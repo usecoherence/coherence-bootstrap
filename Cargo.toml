@@ -11,7 +11,7 @@ name = "coherence-bootstrap"
 path = "src/main.rs"
 
 [workspace]
-members = ["crates/coherence-core-db", "crates/coherence-core-db-tui", "crates/coherence-test-world"]
+members = ["crates/coherence-code-quality", "crates/coherence-core-db", "crates/coherence-core-db-tui", "crates/coherence-test-world"]
 resolver = "2"
 
 [workspace.package]
@@ -33,6 +33,7 @@ expect_used = "warn"
 toml = "0.8.19"
 
 [dependencies]
+coherence-code-quality = { path = "crates/coherence-code-quality" }
 coherence-core-db = { path = "crates/coherence-core-db" }
 coherence-core-db-tui = { path = "crates/coherence-core-db-tui" }
 

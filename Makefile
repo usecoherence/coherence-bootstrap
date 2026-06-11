@@ -102,5 +102,8 @@ codescene-delta-staged:
 codescene-full:
 	@./scripts/codescene-full
 
+codescene-xray:
+	@cargo run --bin coherence-bootstrap -- code-quality codescene-xray $(FILE)
+
 %:
 	@:
