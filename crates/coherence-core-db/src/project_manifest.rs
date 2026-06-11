@@ -215,27 +215,36 @@ pub fn sanitize_dolt_db_segment(input: &str) -> String {
     let mut out = String::new();
     for ch in input.chars() {
         if let Some(c) = dolt_db_segment_char(ch) {
-            if should_skip_underscore(c, &out) {
-                continue;
-            }
-            if out.len() >= DOLT_DB_NAME_MAX_LEN {
+            if !push_dolt_db_segment_char(&mut out, c) {
                 break;
             }
-            out.push(c);
-        } else if !out.is_empty() && !out.ends_with('_') && out.len() < DOLT_DB_NAME_MAX_LEN {
-            out.push('_');
+        } else {
+            push_dolt_db_separator(&mut out);
         }
     }
-    while out.ends_with('_') {
-        out.pop();
-    }
-    if out.len() > DOLT_DB_NAME_MAX_LEN {
-        out.truncate(DOLT_DB_NAME_MAX_LEN);
-        while out.ends_with('_') {
-            out.pop();
-        }
-    }
+    trim_segment_to_fit(&mut out, DOLT_DB_NAME_MAX_LEN);
     out
+}
+
+fn push_dolt_db_segment_char(out: &mut String, ch: char) -> bool {
+    if should_skip_underscore(ch, out) {
+        return true;
+    }
+    if out.len() >= DOLT_DB_NAME_MAX_LEN {
+        return false;
+    }
+    out.push(ch);
+    true
+}
+
+fn push_dolt_db_separator(out: &mut String) {
+    if can_push_dolt_db_separator(out) {
+        out.push('_');
+    }
+}
+
+fn can_push_dolt_db_separator(out: &str) -> bool {
+    !out.is_empty() && !out.ends_with('_') && out.len() < DOLT_DB_NAME_MAX_LEN
 }
 
 fn dolt_db_segment_char(ch: char) -> Option<char> {
