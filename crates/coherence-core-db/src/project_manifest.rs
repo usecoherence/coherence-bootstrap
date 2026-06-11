@@ -214,20 +214,9 @@ fn validate_manifest(manifest: &ProjectManifest) -> Result<(), String> {
 pub fn sanitize_dolt_db_segment(input: &str) -> String {
     let mut out = String::new();
     for ch in input.chars() {
-        let mapped = match ch {
-            'A'..='Z' => Some(ch.to_ascii_lowercase()),
-            'a'..='z' | '0'..='9' => Some(ch),
-            '_' => Some('_'),
-            _ => None,
-        };
-        if let Some(c) = mapped {
-            if c == '_' {
-                if out.is_empty() {
-                    continue;
-                }
-                if out.ends_with('_') {
-                    continue;
-                }
+        if let Some(c) = dolt_db_segment_char(ch) {
+            if should_skip_underscore(c, &out) {
+                continue;
             }
             if out.len() >= DOLT_DB_NAME_MAX_LEN {
                 break;
@@ -247,6 +236,19 @@ pub fn sanitize_dolt_db_segment(input: &str) -> String {
         }
     }
     out
+}
+
+fn dolt_db_segment_char(ch: char) -> Option<char> {
+    match ch {
+        'A'..='Z' => Some(ch.to_ascii_lowercase()),
+        'a'..='z' | '0'..='9' => Some(ch),
+        '_' => Some('_'),
+        _ => None,
+    }
+}
+
+fn should_skip_underscore(ch: char, out: &str) -> bool {
+    ch == '_' && (out.is_empty() || out.ends_with('_'))
 }
 
 /// First four lowercase hex digits of SHA-256 over UTF-8 bytes of `path_for_hash`
