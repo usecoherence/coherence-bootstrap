@@ -449,24 +449,8 @@ pub fn ensure_project_database(config: &ConnectionConfig) -> Result<(), String> 
     }
 
     if let Some(m) = project_manifest::try_read_project_manifest_from_cwd() {
-        if let Some(ref h) = m.project_hash {
-            let ht = h.trim();
-            if !ht.is_empty() {
-                let slug = m.project_slug.trim();
-                let mut tiers = Vec::with_capacity(3);
-                for env in [
-                    project_manifest::CoherenceEnv::Dev,
-                    project_manifest::CoherenceEnv::Test,
-                    project_manifest::CoherenceEnv::Prod,
-                ] {
-                    tiers.push(project_manifest::effective_dolt_catalog_name(
-                        slug,
-                        Some(ht),
-                        env,
-                    )?);
-                }
-                return ensure_databases_named(config, &tiers);
-            }
+        if let Some(tiers) = manifest_tier_catalog_names(&m)? {
+            return ensure_databases_named(config, &tiers);
         }
     }
 
@@ -474,6 +458,28 @@ pub fn ensure_project_database(config: &ConnectionConfig) -> Result<(), String> 
         return Err("logical catalog name is empty; cannot ensure database".to_string());
     }
     ensure_databases_named(config, std::slice::from_ref(&config.database))
+}
+
+fn manifest_tier_catalog_names(
+    manifest: &project_manifest::ProjectManifest,
+) -> Result<Option<Vec<String>>, String> {
+    let Some(ref h) = manifest.project_hash else {
+        return Ok(None);
+    };
+    let ht = h.trim();
+    if ht.is_empty() {
+        return Ok(None);
+    }
+    let slug = manifest.project_slug.trim();
+    [
+        project_manifest::CoherenceEnv::Dev,
+        project_manifest::CoherenceEnv::Test,
+        project_manifest::CoherenceEnv::Prod,
+    ]
+    .into_iter()
+    .map(|env| project_manifest::effective_dolt_catalog_name(slug, Some(ht), env))
+    .collect::<Result<Vec<_>, _>>()
+    .map(Some)
 }
 
 pub fn connect(config: &ConnectionConfig) -> Result<(Conn, ConnectionMode), String> {
