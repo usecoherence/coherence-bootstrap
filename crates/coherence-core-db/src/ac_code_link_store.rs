@@ -241,7 +241,7 @@ mod tests {
         let config = ConnectionConfig::from_env().ok()?;
         test_world_guard::panic_unless_isolated_test_world_for_writes(
             "ac_code_link_store::tests",
-            &config,
+            &config.database,
         );
         migrations::apply_all(&config).ok()?;
         let (conn, _) = db::connect(&config).ok()?;

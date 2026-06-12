@@ -247,19 +247,17 @@ fn replace_ac_concerns(conn: &mut Conn, ac: &AcceptanceCriterion) -> Result<(), 
     Ok(())
 }
 
+const AC_SELECT: &str =
+    "SELECT id, spec_id, slug, title, intent, review_mode, risk_level, created_at, updated_at \
+     FROM acceptance_criteria";
+
 pub fn get_acceptance_criterion(
     conn: &mut Conn,
     ac_id: &str,
 ) -> Result<Option<AcceptanceCriterion>, String> {
+    let sql = format!("{AC_SELECT} WHERE id = :id");
     let row: Option<AcceptanceCriterionRow> = conn
-        .exec_first(
-            r"SELECT id, spec_id, slug, title, intent, review_mode, risk_level, created_at, updated_at
-              FROM acceptance_criteria
-              WHERE id = :id",
-            params! {
-                "id" => ac_id,
-            },
-        )
+        .exec_first(sql.as_str(), params! {"id" => ac_id})
         .map_err(|err| format!("failed to get acceptance criterion {ac_id}: {err}"))?;
     row.map(|r| ac_from_row_with_concerns(conn, r)).transpose()
 }
@@ -268,16 +266,9 @@ pub fn list_acceptance_criteria_for_spec(
     conn: &mut Conn,
     spec_id: &str,
 ) -> Result<Vec<AcceptanceCriterion>, String> {
+    let sql = format!("{AC_SELECT} WHERE spec_id = :spec_id ORDER BY id");
     let rows: Vec<AcceptanceCriterionRow> = conn
-        .exec(
-            r"SELECT id, spec_id, slug, title, intent, review_mode, risk_level, created_at, updated_at
-              FROM acceptance_criteria
-              WHERE spec_id = :spec_id
-              ORDER BY id",
-            params! {
-                "spec_id" => spec_id,
-            },
-        )
+        .exec(sql.as_str(), params! {"spec_id" => spec_id})
         .map_err(|err| format!("failed to list ACs for {spec_id}: {err}"))?;
 
     rows.into_iter()
@@ -437,7 +428,10 @@ mod tests {
     fn maybe_conn() -> Option<test_world_guard::EnvConnLock<Conn>> {
         let lock = test_world_guard::lock_test_env();
         let config = ConnectionConfig::from_env().ok()?;
-        test_world_guard::panic_unless_isolated_test_world_for_writes("spec_store::tests", &config);
+        test_world_guard::panic_unless_isolated_test_world_for_writes(
+            "spec_store::tests",
+            &config.database,
+        );
         migrations::apply_all(&config).ok()?;
         let (conn, _) = db::connect(&config).ok()?;
         Some(test_world_guard::EnvConnLock {

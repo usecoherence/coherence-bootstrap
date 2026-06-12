@@ -482,14 +482,20 @@ mod tests {
 
     #[test]
     fn write_rejects_project_hash_on_schema_v1() {
-        assert_write_fails(ProjectManifest {
+        let tmp = TempDir::new().unwrap();
+        let bad = ProjectManifest {
             version: 1,
             project_slug: "x".to_string(),
             dolt_db_name: None,
             frozen_git_toplevel: None,
             project_hash: Some("abcd".to_string()),
             dolt_mode: None,
-        });
+        };
+        let err = write_manifest(tmp.path(), &bad).unwrap_err();
+        assert!(
+            err.contains("version >= 2"),
+            "expected version requirement error, got: {err}"
+        );
     }
 
     #[test]
