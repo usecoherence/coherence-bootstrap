@@ -399,7 +399,12 @@ mod tests {
             std::fs::write(_tmp.path().join(".coherence/project.toml"), body).unwrap();
             let _cwd = SaveCwd::chdir(_tmp.path());
             env::set_var(PROFILE_ENV_VAR, "test");
-            Self { _lock, _restore, _tmp, _cwd }
+            Self {
+                _lock,
+                _restore,
+                _tmp,
+                _cwd,
+            }
         }
     }
 
