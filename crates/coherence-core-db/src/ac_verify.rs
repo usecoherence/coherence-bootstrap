@@ -370,7 +370,12 @@ mod tests {
         loc.created_at = "t1".to_string();
         loc.updated_at = "t1".to_string();
         ac_code_link_store::put_code_location(conn, &loc).expect("put_code_location");
-        let mut link = AcCodeLink::new(link_id, ac_id.clone(), loc_id, AcCodeRelationKind::VerifiedBy);
+        let mut link = AcCodeLink::new(
+            link_id,
+            ac_id.clone(),
+            loc_id,
+            AcCodeRelationKind::VerifiedBy,
+        );
         link.created_at = "t2".to_string();
         link.updated_at = "t2".to_string();
         ac_code_link_store::put_ac_code_link(conn, &link).expect("put_ac_code_link");
@@ -401,16 +406,28 @@ mod tests {
 
     #[test]
     fn verify_ac_no_links_no_verification() {
-        let Some(mut conn) = conn_or_skip() else { return };
+        let Some(mut conn) = conn_or_skip() else {
+            return;
+        };
         let suf = unique_label("VFY-NONE");
         let ac_id = format!("AC-VFY-NONE-{suf}");
         let got = verify_acceptance_criterion(&mut conn, &ac_id).expect("verify");
-        assert_eq!((got.no_verification_links, got.links.len(), got.exit_code(), got.overall_status_label()), (true, 0, 0, "no_verification"));
+        assert_eq!(
+            (
+                got.no_verification_links,
+                got.links.len(),
+                got.exit_code(),
+                got.overall_status_label()
+            ),
+            (true, 0, 0, "no_verification")
+        );
     }
 
     #[test]
     fn verify_ac_skips_non_verified_relation() {
-        let Some(mut conn) = conn_or_skip() else { return };
+        let Some(mut conn) = conn_or_skip() else {
+            return;
+        };
         let suf = unique_label("VFY-SKIPREL");
         let ac_id = format!("AC-VFY-SR-{suf}");
         let loc_id = format!("LOC-VFY-SR-{suf}");
@@ -420,17 +437,27 @@ mod tests {
         loc.created_at = "t1".to_string();
         loc.updated_at = "t1".to_string();
         ac_code_link_store::put_code_location(&mut conn, &loc).expect("put_code_location");
-        let mut link = AcCodeLink::new(format!("LNK-VFY-SR-{suf}"), ac_id.clone(), loc_id, AcCodeRelationKind::ImplementedBy);
+        let mut link = AcCodeLink::new(
+            format!("LNK-VFY-SR-{suf}"),
+            ac_id.clone(),
+            loc_id,
+            AcCodeRelationKind::ImplementedBy,
+        );
         link.created_at = "t2".to_string();
         link.updated_at = "t2".to_string();
         ac_code_link_store::put_ac_code_link(&mut conn, &link).expect("put_ac_code_link");
         let got = verify_acceptance_criterion(&mut conn, &ac_id).expect("verify");
-        assert_eq!((got.no_verification_links, got.links.len(), got.exit_code()), (true, 0, 0));
+        assert_eq!(
+            (got.no_verification_links, got.links.len(), got.exit_code()),
+            (true, 0, 0)
+        );
     }
 
     #[test]
     fn verify_ac_skips_missing_command() {
-        let Some(mut conn) = conn_or_skip() else { return };
+        let Some(mut conn) = conn_or_skip() else {
+            return;
+        };
         let suf = unique_label("VFY-NOCMD");
         let ac_id = format!("AC-VFY-NC-{suf}");
         let loc_id = format!("LOC-VFY-NC-{suf}");
@@ -440,20 +467,33 @@ mod tests {
         loc.created_at = "t1".to_string();
         loc.updated_at = "t1".to_string();
         ac_code_link_store::put_code_location(&mut conn, &loc).expect("put_code_location");
-        let mut link = AcCodeLink::new(format!("LNK-VFY-NC-{suf}"), ac_id.clone(), loc_id, AcCodeRelationKind::VerifiedBy);
+        let mut link = AcCodeLink::new(
+            format!("LNK-VFY-NC-{suf}"),
+            ac_id.clone(),
+            loc_id,
+            AcCodeRelationKind::VerifiedBy,
+        );
         link.created_at = "t2".to_string();
         link.updated_at = "t2".to_string();
         ac_code_link_store::put_ac_code_link(&mut conn, &link).expect("put_ac_code_link");
         let got = verify_acceptance_criterion(&mut conn, &ac_id).expect("verify");
         assert!(!got.no_verification_links);
         assert_eq!(got.links.len(), 1);
-        assert!(matches!(got.links[0].status, AcVerifyLinkStatus::Skipped { .. }));
-        assert_eq!((got.exit_code(), got.overall_status_label()), (0, "skipped"));
+        assert!(matches!(
+            got.links[0].status,
+            AcVerifyLinkStatus::Skipped { .. }
+        ));
+        assert_eq!(
+            (got.exit_code(), got.overall_status_label()),
+            (0, "skipped")
+        );
     }
 
     #[test]
     fn verify_ac_passes_true_command() {
-        let Some(mut conn) = conn_or_skip() else { return };
+        let Some(mut conn) = conn_or_skip() else {
+            return;
+        };
         let suf = unique_label("VFY-OK");
         let (ac_id, _) = setup_verified_loc(&mut conn, &suf, "VFY-OK", Some("true"));
         let got = verify_acceptance_criterion(&mut conn, &ac_id).expect("verify");
@@ -463,24 +503,31 @@ mod tests {
         assert_eq!(got.exit_code(), 0);
         assert_eq!(got.overall_status_label(), "passed");
         let latest = ac_verification_store::get_ac_verification_latest(&mut conn, &ac_id)
-            .expect("latest").expect("recorded");
+            .expect("latest")
+            .expect("recorded");
         assert_eq!(latest.overall_status.as_label(), "passed");
     }
 
     #[test]
     fn verify_ac_fails_false_command() {
-        let Some(mut conn) = conn_or_skip() else { return };
+        let Some(mut conn) = conn_or_skip() else {
+            return;
+        };
         let suf = unique_label("VFY-BAD");
         let (ac_id, _) = setup_verified_loc(&mut conn, &suf, "VFY-BAD", Some("false"));
         let got = verify_acceptance_criterion(&mut conn, &ac_id).expect("verify");
         assert_eq!(got.links.len(), 1);
-        assert!(matches!(got.links[0].status, AcVerifyLinkStatus::Failed { exit_code } if exit_code != 0));
+        assert!(
+            matches!(got.links[0].status, AcVerifyLinkStatus::Failed { exit_code } if exit_code != 0)
+        );
         assert_eq!((got.exit_code(), got.overall_status_label()), (1, "failed"));
     }
 
     #[test]
     fn verify_ac_round_trip_with_spec_row() {
-        let Some(mut conn) = conn_or_skip() else { return };
+        let Some(mut conn) = conn_or_skip() else {
+            return;
+        };
         let suf = unique_label("VFY-SPEC");
         let spec_id = setup_spec_and_ac(&mut conn, &suf, "VFY", "Verify AC runner");
         let ac_id = format!("AC-VFY-SPEC-{suf}");
@@ -492,7 +539,12 @@ mod tests {
         loc.created_at = "tl".to_string();
         loc.updated_at = "tl".to_string();
         ac_code_link_store::put_code_location(&mut conn, &loc).expect("put_code_location");
-        let mut link = AcCodeLink::new(format!("LNK-VFY-SPEC-{suf}"), ac_id.clone(), loc_id, AcCodeRelationKind::VerifiedBy);
+        let mut link = AcCodeLink::new(
+            format!("LNK-VFY-SPEC-{suf}"),
+            ac_id.clone(),
+            loc_id,
+            AcCodeRelationKind::VerifiedBy,
+        );
         link.note = String::new();
         link.created_at = "tln".to_string();
         link.updated_at = "tln".to_string();
@@ -510,7 +562,9 @@ mod tests {
 
     #[test]
     fn verify_spec_requires_spec_row() {
-        let Some(mut conn) = conn_or_skip() else { return };
+        let Some(mut conn) = conn_or_skip() else {
+            return;
+        };
         let suf = unique_label("VSPEC-NO");
         let spec_id = format!("SPEC-VS-NONE-{suf}");
         let err = verify_spec(&mut conn, &spec_id).expect_err("expected err");
@@ -519,7 +573,9 @@ mod tests {
 
     #[test]
     fn verify_spec_aggregate_counts_per_ac_status() {
-        let Some(mut conn) = conn_or_skip() else { return };
+        let Some(mut conn) = conn_or_skip() else {
+            return;
+        };
         let suf = unique_label("VSPEC-MIX");
         let spec_id = setup_spec_and_ac(&mut conn, &suf, "VS-MIX", "Verify-spec mix");
         let ac_no = format!("AC-VS-NV-{suf}");
@@ -531,20 +587,42 @@ mod tests {
         let _ = setup_verified_loc(&mut conn, &suf, "VS-SK", None);
         setup_verified_loc(&mut conn, &suf, "VS-OK", Some("true"));
         let report = verify_spec(&mut conn, &spec_id).expect("verify_spec");
-        assert_eq!((report.spec_id.as_str(), report.acceptance_criteria, report.no_verification, report.skipped, report.passed, report.failed, report.exit_code()),
-                   (spec_id.as_str(), 3, 1, 1, 1, 0, 0));
+        assert_eq!(
+            (
+                report.spec_id.as_str(),
+                report.acceptance_criteria,
+                report.no_verification,
+                report.skipped,
+                report.passed,
+                report.failed,
+                report.exit_code()
+            ),
+            (spec_id.as_str(), 3, 1, 1, 1, 0, 0)
+        );
         assert_eq!(report.ac_results.len(), 3);
-        assert!(report.ac_results.iter().any(|r| r.ac_id == ac_no && r.overall_status_label() == "no_verification"));
-        assert!(report.ac_results.iter().any(|r| r.ac_id == ac_skip && r.overall_status_label() == "skipped"));
-        assert!(report.ac_results.iter().any(|r| r.ac_id == ac_pass && r.overall_status_label() == "passed"));
+        assert!(report
+            .ac_results
+            .iter()
+            .any(|r| r.ac_id == ac_no && r.overall_status_label() == "no_verification"));
+        assert!(report
+            .ac_results
+            .iter()
+            .any(|r| r.ac_id == ac_skip && r.overall_status_label() == "skipped"));
+        assert!(report
+            .ac_results
+            .iter()
+            .any(|r| r.ac_id == ac_pass && r.overall_status_label() == "passed"));
         let latest = ac_verification_store::get_ac_verification_latest(&mut conn, &ac_pass)
-            .expect("latest").expect("recorded");
+            .expect("latest")
+            .expect("recorded");
         assert_eq!(latest.overall_status.as_label(), "passed");
     }
 
     #[test]
     fn verify_spec_nonzero_exit_when_any_command_fails() {
-        let Some(mut conn) = conn_or_skip() else { return };
+        let Some(mut conn) = conn_or_skip() else {
+            return;
+        };
         let suf = unique_label("VSPEC-FAIL");
         let spec_id = setup_spec_and_ac(&mut conn, &suf, "VS-FAIL", "Verify-spec fail");
         let ac_id = format!("AC-VS-FAIL-{suf}");

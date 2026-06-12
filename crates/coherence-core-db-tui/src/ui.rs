@@ -5,6 +5,7 @@ use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph, Wrap};
 use ratatui::Frame;
 
 use coherence_core_db::ac_verify::AcVerifyOverallStatus;
+use coherence_core_db::models::{AcceptanceCriterion, Spec, SpecGraph};
 
 use crate::app::{AppState, Screen};
 use crate::edit::Draft;
@@ -45,33 +46,34 @@ pub fn ui(frame: &mut Frame, app: &mut AppState, theme: &Theme) {
     );
 }
 
-fn title_line(app: &AppState, theme: &Theme) -> Line<'static> {
-    let hint = match app.screen {
+fn title_hint(app: &AppState) -> &'static str {
+    match app.screen {
         Screen::ProjectPicker => " [↑↓] nav  [Enter] select  [q] quit",
         Screen::EnvPicker => " [↑↓] nav  [Enter] select  [Esc] back  [q] quit",
-        Screen::Specs => {
-            if app.edit_mode {
-                " [s] status  [l] level  [r] review  [k] risk  [e] editor  [Enter] save  [Esc] cancel"
-            } else if app.focus_tree {
-                " [↑↓] nav  [Enter] expand/open  [v] verify  [V] all  [p] project  [d] DB  [e] edit  [q] quit"
-            } else {
-                " [↑↓] scroll  [Enter/Esc] back to tree  [v] verify  [V] all  [e] edit  [q] quit"
-            }
+        Screen::Specs if app.edit_mode => {
+            " [s] status  [l] level  [r] review  [k] risk  [e] editor  [Enter] save  [Esc] cancel"
         }
-    };
-    let label = match app.screen {
+        Screen::Specs if app.focus_tree => {
+            " [↑↓] nav  [Enter] expand/open  [v] verify  [V] all  [p] project  [d] DB  [e] edit  [q] quit"
+        }
+        Screen::Specs => {
+            " [↑↓] scroll  [Enter/Esc] back to tree  [v] verify  [V] all  [e] edit  [q] quit"
+        }
+    }
+}
+
+fn title_label(app: &AppState) -> &'static str {
+    match app.screen {
         Screen::ProjectPicker => " Coherence Spec Browser  ",
         Screen::EnvPicker => " Environment  ",
-        Screen::Specs => {
-            if app.focus_tree {
-                " Specs  "
-            } else {
-                " Detail  "
-            }
-        }
-    };
+        Screen::Specs if app.focus_tree => " Specs  ",
+        Screen::Specs => " Detail  ",
+    }
+}
+
+fn title_line(app: &AppState, theme: &Theme) -> Line<'static> {
     Line::from(Span::styled(
-        format!("{}{}", label, hint),
+        format!("{}{}", title_label(app), title_hint(app)),
         Style::default()
             .fg(theme.title_fg)
             .bg(theme.title_bg)
@@ -79,8 +81,15 @@ fn title_line(app: &AppState, theme: &Theme) -> Line<'static> {
     ))
 }
 
+fn render_picker(frame: &mut Frame, area: Rect, items: Vec<ListItem>, title: &str) {
+    frame.render_widget(
+        List::new(items).block(Block::default().borders(Borders::ALL).title(title)),
+        area,
+    );
+}
+
 fn render_project_picker(frame: &mut Frame, area: Rect, app: &AppState, theme: &Theme) {
-    let items: Vec<ListItem> = app
+    let items = app
         .projects
         .iter()
         .enumerate()
@@ -96,15 +105,11 @@ fn render_project_picker(frame: &mut Frame, area: Rect, app: &AppState, theme: &
             )))
         })
         .collect();
-
-    frame.render_widget(
-        List::new(items).block(Block::default().borders(Borders::ALL).title(" Projects ")),
-        area,
-    );
+    render_picker(frame, area, items, " Projects ");
 }
 
 fn render_env_picker(frame: &mut Frame, area: Rect, app: &AppState, theme: &Theme) {
-    let items: Vec<ListItem> = app
+    let items = app
         .envs
         .iter()
         .enumerate()
@@ -117,15 +122,7 @@ fn render_env_picker(frame: &mut Frame, area: Rect, app: &AppState, theme: &Them
             ListItem::new(Line::from(Span::styled(format!(" {env} "), style)))
         })
         .collect();
-
-    frame.render_widget(
-        List::new(items).block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(" Environment "),
-        ),
-        area,
-    );
+    render_picker(frame, area, items, " Environment ");
 }
 
 fn render_tree(frame: &mut Frame, area: Rect, app: &mut AppState, theme: &Theme) {
@@ -148,12 +145,32 @@ fn render_tree(frame: &mut Frame, area: Rect, app: &mut AppState, theme: &Theme)
         .saturating_add(viewport_height)
         .min(app.tree_items.len());
 
-    let items: Vec<ListItem> = app
-        .tree_items
+    let items = build_tree_items(app, theme, visible_start, visible_end);
+
+    let title = tree_title(title, app, viewport_height);
+
+    frame.render_widget(
+        List::new(items).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(border_color))
+                .title(title),
+        ),
+        area,
+    );
+}
+
+fn build_tree_items<'a>(
+    app: &'a AppState,
+    theme: &'a Theme,
+    start: usize,
+    end: usize,
+) -> Vec<ListItem<'a>> {
+    app.tree_items
         .iter()
         .enumerate()
-        .skip(visible_start)
-        .take(visible_end.saturating_sub(visible_start))
+        .skip(start)
+        .take(end.saturating_sub(start))
         .map(|(i, item)| {
             let prefix = if item.has_children {
                 if item.expanded {
@@ -165,14 +182,12 @@ fn render_tree(frame: &mut Frame, area: Rect, app: &mut AppState, theme: &Theme)
                 "  "
             };
             let indent = "  ".repeat(item.indent);
-            let marker = if item.parent_spec_id.is_some() {
+            let marker = item.parent_spec_id.as_ref().map_or_else(String::new, |_| {
                 format!(
                     "{} ",
                     verification_marker(app.verification_statuses.get(&item.id).copied())
                 )
-            } else {
-                String::new()
-            };
+            });
             let label = format!("{}{marker}{prefix}{}", indent, item.label);
 
             let fg = if item.indent == 0 {
@@ -190,9 +205,11 @@ fn render_tree(frame: &mut Frame, area: Rect, app: &mut AppState, theme: &Theme)
             };
             ListItem::new(Line::from(Span::styled(label, style)))
         })
-        .collect();
+        .collect()
+}
 
-    let title = if app.tree_items.len() > viewport_height && viewport_height > 0 {
+fn tree_title(title: &str, app: &AppState, viewport_height: usize) -> String {
+    if app.tree_items.len() > viewport_height && viewport_height > 0 {
         format!(
             "{title} {}/{} ",
             app.selected_tree.saturating_add(1),
@@ -200,17 +217,7 @@ fn render_tree(frame: &mut Frame, area: Rect, app: &mut AppState, theme: &Theme)
         )
     } else {
         title.to_string()
-    };
-
-    frame.render_widget(
-        List::new(items).block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(border_color))
-                .title(title),
-        ),
-        area,
-    );
+    }
 }
 
 fn render_detail(frame: &mut Frame, area: Rect, app: &AppState, theme: &Theme) {
@@ -234,154 +241,7 @@ fn render_detail(frame: &mut Frame, area: Rect, app: &AppState, theme: &Theme) {
         return;
     };
 
-    let dirty = app.draft.as_ref().is_some_and(Draft::is_dirty);
-    let changes = if dirty { "  [modified]" } else { "" };
-
-    let content = if let Some(ref spec_id) = app.detail_spec_id {
-        let spec = graph.specs.iter().find(|s| s.id == *spec_id);
-        let spec_draft = app.draft.as_ref().and_then(|d| match d {
-            Draft::Spec { spec_id: did, .. } if did == spec_id => Some(d),
-            _ => None,
-        });
-        match spec {
-            Some(s) => {
-                let (level, status, desc) = match spec_draft {
-                    Some(Draft::Spec {
-                        pending_level,
-                        pending_status,
-                        pending_description,
-                        ..
-                    }) => {
-                        let d = pending_description.as_deref().unwrap_or(&s.description);
-                        (pending_level.as_db_str(), pending_status.as_db_str(), d)
-                    }
-                    _ => (
-                        s.level.as_db_str(),
-                        s.status.as_db_str(),
-                        &s.description as &str,
-                    ),
-                };
-                let concerns = graph
-                    .acceptance_criteria
-                    .iter()
-                    .filter(|a| a.spec_id == s.id)
-                    .map(|a| {
-                        format!(
-                            "      ├ {} — {} (risk={} review={})",
-                            a.slug,
-                            a.title,
-                            a.risk_level.as_db_str(),
-                            a.review_mode.as_db_str()
-                        )
-                    })
-                    .collect::<Vec<_>>()
-                    .join("\n");
-                format!(
-                    "┌ {:━^78}┐\n\
-                     ┃  ID       │ {}    \n\
-                     ┃  Slug     │ {}    \n\
-                     ┃  Title    │ {}    \n\
-                     ┃  Level    │ {}    \n\
-                     ┃  Status   │ {}    \n\
-                     ┣{:━^80}┨\n\
-                      ┃  Description:{changes}    \n\
-                      {}\n\
-                     {}\n\
-                     ┗{:━^80}┛",
-                    " Spec ",
-                    s.id,
-                    s.slug,
-                    s.title,
-                    level,
-                    status,
-                    "",
-                    textwrap_indent(desc, "┃  "),
-                    if concerns.is_empty() {
-                        String::new()
-                    } else {
-                        format!("┃\n┃  Acceptance Criteria:\n{concerns}\n")
-                    },
-                    ""
-                )
-            }
-            None => "Spec not found".into(),
-        }
-    } else if let Some(ref ac_id) = app.detail_ac_id {
-        let ac = graph.acceptance_criteria.iter().find(|a| a.id == *ac_id);
-        let ac_draft = app.draft.as_ref().and_then(|d| match d {
-            Draft::Ac { ac_id: did, .. } if did == ac_id => Some(d),
-            _ => None,
-        });
-        match ac {
-            Some(a) => {
-                let (review_mode, risk_level, intent_changes, intent) = match ac_draft {
-                    Some(Draft::Ac {
-                        pending_review_mode,
-                        pending_risk_level,
-                        pending_intent,
-                        ..
-                    }) => {
-                        let i = pending_intent.as_deref().unwrap_or(&a.intent);
-                        let ch = if pending_intent.is_some() {
-                            "  [modified]"
-                        } else {
-                            ""
-                        };
-                        (
-                            pending_review_mode.as_db_str(),
-                            pending_risk_level.as_db_str(),
-                            ch,
-                            i,
-                        )
-                    }
-                    _ => (
-                        a.review_mode.as_db_str(),
-                        a.risk_level.as_db_str(),
-                        "",
-                        &a.intent as &str,
-                    ),
-                };
-                let concerns_str = a
-                    .concerns
-                    .iter()
-                    .map(|c| c.as_db_str())
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                let verification =
-                    verification_description(app.verification_statuses.get(&a.id).copied());
-                format!(
-                    "┌ {:━^78}┐\n\
-                     ┃  ID         │ {}    \n\
-                     ┃  Spec ID    │ {}    \n\
-                     ┃  Slug       │ {}    \n\
-                     ┃  Title      │ {}    \n\
-                     ┃  Review     │ {}    \n\
-                     ┃  Risk       │ {}    \n\
-                     ┃  Concerns   │ {}    \n\
-                     ┃  Verify     │ {}    \n\
-                     ┣{:━^80}┨\n\
-                     ┃  Intent:{intent_changes}    \n\
-                     {}\n\
-                     ┗{:━^80}┛",
-                    " Acceptance Criterion ",
-                    a.id,
-                    a.spec_id,
-                    a.slug,
-                    a.title,
-                    review_mode,
-                    risk_level,
-                    concerns_str,
-                    verification,
-                    "",
-                    textwrap_indent(intent, "┃  "),
-                    ""
-                )
-            }
-            None => "AC not found".into(),
-        }
-    } else {
-        "Select a spec or AC from the tree".to_string()
-    };
+    let content = detail_content(app, graph);
 
     frame.render_widget(
         Paragraph::new(content)
@@ -395,6 +255,176 @@ fn render_detail(frame: &mut Frame, area: Rect, app: &AppState, theme: &Theme) {
             .wrap(Wrap { trim: false }),
         area,
     );
+}
+
+fn find_draft<'a>(app: &'a AppState, id: &str) -> Option<&'a Draft> {
+    app.draft.as_ref().and_then(|d| match d {
+        Draft::Spec { spec_id, .. } if spec_id == id => Some(d),
+        Draft::Ac { ac_id, .. } if ac_id == id => Some(d),
+        _ => None,
+    })
+}
+
+fn detail_content(app: &AppState, graph: &SpecGraph) -> String {
+    let dirty = app.draft.as_ref().is_some_and(Draft::is_dirty);
+    let changes = if dirty { "  [modified]" } else { "" };
+
+    if let Some(ref spec_id) = app.detail_spec_id {
+        return detail_spec_or_not_found(app, graph, spec_id, changes);
+    }
+    if let Some(ref ac_id) = app.detail_ac_id {
+        return detail_ac_or_not_found(app, graph, ac_id);
+    }
+    "Select a spec or AC from the tree".to_string()
+}
+
+fn detail_spec_or_not_found(
+    app: &AppState,
+    graph: &SpecGraph,
+    spec_id: &str,
+    changes: &str,
+) -> String {
+    match graph.specs.iter().find(|s| s.id == *spec_id) {
+        Some(s) => detail_spec_content(s, find_draft(app, spec_id), graph, changes),
+        None => "Spec not found".into(),
+    }
+}
+
+fn detail_ac_or_not_found(app: &AppState, graph: &SpecGraph, ac_id: &str) -> String {
+    match graph.acceptance_criteria.iter().find(|a| a.id == *ac_id) {
+        Some(a) => detail_ac_content(a, find_draft(app, ac_id), app),
+        None => "AC not found".into(),
+    }
+}
+
+fn detail_spec_content(
+    s: &Spec,
+    draft: Option<&Draft>,
+    graph: &SpecGraph,
+    changes: &str,
+) -> String {
+    let (level, status, desc) = match draft {
+        Some(Draft::Spec {
+            pending_level,
+            pending_status,
+            pending_description,
+            ..
+        }) => {
+            let d = pending_description.as_deref().unwrap_or(&s.description);
+            (pending_level.as_db_str(), pending_status.as_db_str(), d)
+        }
+        _ => (
+            s.level.as_db_str(),
+            s.status.as_db_str(),
+            &s.description as &str,
+        ),
+    };
+    let concerns = graph
+        .acceptance_criteria
+        .iter()
+        .filter(|a| a.spec_id == s.id)
+        .map(|a| {
+            format!(
+                "      ├ {} — {} (risk={} review={})",
+                a.slug,
+                a.title,
+                a.risk_level.as_db_str(),
+                a.review_mode.as_db_str()
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    format!(
+        "┌ {:━^78}┐\n\
+         ┃  ID       │ {}    \n\
+         ┃  Slug     │ {}    \n\
+         ┃  Title    │ {}    \n\
+         ┃  Level    │ {}    \n\
+         ┃  Status   │ {}    \n\
+         ┣{:━^80}┨\n\
+         ┃  Description:{changes}    \n\
+         {}\n\
+         {}\n\
+         ┗{:━^80}┛",
+        " Spec ",
+        s.id,
+        s.slug,
+        s.title,
+        level,
+        status,
+        "",
+        textwrap_indent(desc, "┃  "),
+        if concerns.is_empty() {
+            String::new()
+        } else {
+            format!("┃\n┃  Acceptance Criteria:\n{concerns}\n")
+        },
+        ""
+    )
+}
+
+fn detail_ac_content(a: &AcceptanceCriterion, draft: Option<&Draft>, app: &AppState) -> String {
+    let (review_mode, risk_level, intent_changes, intent) = match draft {
+        Some(Draft::Ac {
+            pending_review_mode,
+            pending_risk_level,
+            pending_intent,
+            ..
+        }) => {
+            let i = pending_intent.as_deref().unwrap_or(&a.intent);
+            let ch = if pending_intent.is_some() {
+                "  [modified]"
+            } else {
+                ""
+            };
+            (
+                pending_review_mode.as_db_str(),
+                pending_risk_level.as_db_str(),
+                ch,
+                i,
+            )
+        }
+        _ => (
+            a.review_mode.as_db_str(),
+            a.risk_level.as_db_str(),
+            "",
+            &a.intent as &str,
+        ),
+    };
+    let concerns_str = a
+        .concerns
+        .iter()
+        .map(|c| c.as_db_str())
+        .collect::<Vec<_>>()
+        .join(", ");
+    let verification = verification_description(app.verification_statuses.get(&a.id).copied());
+    format!(
+        "┌ {:━^78}┐\n\
+         ┃  ID         │ {}    \n\
+         ┃  Spec ID    │ {}    \n\
+         ┃  Slug       │ {}    \n\
+         ┃  Title      │ {}    \n\
+         ┃  Review     │ {}    \n\
+         ┃  Risk       │ {}    \n\
+         ┃  Concerns   │ {}    \n\
+         ┃  Verify     │ {}    \n\
+         ┣{:━^80}┨\n\
+         ┃  Intent:{intent_changes}    \n\
+         {}\n\
+         ┗{:━^80}┛",
+        " Acceptance Criterion ",
+        a.id,
+        a.spec_id,
+        a.slug,
+        a.title,
+        review_mode,
+        risk_level,
+        concerns_str,
+        verification,
+        "",
+        textwrap_indent(intent, "┃  "),
+        ""
+    )
 }
 
 fn textwrap_indent(text: &str, prefix: &str) -> String {
