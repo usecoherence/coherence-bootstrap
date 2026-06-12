@@ -1,7 +1,0 @@
-Deliverable: short decision note (e.g. docs/decisions/ or .coherence/stubs); optional isolated spike; recommendation: stay manual / adopt SQLx later / TinyORM / defer.
-
-Do NOT: rewrite DB layer; switch COREDB repos to SQLx; change migrations/commands; block COREDB-9..14.
-
-Verification: `make tool run`; spike isolated if present; recommendation explicit.
-
-Close: clear whether to revisit ORM/SQLx and what future task would adopt it.

@@ -1,7 +1,0 @@
-NOT_IMPLEMENTED: blast-radius
-
-Requires:
-  - codeintel SCIP index
-  - AC_CODE_LINK -> CODE_ARTIFACT mapping
-  - spec/task bridge tables
-  - graph traversal and ranking

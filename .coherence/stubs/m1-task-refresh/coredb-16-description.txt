@@ -1,3 +1,0 @@
-Thin CLI wrapper over existing spec repository functions (COREDB-8). No new persistence model.
-
-Goal: humans and later tools can create and inspect Spec/AC records without hardcoded smoke data. Sits after COREDB-9 (smoke proof), before COREDB-10 (codeintel schema).

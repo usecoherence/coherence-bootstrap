@@ -1,1 +1,0 @@
-Boundary: persistence stays in COREDB-8 functions; this task is command surface only.

@@ -1,3 +1,0 @@
-Schema/migration only for codeintel module. No repository functions yet.
-
-Goal: smallest codeintel-owned schema to link ACs to test files or test commands. Module layout under sql/modules/codeintel/migrations/.

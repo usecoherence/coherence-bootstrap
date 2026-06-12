@@ -1,3 +1,0 @@
-Documentation only for M1 module ownership (tiny wording fixes in code allowed if needed).
-
-Goal: one place explains physical co-location vs logical owners, current M1 command flow, and explicit non-goals.

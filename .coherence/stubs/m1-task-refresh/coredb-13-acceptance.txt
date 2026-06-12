@@ -1,7 +1,0 @@
-Command e.g. `verify-spec <SPEC_ID>`. Load ACs for spec; for each AC list links; use COREDB-12 logic; statuses passed/failed/skipped/no_verification. Summary counts: specs 1, acceptance_criteria N, passed/failed/skipped/no_verification. Stable output for evidence.
-
-Do NOT: full review/evidence system; docs export; Temporal; coverage; SCIP graph; codeintel schema changes unless tiny missing field blocks report.
-
-Verification: `make tool run`; live flow Spec+AC+CodeLocation+link => verify-spec passed summary; failing command => nonzero; no-link AC clear.
-
-Close: one Spec produces meaningful AC verification report from linked commands.

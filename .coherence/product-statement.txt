@@ -1,8 +1,0 @@
-Product statement
-
-coherence-core-db is a Coherence-compatible Rust CLI tool.
-
-This generated repository intentionally starts with a uniform workflow harness:
-context -> next -> plan -> run -> present-work -> feedback.
-
-The implementation may be tiny, but the operating contract is already in place.

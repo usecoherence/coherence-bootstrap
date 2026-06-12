@@ -1,3 +1,0 @@
-Spec-level aggregation over COREDB-12 runner and link storage.
-
-Goal: given Spec id, list ACs, run/collect linked verification per AC, print spec health report; nonzero exit if any linked verification fails.

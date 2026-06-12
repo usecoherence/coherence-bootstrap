@@ -1,9 +1,0 @@
-Deliverable: add command `m1-spec-smoke` (name may match existing CLI style). Command connects to live Dolt using existing connection policy; applies migrations through existing migration path; creates one Spec, one AcceptanceCriterion for that Spec, one SpecRelation if repository supports it; reads everything back via repository functions; prints stable summary.
-
-Output includes: connection_mode; migration status or migrate success signal; spec count; AC count; relation count; final line `m1-spec-smoke: success`.
-
-Do NOT: codeintel tables; AC-to-test links; verify-spec; generic graph model; polished spec/ac CLI UX (that is COREDB-16); new store functions beyond COREDB-8; SQLx/TinyORM.
-
-Verification: `make tool run`; `cargo run -p coherence-core-db -- m1-spec-smoke`; `m0-smoke` still passes if present; show diff summary and final command output.
-
-Close: live Dolt run proves migrate + put/read/list for Spec/AC/SpecRelation.
