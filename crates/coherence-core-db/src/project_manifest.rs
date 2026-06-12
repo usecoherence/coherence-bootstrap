@@ -374,21 +374,21 @@ mod tests {
 
     use tempfile::TempDir;
 
-    fn assert_round_trip(manifest: ProjectManifest) {
+    fn assert_round_trip(manifest: &ProjectManifest) {
         let tmp = TempDir::new().unwrap();
-        write_manifest(tmp.path(), &manifest).unwrap();
+        write_manifest(tmp.path(), manifest).unwrap();
         let loaded = read_manifest(tmp.path()).unwrap();
-        assert_eq!(loaded, manifest);
+        assert_eq!(loaded, *manifest);
     }
 
-    fn assert_write_fails(manifest: ProjectManifest) {
+    fn assert_write_fails(manifest: &ProjectManifest) {
         let tmp = TempDir::new().unwrap();
-        assert!(write_manifest(tmp.path(), &manifest).is_err());
+        assert!(write_manifest(tmp.path(), manifest).is_err());
     }
 
     #[test]
     fn round_trip_write_read() {
-        assert_round_trip(ProjectManifest {
+        assert_round_trip(&ProjectManifest {
             version: 1,
             project_slug: "my-project".to_string(),
             dolt_db_name: Some("my_catalog".to_string()),
@@ -400,7 +400,7 @@ mod tests {
 
     #[test]
     fn read_rejects_empty_slug() {
-        assert_write_fails(ProjectManifest {
+        assert_write_fails(&ProjectManifest {
             version: 1,
             project_slug: "   ".to_string(),
             dolt_db_name: None,
@@ -470,7 +470,7 @@ mod tests {
 
     #[test]
     fn round_trip_write_read_with_project_hash_v2() {
-        assert_round_trip(ProjectManifest {
+        assert_round_trip(&ProjectManifest {
             version: CURRENT_MANIFEST_SCHEMA_VERSION,
             project_slug: "acme-core".to_string(),
             dolt_db_name: None,

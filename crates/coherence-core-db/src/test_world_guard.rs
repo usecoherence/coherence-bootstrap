@@ -175,15 +175,9 @@ fn refuse_manifest_bound_dev_catalog_for_test_writes(
          \n\
          Cause: resolved `DOLT_DB`={database:?} matches dev-tier name {dev_catalog:?} derived from `{env_name}=dev` rules; use the **test** tier or a disposable database.\n\
          \n\
-         {remediation}\
+         {STANDARD_REMEDIATION_TARGETS}\
          \n\
-         Fix: export `{env_name}=test` (as in `scripts/with-isolated-test-profile`) and avoid overriding `DOLT_DB` with the dev catalog, or use a disposable `coherence_test_*` name / `{allow_var}`.",
-        context = context,
-        database = database,
-        dev_catalog = dev_catalog,
-        env_name = env_name,
-        remediation = STANDARD_REMEDIATION_TARGETS,
-        allow_var = TEST_WORLD_ALLOWLIST_ENV_VAR,
+         Fix: export `{env_name}=test` (as in `scripts/with-isolated-test-profile`) and avoid overriding `DOLT_DB` with the dev catalog, or use a disposable `coherence_test_*` name / `{TEST_WORLD_ALLOWLIST_ENV_VAR}`.",
     ))
 }
 
@@ -355,28 +349,29 @@ mod tests {
 
     /// Test harness that locks env, snapshots env, clears guard vars, creates a temporary git repo
     /// with the given manifest, chdirs into it, and sets `COHERENCE_DB_PROFILE=test`.
+    #[allow(dead_code)]
     struct TestHarness {
-        _lock: std::sync::MutexGuard<'static, ()>,
-        _restore: SavedTestEnv,
-        _tmp: tempfile::TempDir,
-        _cwd: SaveCwd,
+        lock: std::sync::MutexGuard<'static, ()>,
+        restore: SavedTestEnv,
+        tmp: tempfile::TempDir,
+        cwd: SaveCwd,
     }
 
     impl TestHarness {
         fn with_manifest(body: &str) -> Self {
-            let _lock = lock_test_env();
-            let _restore = SavedTestEnv::snapshot(SNAPSHOT_KEYS);
+            let lock = lock_test_env();
+            let restore = SavedTestEnv::snapshot(SNAPSHOT_KEYS);
             clear_guard_env();
-            let _tmp = tmp_git_repo();
-            std::fs::create_dir_all(_tmp.path().join(".coherence")).unwrap();
-            std::fs::write(_tmp.path().join(".coherence/project.toml"), body).unwrap();
-            let _cwd = SaveCwd::chdir(_tmp.path());
+            let tmp = tmp_git_repo();
+            std::fs::create_dir_all(tmp.path().join(".coherence")).unwrap();
+            std::fs::write(tmp.path().join(".coherence/project.toml"), body).unwrap();
+            let cwd = SaveCwd::chdir(tmp.path());
             env::set_var(PROFILE_ENV_VAR, "test");
             Self {
-                _lock,
-                _restore,
-                _tmp,
-                _cwd,
+                lock,
+                restore,
+                tmp,
+                cwd,
             }
         }
     }
