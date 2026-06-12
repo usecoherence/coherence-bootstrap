@@ -355,122 +355,107 @@ mod tests {
         format!("{prefix}-{nanos}-{}", std::process::id())
     }
 
+    fn setup_verified_loc(
+        conn: &mut Conn,
+        suf: &str,
+        prefix: &str,
+        command: Option<&str>,
+    ) -> (String, String) {
+        let ac_id = format!("AC-{prefix}-{suf}");
+        let loc_id = format!("LOC-{prefix}-{suf}");
+        let link_id = format!("LNK-{prefix}-{suf}");
+        let mut loc = CodeLocation::new(loc_id.clone(), ".", ".");
+        loc.kind = CodeLocationKind::TestCommand;
+        loc.test_command = command.map(String::from);
+        loc.created_at = "t1".to_string();
+        loc.updated_at = "t1".to_string();
+        ac_code_link_store::put_code_location(conn, &loc).expect("put_code_location");
+        let mut link = AcCodeLink::new(link_id, ac_id.clone(), loc_id, AcCodeRelationKind::VerifiedBy);
+        link.created_at = "t2".to_string();
+        link.updated_at = "t2".to_string();
+        ac_code_link_store::put_ac_code_link(conn, &link).expect("put_ac_code_link");
+        (ac_id, suf.to_string())
+    }
+
+    fn setup_spec_and_ac(conn: &mut Conn, suf: &str, prefix: &str, title: &str) -> String {
+        let spec_id = format!("SPEC-{prefix}-{suf}");
+        let mut spec = Spec::new(spec_id.clone(), title);
+        spec.description = "core-db verify-spec".to_string();
+        spec.created_at = "ts".to_string();
+        spec.updated_at = "ts".to_string();
+        spec_store::put_spec(conn, &spec).expect("put_spec");
+        spec_id
+    }
+
+    fn setup_ac_for_spec(conn: &mut Conn, ac_id: &str, spec_id: &str, title: &str) {
+        let mut ac = AcceptanceCriterion::new(ac_id.to_string(), spec_id.to_string(), title);
+        ac.intent = "verify-spec counts".to_string();
+        ac.created_at = "ta".to_string();
+        ac.updated_at = "ta".to_string();
+        spec_store::put_acceptance_criterion(conn, &ac).expect("put_ac");
+    }
+
+    fn conn_or_skip() -> Option<test_world_guard::EnvConnLock<Conn>> {
+        maybe_conn()
+    }
+
     #[test]
     fn verify_ac_no_links_no_verification() {
-        let Some(mut conn) = maybe_conn() else {
-            return;
-        };
+        let Some(mut conn) = conn_or_skip() else { return };
         let suf = unique_label("VFY-NONE");
         let ac_id = format!("AC-VFY-NONE-{suf}");
-
         let got = verify_acceptance_criterion(&mut conn, &ac_id).expect("verify");
-        assert!(got.no_verification_links);
-        assert!(got.links.is_empty());
-        assert_eq!(got.exit_code(), 0);
-        assert_eq!(got.overall_status_label(), "no_verification");
+        assert_eq!((got.no_verification_links, got.links.len(), got.exit_code(), got.overall_status_label()), (true, 0, 0, "no_verification"));
     }
 
     #[test]
     fn verify_ac_skips_non_verified_relation() {
-        let Some(mut conn) = maybe_conn() else {
-            return;
-        };
-
+        let Some(mut conn) = conn_or_skip() else { return };
         let suf = unique_label("VFY-SKIPREL");
         let ac_id = format!("AC-VFY-SR-{suf}");
         let loc_id = format!("LOC-VFY-SR-{suf}");
-        let link_id = format!("LNK-VFY-SR-{suf}");
-
         let mut loc = CodeLocation::new(loc_id.clone(), ".", ".");
         loc.kind = CodeLocationKind::TestCommand;
         loc.test_command = Some("exit 1".to_string());
         loc.created_at = "t1".to_string();
         loc.updated_at = "t1".to_string();
         ac_code_link_store::put_code_location(&mut conn, &loc).expect("put_code_location");
-
-        let mut link = AcCodeLink::new(
-            link_id,
-            ac_id.clone(),
-            loc_id,
-            AcCodeRelationKind::ImplementedBy,
-        );
+        let mut link = AcCodeLink::new(format!("LNK-VFY-SR-{suf}"), ac_id.clone(), loc_id, AcCodeRelationKind::ImplementedBy);
         link.created_at = "t2".to_string();
         link.updated_at = "t2".to_string();
         ac_code_link_store::put_ac_code_link(&mut conn, &link).expect("put_ac_code_link");
-
         let got = verify_acceptance_criterion(&mut conn, &ac_id).expect("verify");
-        assert!(got.no_verification_links);
-        assert!(got.links.is_empty());
-        assert_eq!(got.exit_code(), 0);
+        assert_eq!((got.no_verification_links, got.links.len(), got.exit_code()), (true, 0, 0));
     }
 
     #[test]
     fn verify_ac_skips_missing_command() {
-        let Some(mut conn) = maybe_conn() else {
-            return;
-        };
-
+        let Some(mut conn) = conn_or_skip() else { return };
         let suf = unique_label("VFY-NOCMD");
         let ac_id = format!("AC-VFY-NC-{suf}");
         let loc_id = format!("LOC-VFY-NC-{suf}");
-        let link_id = format!("LNK-VFY-NC-{suf}");
-
         let mut loc = CodeLocation::new(loc_id.clone(), ".", ".");
         loc.kind = CodeLocationKind::TestFile;
         loc.test_command = None;
         loc.created_at = "t1".to_string();
         loc.updated_at = "t1".to_string();
         ac_code_link_store::put_code_location(&mut conn, &loc).expect("put_code_location");
-
-        let mut link = AcCodeLink::new(
-            link_id,
-            ac_id.clone(),
-            loc_id,
-            AcCodeRelationKind::VerifiedBy,
-        );
+        let mut link = AcCodeLink::new(format!("LNK-VFY-NC-{suf}"), ac_id.clone(), loc_id, AcCodeRelationKind::VerifiedBy);
         link.created_at = "t2".to_string();
         link.updated_at = "t2".to_string();
         ac_code_link_store::put_ac_code_link(&mut conn, &link).expect("put_ac_code_link");
-
         let got = verify_acceptance_criterion(&mut conn, &ac_id).expect("verify");
         assert!(!got.no_verification_links);
         assert_eq!(got.links.len(), 1);
-        assert!(matches!(
-            got.links[0].status,
-            AcVerifyLinkStatus::Skipped { .. }
-        ));
-        assert_eq!(got.exit_code(), 0);
-        assert_eq!(got.overall_status_label(), "skipped");
+        assert!(matches!(got.links[0].status, AcVerifyLinkStatus::Skipped { .. }));
+        assert_eq!((got.exit_code(), got.overall_status_label()), (0, "skipped"));
     }
 
     #[test]
     fn verify_ac_passes_true_command() {
-        let Some(mut conn) = maybe_conn() else {
-            return;
-        };
-
+        let Some(mut conn) = conn_or_skip() else { return };
         let suf = unique_label("VFY-OK");
-        let ac_id = format!("AC-VFY-OK-{suf}");
-        let loc_id = format!("LOC-VFY-OK-{suf}");
-        let link_id = format!("LNK-VFY-OK-{suf}");
-
-        let mut loc = CodeLocation::new(loc_id.clone(), ".", ".");
-        loc.kind = CodeLocationKind::TestCommand;
-        loc.test_command = Some("true".to_string());
-        loc.created_at = "t1".to_string();
-        loc.updated_at = "t1".to_string();
-        ac_code_link_store::put_code_location(&mut conn, &loc).expect("put_code_location");
-
-        let mut link = AcCodeLink::new(
-            link_id,
-            ac_id.clone(),
-            loc_id,
-            AcCodeRelationKind::VerifiedBy,
-        );
-        link.created_at = "t2".to_string();
-        link.updated_at = "t2".to_string();
-        ac_code_link_store::put_ac_code_link(&mut conn, &link).expect("put_ac_code_link");
-
+        let (ac_id, _) = setup_verified_loc(&mut conn, &suf, "VFY-OK", Some("true"));
         let got = verify_acceptance_criterion(&mut conn, &ac_id).expect("verify");
         assert!(!got.no_verification_links);
         assert_eq!(got.links.len(), 1);
@@ -478,91 +463,40 @@ mod tests {
         assert_eq!(got.exit_code(), 0);
         assert_eq!(got.overall_status_label(), "passed");
         let latest = ac_verification_store::get_ac_verification_latest(&mut conn, &ac_id)
-            .expect("latest")
-            .expect("recorded");
+            .expect("latest").expect("recorded");
         assert_eq!(latest.overall_status.as_label(), "passed");
     }
 
     #[test]
     fn verify_ac_fails_false_command() {
-        let Some(mut conn) = maybe_conn() else {
-            return;
-        };
-
+        let Some(mut conn) = conn_or_skip() else { return };
         let suf = unique_label("VFY-BAD");
-        let ac_id = format!("AC-VFY-BAD-{suf}");
-        let loc_id = format!("LOC-VFY-BAD-{suf}");
-        let link_id = format!("LNK-VFY-BAD-{suf}");
-
-        let mut loc = CodeLocation::new(loc_id.clone(), ".", ".");
-        loc.kind = CodeLocationKind::TestCommand;
-        loc.test_command = Some("false".to_string());
-        loc.created_at = "t1".to_string();
-        loc.updated_at = "t1".to_string();
-        ac_code_link_store::put_code_location(&mut conn, &loc).expect("put_code_location");
-
-        let mut link = AcCodeLink::new(
-            link_id,
-            ac_id.clone(),
-            loc_id,
-            AcCodeRelationKind::VerifiedBy,
-        );
-        link.created_at = "t2".to_string();
-        link.updated_at = "t2".to_string();
-        ac_code_link_store::put_ac_code_link(&mut conn, &link).expect("put_ac_code_link");
-
+        let (ac_id, _) = setup_verified_loc(&mut conn, &suf, "VFY-BAD", Some("false"));
         let got = verify_acceptance_criterion(&mut conn, &ac_id).expect("verify");
         assert_eq!(got.links.len(), 1);
-        assert!(matches!(
-            got.links[0].status,
-            AcVerifyLinkStatus::Failed { exit_code } if exit_code != 0
-        ));
-        assert_eq!(got.exit_code(), 1);
-        assert_eq!(got.overall_status_label(), "failed");
+        assert!(matches!(got.links[0].status, AcVerifyLinkStatus::Failed { exit_code } if exit_code != 0));
+        assert_eq!((got.exit_code(), got.overall_status_label()), (1, "failed"));
     }
 
     #[test]
     fn verify_ac_round_trip_with_spec_row() {
-        let Some(mut conn) = maybe_conn() else {
-            return;
-        };
-
+        let Some(mut conn) = conn_or_skip() else { return };
         let suf = unique_label("VFY-SPEC");
-        let spec_id = format!("SPEC-VFY-{suf}");
+        let spec_id = setup_spec_and_ac(&mut conn, &suf, "VFY", "Verify AC runner");
         let ac_id = format!("AC-VFY-SPEC-{suf}");
+        setup_ac_for_spec(&mut conn, &ac_id, &spec_id, "Runnable AC");
         let loc_id = format!("LOC-VFY-SPEC-{suf}");
-        let link_id = format!("LNK-VFY-SPEC-{suf}");
-
-        let mut spec = Spec::new(spec_id.clone(), "Verify AC runner");
-        spec.description = "core-db verify-ac".to_string();
-        spec.created_at = "ts".to_string();
-        spec.updated_at = "ts".to_string();
-        spec_store::put_spec(&mut conn, &spec).expect("put_spec");
-
-        let mut ac = AcceptanceCriterion::new(ac_id.clone(), spec_id, "Runnable AC");
-        ac.intent = "verified_by true".to_string();
-        ac.created_at = "ta".to_string();
-        ac.updated_at = "ta".to_string();
-        spec_store::put_acceptance_criterion(&mut conn, &ac).expect("put_ac");
-
         let mut loc = CodeLocation::new(loc_id.clone(), ".", ".");
         loc.kind = CodeLocationKind::TestCommand;
         loc.test_command = Some("echo verify-ac-smoke".to_string());
         loc.created_at = "tl".to_string();
         loc.updated_at = "tl".to_string();
         ac_code_link_store::put_code_location(&mut conn, &loc).expect("put_code_location");
-
-        let mut link = AcCodeLink::new(
-            link_id,
-            ac_id.clone(),
-            loc_id,
-            AcCodeRelationKind::VerifiedBy,
-        );
+        let mut link = AcCodeLink::new(format!("LNK-VFY-SPEC-{suf}"), ac_id.clone(), loc_id, AcCodeRelationKind::VerifiedBy);
         link.note = String::new();
         link.created_at = "tln".to_string();
         link.updated_at = "tln".to_string();
         ac_code_link_store::put_ac_code_link(&mut conn, &link).expect("put_ac_code_link");
-
         let got = verify_acceptance_criterion(&mut conn, &ac_id).expect("verify");
         assert_eq!(got.ac_id, ac_id);
         assert!(!got.no_verification_links);
@@ -576,9 +510,7 @@ mod tests {
 
     #[test]
     fn verify_spec_requires_spec_row() {
-        let Some(mut conn) = maybe_conn() else {
-            return;
-        };
+        let Some(mut conn) = conn_or_skip() else { return };
         let suf = unique_label("VSPEC-NO");
         let spec_id = format!("SPEC-VS-NONE-{suf}");
         let err = verify_spec(&mut conn, &spec_id).expect_err("expected err");
@@ -587,140 +519,38 @@ mod tests {
 
     #[test]
     fn verify_spec_aggregate_counts_per_ac_status() {
-        let Some(mut conn) = maybe_conn() else {
-            return;
-        };
-
+        let Some(mut conn) = conn_or_skip() else { return };
         let suf = unique_label("VSPEC-MIX");
-        let spec_id = format!("SPEC-VS-MIX-{suf}");
-
-        let mut spec = Spec::new(spec_id.clone(), "Verify-spec mix");
-        spec.description = "core-db verify-spec".to_string();
-        spec.created_at = "ts".to_string();
-        spec.updated_at = "ts".to_string();
-        spec_store::put_spec(&mut conn, &spec).expect("put_spec");
-
+        let spec_id = setup_spec_and_ac(&mut conn, &suf, "VS-MIX", "Verify-spec mix");
         let ac_no = format!("AC-VS-NV-{suf}");
         let ac_skip = format!("AC-VS-SK-{suf}");
         let ac_pass = format!("AC-VS-OK-{suf}");
-
-        for (id, title) in [
-            (&ac_no, "No links"),
-            (&ac_skip, "Skipped runner"),
-            (&ac_pass, "Passing runner"),
-        ] {
-            let mut ac = AcceptanceCriterion::new((*id).clone(), spec_id.clone(), title);
-            ac.intent = "verify-spec counts".to_string();
-            ac.created_at = "ta".to_string();
-            ac.updated_at = "ta".to_string();
-            spec_store::put_acceptance_criterion(&mut conn, &ac).expect("put_ac");
-        }
-
-        let loc_skip = format!("LOC-VS-SK-{suf}");
-        let mut loc_s = CodeLocation::new(loc_skip.clone(), ".", ".");
-        loc_s.kind = CodeLocationKind::TestCommand;
-        loc_s.test_command = None;
-        loc_s.created_at = "tl".to_string();
-        loc_s.updated_at = "tl".to_string();
-        ac_code_link_store::put_code_location(&mut conn, &loc_s).expect("put_code_location");
-
-        let mut link_s = AcCodeLink::new(
-            format!("LNK-VS-SK-{suf}"),
-            ac_skip.clone(),
-            loc_skip,
-            AcCodeRelationKind::VerifiedBy,
-        );
-        link_s.created_at = "tln".to_string();
-        link_s.updated_at = "tln".to_string();
-        ac_code_link_store::put_ac_code_link(&mut conn, &link_s).expect("put_ac_code_link");
-
-        let loc_ok = format!("LOC-VS-OK-{suf}");
-        let mut loc_o = CodeLocation::new(loc_ok.clone(), ".", ".");
-        loc_o.kind = CodeLocationKind::TestCommand;
-        loc_o.test_command = Some("true".to_string());
-        loc_o.created_at = "tl".to_string();
-        loc_o.updated_at = "tl".to_string();
-        ac_code_link_store::put_code_location(&mut conn, &loc_o).expect("put_code_location");
-
-        let mut link_o = AcCodeLink::new(
-            format!("LNK-VS-OK-{suf}"),
-            ac_pass.clone(),
-            loc_ok,
-            AcCodeRelationKind::VerifiedBy,
-        );
-        link_o.created_at = "tln".to_string();
-        link_o.updated_at = "tln".to_string();
-        ac_code_link_store::put_ac_code_link(&mut conn, &link_o).expect("put_ac_code_link");
-
+        setup_ac_for_spec(&mut conn, &ac_no, &spec_id, "No links");
+        setup_ac_for_spec(&mut conn, &ac_skip, &spec_id, "Skipped runner");
+        setup_ac_for_spec(&mut conn, &ac_pass, &spec_id, "Passing runner");
+        let _ = setup_verified_loc(&mut conn, &suf, "VS-SK", None);
+        setup_verified_loc(&mut conn, &suf, "VS-OK", Some("true"));
         let report = verify_spec(&mut conn, &spec_id).expect("verify_spec");
-        assert_eq!(report.spec_id, spec_id);
-        assert_eq!(report.acceptance_criteria, 3);
-        assert_eq!(report.no_verification, 1);
-        assert_eq!(report.skipped, 1);
-        assert_eq!(report.passed, 1);
-        assert_eq!(report.failed, 0);
-        assert_eq!(report.exit_code(), 0);
+        assert_eq!((report.spec_id.as_str(), report.acceptance_criteria, report.no_verification, report.skipped, report.passed, report.failed, report.exit_code()),
+                   (spec_id.as_str(), 3, 1, 1, 1, 0, 0));
         assert_eq!(report.ac_results.len(), 3);
-        assert!(report
-            .ac_results
-            .iter()
-            .any(|r| r.ac_id == ac_no && r.overall_status_label() == "no_verification"));
-        assert!(report
-            .ac_results
-            .iter()
-            .any(|r| r.ac_id == ac_skip && r.overall_status_label() == "skipped"));
-        assert!(report
-            .ac_results
-            .iter()
-            .any(|r| r.ac_id == ac_pass && r.overall_status_label() == "passed"));
+        assert!(report.ac_results.iter().any(|r| r.ac_id == ac_no && r.overall_status_label() == "no_verification"));
+        assert!(report.ac_results.iter().any(|r| r.ac_id == ac_skip && r.overall_status_label() == "skipped"));
+        assert!(report.ac_results.iter().any(|r| r.ac_id == ac_pass && r.overall_status_label() == "passed"));
         let latest = ac_verification_store::get_ac_verification_latest(&mut conn, &ac_pass)
-            .expect("latest")
-            .expect("recorded");
+            .expect("latest").expect("recorded");
         assert_eq!(latest.overall_status.as_label(), "passed");
     }
 
     #[test]
     fn verify_spec_nonzero_exit_when_any_command_fails() {
-        let Some(mut conn) = maybe_conn() else {
-            return;
-        };
-
+        let Some(mut conn) = conn_or_skip() else { return };
         let suf = unique_label("VSPEC-FAIL");
-        let spec_id = format!("SPEC-VS-FAIL-{suf}");
-
-        let mut spec = Spec::new(spec_id.clone(), "Verify-spec fail");
-        spec.description = "core-db verify-spec".to_string();
-        spec.created_at = "ts".to_string();
-        spec.updated_at = "ts".to_string();
-        spec_store::put_spec(&mut conn, &spec).expect("put_spec");
-
+        let spec_id = setup_spec_and_ac(&mut conn, &suf, "VS-FAIL", "Verify-spec fail");
         let ac_id = format!("AC-VS-FAIL-{suf}");
-        let mut ac = AcceptanceCriterion::new(ac_id.clone(), spec_id.clone(), "Fails");
-        ac.intent = "false".to_string();
-        ac.created_at = "ta".to_string();
-        ac.updated_at = "ta".to_string();
-        spec_store::put_acceptance_criterion(&mut conn, &ac).expect("put_ac");
-
-        let loc_id = format!("LOC-VS-FAIL-{suf}");
-        let mut loc = CodeLocation::new(loc_id.clone(), ".", ".");
-        loc.kind = CodeLocationKind::TestCommand;
-        loc.test_command = Some("false".to_string());
-        loc.created_at = "tl".to_string();
-        loc.updated_at = "tl".to_string();
-        ac_code_link_store::put_code_location(&mut conn, &loc).expect("put_code_location");
-
-        let mut link = AcCodeLink::new(
-            format!("LNK-VS-FAIL-{suf}"),
-            ac_id.clone(),
-            loc_id,
-            AcCodeRelationKind::VerifiedBy,
-        );
-        link.created_at = "tln".to_string();
-        link.updated_at = "tln".to_string();
-        ac_code_link_store::put_ac_code_link(&mut conn, &link).expect("put_ac_code_link");
-
+        setup_ac_for_spec(&mut conn, &ac_id, &spec_id, "Fails");
+        setup_verified_loc(&mut conn, &suf, "VS-FAIL", Some("false"));
         let report = verify_spec(&mut conn, &spec_id).expect("verify_spec");
-        assert_eq!(report.failed, 1);
-        assert_eq!(report.exit_code(), 1);
+        assert_eq!((report.failed, report.exit_code()), (1, 1));
     }
 }
