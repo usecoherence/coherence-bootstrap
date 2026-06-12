@@ -160,6 +160,27 @@ Operators select the logical catalog with **`DOLT_DB`**, or derive it from the m
 
 Verification helper: **`./scripts/user-scoped-dolt-smoke.sh`** (isolated **`/tmp`** unless **`COHERENCE_USER_SCOPED_SMOKE_ROOT`** overrides).
 
+### Agent Dolt connectivity (read this)
+
+**Never use raw `dolt sql -q "SELECT ..."` to query the running Dolt server.** The `dolt sql` CLI command starts its own local Dolt engine (scanning for `.dolt/` in cwd), **not** the running `dolt sql-server`. Even with `DOLT_SOCKET` exported, `dolt sql` ignores it — only `dolt sql-client` or direct MySQL clients respect the socket variable.
+
+Always use the Rust CLI to query or mutate Dolt state:
+
+```bash
+# List specs, ACs, databases, connection state
+cargo run -p coherence-core-db --bin coherence-core-db -- spec list
+cargo run -p coherence-core-db --bin coherence-core-db -- ac list --spec-id <ID>
+cargo run -p coherence-core-db --bin coherence-core-db -- db list-databases
+cargo run -p coherence-core-db --bin coherence-core-db -- db ping
+
+# Or via make
+make tool dolt-status
+```
+
+If you must use MySQL-protocol directly, use `mysql -S <socket>` (requires `mysql` CLI) or `dolt sql-client -q "..."` (requires the `DOLT_SOCKET` env var, **not** the `dolt sql` command).
+
+See `.coherence/architecture-report.md:section-9` for details.
+
 Interactive commands that **curate** the database (`migrate`, `spec add`, `ac add`, …) are for intentional work on the canonical catalog and are not gated by the test-world profile—the guard applies to automated tests and mutating smoke only.
 
 - `ac-tests materialize-rust` loads the spec graph using normal `DOLT_SOCKET` / `DOLT_DB` (and runs migrations like `spec list` so the schema is current). It only creates **missing** files under `<workspace>/tests/ac/` and never overwrites, then **upserts** matching `codeintel_code_locations` + `codeintel_ac_links` (`verified_by`, kind `test_file`) for every expected path that exists on disk so `verify-ac` sees the same files as the graph. **`COHERENCE_DB_PROFILE=test` is not required**: the command does not invoke the isolated test-world guard; catalog writes here are explicit product behavior (contrast with smoke/tests, which stay isolated).
