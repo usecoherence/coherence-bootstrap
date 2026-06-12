@@ -13,6 +13,7 @@ __pycache__/
 
 # Beads / Dolt files (added by bd init)
 .dolt/
+.doltcfg/
 *.db
 .beads-credential-key
 config.yaml

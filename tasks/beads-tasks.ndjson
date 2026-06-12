@@ -1,3 +1,0 @@
-{"id":"BOOT-1","title":"Verify generated CLI scaffold","status":"open","priority":"P1","deliverables":["make tool doctor runs","make tool context prints product statement","make tool run passes"],"verification":"make tool doctor && make tool context && make tool run"}
-{"id":"BOOT-2","title":"Define first product/spec context","status":"open","priority":"P1","deliverables":["product statement updated through spec workflow","initial AC placeholder exists"],"verification":"make tool context"}
-{"id":"BOOT-3","title":"Wire real task and deliverable backend","status":"open","priority":"P2","deliverables":["beads backend connected","beads-deliverables contract flow verified"],"verification":"make tool doctor && make tool next"}
