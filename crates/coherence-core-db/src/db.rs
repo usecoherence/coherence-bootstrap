@@ -334,37 +334,35 @@ fn default_database_name() -> String {
 }
 
 fn socket_opts(config: &ConnectionConfig) -> OptsBuilder {
-    OptsBuilder::new()
-        .user(Some(config.user.clone()))
-        .pass(config.password.clone())
+    base_opts(config)
         .db_name(Some(config.database.clone()))
         .socket(Some(config.socket_path.to_string_lossy().to_string()))
 }
 
 fn tcp_opts(config: &ConnectionConfig) -> OptsBuilder {
-    OptsBuilder::new()
-        .user(Some(config.user.clone()))
-        .pass(config.password.clone())
+    base_opts(config)
         .db_name(Some(config.database.clone()))
         .ip_or_hostname(Some(config.host.clone()))
         .tcp_port(config.port)
 }
 
 fn socket_opts_no_db(config: &ConnectionConfig) -> OptsBuilder {
-    OptsBuilder::new()
-        .user(Some(config.user.clone()))
-        .pass(config.password.clone())
+    base_opts(config)
         .db_name(None::<String>)
         .socket(Some(config.socket_path.to_string_lossy().to_string()))
 }
 
 fn tcp_opts_no_db(config: &ConnectionConfig) -> OptsBuilder {
-    OptsBuilder::new()
-        .user(Some(config.user.clone()))
-        .pass(config.password.clone())
+    base_opts(config)
         .db_name(None::<String>)
         .ip_or_hostname(Some(config.host.clone()))
         .tcp_port(config.port)
+}
+
+fn base_opts(config: &ConnectionConfig) -> OptsBuilder {
+    OptsBuilder::new()
+        .user(Some(config.user.clone()))
+        .pass(config.password.clone())
 }
 
 pub fn connect_without_database(
@@ -378,24 +376,26 @@ fn connect_with_fallback(
     socket: OptsBuilder,
     tcp: OptsBuilder,
 ) -> Result<(Conn, ConnectionMode), String> {
-    match Conn::new(socket) {
-        Ok(conn) => Ok((conn, ConnectionMode::Socket)),
-        Err(socket_err) => {
-            eprintln!(
-                "connection: socket failed at {} ({socket_err})",
-                config.socket_path.display()
-            );
-            match Conn::new(tcp) {
-                Ok(conn) => Ok((conn, ConnectionMode::TcpFallback)),
-                Err(tcp_err) => Err(format!(
-                    "connection failed: socket={} then tcp={}:{} ({tcp_err})",
-                    config.socket_path.display(),
-                    config.host,
-                    config.port,
-                )),
-            }
-        }
-    }
+    let socket_err = match Conn::new(socket) {
+        Ok(conn) => return Ok((conn, ConnectionMode::Socket)),
+        Err(err) => err,
+    };
+
+    eprintln!(
+        "connection: socket failed at {} ({socket_err})",
+        config.socket_path.display()
+    );
+    Conn::new(tcp).map_or_else(
+        |tcp_err| {
+            Err(format!(
+                "connection failed: socket={} then tcp={}:{} ({tcp_err})",
+                config.socket_path.display(),
+                config.host,
+                config.port,
+            ))
+        },
+        |conn| Ok((conn, ConnectionMode::TcpFallback)),
+    )
 }
 
 /// Runs `SELECT 1` without selecting `ConnectionConfig.database` first (server readiness).
