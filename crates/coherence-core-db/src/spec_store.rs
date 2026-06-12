@@ -143,30 +143,8 @@ pub fn load_spec_graph(conn: &mut Conn) -> Result<SpecGraph, String> {
 }
 
 pub fn put_acceptance_criterion(conn: &mut Conn, ac: &AcceptanceCriterion) -> Result<(), String> {
-    if ac.slug.is_empty() {
-        return Err(format!(
-            "acceptance criterion {}: slug must not be empty",
-            ac.id
-        ));
-    }
-
-    let clash: Option<String> = conn
-        .exec_first(
-            r"SELECT id FROM acceptance_criteria
-              WHERE spec_id = :spec_id AND slug = :slug AND id <> :id",
-            params! {
-                "spec_id" => ac.spec_id.as_str(),
-                "slug" => ac.slug.as_str(),
-                "id" => ac.id.as_str(),
-            },
-        )
-        .map_err(|err| format!("failed to check slug uniqueness for {}: {err}", ac.id))?;
-    if let Some(other_id) = clash {
-        return Err(format!(
-            "acceptance criterion slug {:?} is already used in spec {} by {}",
-            ac.slug, ac.spec_id, other_id
-        ));
-    }
+    reject_empty_slug(ac)?;
+    reject_duplicate_slug_in_spec(conn, ac)?;
 
     conn.exec_drop(
         r"INSERT INTO acceptance_criteria (
@@ -212,6 +190,41 @@ pub fn put_acceptance_criterion(conn: &mut Conn, ac: &AcceptanceCriterion) -> Re
     )
     .map_err(|err| format!("failed to put acceptance criterion {}: {err}", ac.id))?;
 
+    replace_ac_concerns(conn, ac)
+}
+
+fn reject_empty_slug(ac: &AcceptanceCriterion) -> Result<(), String> {
+    if ac.slug.is_empty() {
+        return Err(format!(
+            "acceptance criterion {}: slug must not be empty",
+            ac.id
+        ));
+    }
+    Ok(())
+}
+
+fn reject_duplicate_slug_in_spec(conn: &mut Conn, ac: &AcceptanceCriterion) -> Result<(), String> {
+    let clash: Option<String> = conn
+        .exec_first(
+            r"SELECT id FROM acceptance_criteria
+              WHERE spec_id = :spec_id AND slug = :slug AND id <> :id",
+            params! {
+                "spec_id" => ac.spec_id.as_str(),
+                "slug" => ac.slug.as_str(),
+                "id" => ac.id.as_str(),
+            },
+        )
+        .map_err(|err| format!("failed to check slug uniqueness for {}: {err}", ac.id))?;
+    if let Some(other_id) = clash {
+        return Err(format!(
+            "acceptance criterion slug {:?} is already used in spec {} by {}",
+            ac.slug, ac.spec_id, other_id
+        ));
+    }
+    Ok(())
+}
+
+fn replace_ac_concerns(conn: &mut Conn, ac: &AcceptanceCriterion) -> Result<(), String> {
     conn.exec_drop(
         "DELETE FROM acceptance_criterion_concerns WHERE ac_id = :ac_id",
         params! {
@@ -248,12 +261,7 @@ pub fn get_acceptance_criterion(
             },
         )
         .map_err(|err| format!("failed to get acceptance criterion {ac_id}: {err}"))?;
-    let Some(row) = row else {
-        return Ok(None);
-    };
-    let mut ac = acceptance_criterion_from_row(row)?;
-    ac.concerns = concerns_for_ac(conn, &ac.id)?;
-    Ok(Some(ac))
+    row.map(|r| ac_from_row_with_concerns(conn, r)).transpose()
 }
 
 pub fn list_acceptance_criteria_for_spec(
@@ -272,13 +280,18 @@ pub fn list_acceptance_criteria_for_spec(
         )
         .map_err(|err| format!("failed to list ACs for {spec_id}: {err}"))?;
 
-    let mut result = Vec::with_capacity(rows.len());
-    for row in rows {
-        let mut ac = acceptance_criterion_from_row(row)?;
-        ac.concerns = concerns_for_ac(conn, &ac.id)?;
-        result.push(ac);
-    }
-    Ok(result)
+    rows.into_iter()
+        .map(|r| ac_from_row_with_concerns(conn, r))
+        .collect()
+}
+
+fn ac_from_row_with_concerns(
+    conn: &mut Conn,
+    row: AcceptanceCriterionRow,
+) -> Result<AcceptanceCriterion, String> {
+    let mut ac = acceptance_criterion_from_row(row)?;
+    ac.concerns = concerns_for_ac(conn, &ac.id)?;
+    Ok(ac)
 }
 
 pub fn put_spec_relation(conn: &mut Conn, relation: &SpecRelation) -> Result<(), String> {

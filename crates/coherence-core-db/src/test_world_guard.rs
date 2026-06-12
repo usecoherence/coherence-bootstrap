@@ -108,20 +108,21 @@ fn resolved_database_identity_allows_writes(config: &ConnectionConfig) -> Result
                 "resolved `DOLT_DB` matches canonical `{PROJECT_SLUG_ENV_VAR}`={slug:?} (ASCII case-insensitive); refusing mutating workflows against curated catalog identity"
             ));
         }
+        return Ok(());
     }
 
-    let disposable_ok = database_has_disposable_prefix(database);
-    let allowlist_ok = database_is_explicitly_allowlisted(database);
-    let non_canonical_named = slug_opt.is_some(); // ensured != slug above when slug set
-
-    if disposable_ok || allowlist_ok || non_canonical_named {
-        Ok(())
-    } else {
-        let prefix = configured_test_db_prefix();
-        Err(format!(
-            "resolved `DOLT_DB`={database:?} is not disposable (expected prefix {prefix:?} via `COHERENCE_TEST_DB_PREFIX` or an entry in `{TEST_WORLD_ALLOWLIST_ENV_VAR}`), and `{PROJECT_SLUG_ENV_VAR}` is unset — cannot prove a non-canonical disposable target",
-        ))
+    if database_has_disposable_prefix(database) {
+        return Ok(());
     }
+
+    if database_is_explicitly_allowlisted(database) {
+        return Ok(());
+    }
+
+    let prefix = configured_test_db_prefix();
+    Err(format!(
+        "resolved `DOLT_DB`={database:?} is not disposable (expected prefix {prefix:?} via `COHERENCE_TEST_DB_PREFIX` or an entry in `{TEST_WORLD_ALLOWLIST_ENV_VAR}`), and `{PROJECT_SLUG_ENV_VAR}` is unset — cannot prove a non-canonical disposable target",
+    ))
 }
 
 fn check_test_world_expectation(database: &str) -> Result<(), String> {
@@ -333,19 +334,6 @@ mod tests {
         tmp
     }
 
-    fn write_v2_manifest_with_hash(repo: &std::path::Path) {
-        std::fs::create_dir_all(repo.join(".coherence")).unwrap();
-        std::fs::write(
-            repo.join(".coherence/project.toml"),
-            r#"version = 2
-project_slug = "svc"
-project_hash = "cafe"
-dolt_mode = "user-scoped"
-"#,
-        )
-        .unwrap();
-    }
-
     struct SavedTestEnv {
         pairs: Vec<(String, Option<String>)>,
     }
@@ -392,6 +380,29 @@ dolt_mode = "user-scoped"
         env::remove_var("DOLT_DB");
     }
 
+    /// Test harness that locks env, snapshots env, clears guard vars, creates a temporary git repo
+    /// with the given manifest, chdirs into it, and sets `COHERENCE_DB_PROFILE=test`.
+    struct TestHarness {
+        _lock: std::sync::MutexGuard<'static, ()>,
+        _restore: SavedTestEnv,
+        _tmp: tempfile::TempDir,
+        _cwd: SaveCwd,
+    }
+
+    impl TestHarness {
+        fn with_manifest(body: &str) -> Self {
+            let _lock = lock_test_env();
+            let _restore = SavedTestEnv::snapshot(SNAPSHOT_KEYS);
+            clear_guard_env();
+            let _tmp = tmp_git_repo();
+            std::fs::create_dir_all(_tmp.path().join(".coherence")).unwrap();
+            std::fs::write(_tmp.path().join(".coherence/project.toml"), body).unwrap();
+            let _cwd = SaveCwd::chdir(_tmp.path());
+            env::set_var(PROFILE_ENV_VAR, "test");
+            Self { _lock, _restore, _tmp, _cwd }
+        }
+    }
+
     #[test]
     fn refusal_includes_stable_next_targets_when_unset() {
         let _lock = lock_test_env();
@@ -416,21 +427,12 @@ dolt_mode = "user-scoped"
 
     #[test]
     fn ok_when_profile_test_and_disposable_db() {
-        let _lock = lock_test_env();
-        let _restore = SavedTestEnv::snapshot(SNAPSHOT_KEYS);
-        clear_guard_env();
-        let tmp = tmp_git_repo();
-        std::fs::create_dir_all(tmp.path().join(".coherence")).unwrap();
-        std::fs::write(
-            tmp.path().join(".coherence/project.toml"),
+        let _harness = TestHarness::with_manifest(
             r#"version = 2
 project_slug = "fixture_project"
 dolt_mode = "user-scoped"
 "#,
-        )
-        .unwrap();
-        let _cwd = SaveCwd::chdir(tmp.path());
-        env::set_var(PROFILE_ENV_VAR, "test");
+        );
         let uuid = "550e8400-e29b-41d4-a716-446655440000";
         let config = dummy_config(format!("coherence_test_{uuid}"));
         require_isolated_test_world_for_writes("test_ctx", &config).unwrap();
@@ -438,21 +440,12 @@ dolt_mode = "user-scoped"
 
     #[test]
     fn ok_repo_local_catalog_name_when_user_scoped_dolt_disabled() {
-        let _lock = lock_test_env();
-        let _restore = SavedTestEnv::snapshot(SNAPSHOT_KEYS);
-        clear_guard_env();
-        let tmp = tmp_git_repo();
-        std::fs::create_dir_all(tmp.path().join(".coherence")).unwrap();
-        std::fs::write(
-            tmp.path().join(".coherence/project.toml"),
+        let _harness = TestHarness::with_manifest(
             r#"version = 2
 project_slug = "coherence-core-db"
 dolt_mode = "repo-local"
 "#,
-        )
-        .unwrap();
-        let _cwd = SaveCwd::chdir(tmp.path());
-        env::set_var(PROFILE_ENV_VAR, "test");
+        );
         let config = dummy_config("coherence-core-db");
         require_isolated_test_world_for_writes("test_ctx", &config).unwrap();
     }
@@ -470,21 +463,12 @@ dolt_mode = "repo-local"
 
     #[test]
     fn refuse_when_slug_set_and_database_equals_canonical_even_if_profile_test() {
-        let _lock = lock_test_env();
-        let _restore = SavedTestEnv::snapshot(SNAPSHOT_KEYS);
-        clear_guard_env();
-        let tmp = tmp_git_repo();
-        std::fs::create_dir_all(tmp.path().join(".coherence")).unwrap();
-        std::fs::write(
-            tmp.path().join(".coherence/project.toml"),
+        let _harness = TestHarness::with_manifest(
             r#"version = 2
 project_slug = "coherence-core-db"
 dolt_mode = "user-scoped"
 "#,
-        )
-        .unwrap();
-        let _cwd = SaveCwd::chdir(tmp.path());
-        env::set_var(PROFILE_ENV_VAR, "test");
+        );
         env::set_var(PROJECT_SLUG_ENV_VAR, "Coherence-Core-Db");
         let config = dummy_config("coherence-core-db");
         let msg = require_isolated_test_world_for_writes("test_ctx", &config).unwrap_err();
@@ -500,21 +484,12 @@ dolt_mode = "user-scoped"
 
     #[test]
     fn allow_when_slug_set_but_database_differs_even_without_prefix() {
-        let _lock = lock_test_env();
-        let _restore = SavedTestEnv::snapshot(SNAPSHOT_KEYS);
-        clear_guard_env();
-        let tmp = tmp_git_repo();
-        std::fs::create_dir_all(tmp.path().join(".coherence")).unwrap();
-        std::fs::write(
-            tmp.path().join(".coherence/project.toml"),
+        let _harness = TestHarness::with_manifest(
             r#"version = 2
 project_slug = "coherence-core-db"
 dolt_mode = "user-scoped"
 "#,
-        )
-        .unwrap();
-        let _cwd = SaveCwd::chdir(tmp.path());
-        env::set_var(PROFILE_ENV_VAR, "test");
+        );
         env::set_var(PROJECT_SLUG_ENV_VAR, "coherence-core-db");
         let config = dummy_config("my_private_throwaway_db");
         require_isolated_test_world_for_writes("test_ctx", &config).unwrap();
@@ -522,21 +497,12 @@ dolt_mode = "user-scoped"
 
     #[test]
     fn refuse_when_slug_unset_and_db_not_disposable() {
-        let _lock = lock_test_env();
-        let _restore = SavedTestEnv::snapshot(SNAPSHOT_KEYS);
-        clear_guard_env();
-        let tmp = tmp_git_repo();
-        std::fs::create_dir_all(tmp.path().join(".coherence")).unwrap();
-        std::fs::write(
-            tmp.path().join(".coherence/project.toml"),
+        let _harness = TestHarness::with_manifest(
             r#"version = 2
 project_slug = "fixture_project"
 dolt_mode = "user-scoped"
 "#,
-        )
-        .unwrap();
-        let _cwd = SaveCwd::chdir(tmp.path());
-        env::set_var(PROFILE_ENV_VAR, "test");
+        );
         let config = dummy_config("some_random_db_name");
         let msg = require_isolated_test_world_for_writes("test_ctx", &config).unwrap_err();
         assert!(
@@ -547,21 +513,12 @@ dolt_mode = "user-scoped"
 
     #[test]
     fn allow_via_allowlist_when_slug_unset() {
-        let _lock = lock_test_env();
-        let _restore = SavedTestEnv::snapshot(SNAPSHOT_KEYS);
-        clear_guard_env();
-        let tmp = tmp_git_repo();
-        std::fs::create_dir_all(tmp.path().join(".coherence")).unwrap();
-        std::fs::write(
-            tmp.path().join(".coherence/project.toml"),
+        let _harness = TestHarness::with_manifest(
             r#"version = 2
 project_slug = "fixture_project"
 dolt_mode = "user-scoped"
 "#,
-        )
-        .unwrap();
-        let _cwd = SaveCwd::chdir(tmp.path());
-        env::set_var(PROFILE_ENV_VAR, "test");
+        );
         env::set_var(TEST_WORLD_ALLOWLIST_ENV_VAR, "staging_clone,fixture_db");
         let config = dummy_config("Fixture_Db");
         require_isolated_test_world_for_writes("test_ctx", &config).unwrap();
@@ -584,16 +541,14 @@ dolt_mode = "user-scoped"
 
     #[test]
     fn refuse_when_resolved_db_matches_manifest_dev_catalog_even_if_coherence_env_test() {
-        let _lock = lock_test_env();
-        let _restore = SavedTestEnv::snapshot(SNAPSHOT_KEYS);
-        clear_guard_env();
-        env::set_var(PROFILE_ENV_VAR, "test");
+        let _harness = TestHarness::with_manifest(
+            r#"version = 2
+project_slug = "svc"
+project_hash = "cafe"
+dolt_mode = "user-scoped"
+"#,
+        );
         env::set_var("COHERENCE_ENV", "test");
-
-        let tmp = tmp_git_repo();
-        write_v2_manifest_with_hash(tmp.path());
-        let _cwd = SaveCwd::chdir(tmp.path());
-
         let config = dummy_config("svc_cafe_dev");
         let msg = require_isolated_test_world_for_writes("test_ctx", &config).unwrap_err();
         assert!(
@@ -608,41 +563,28 @@ dolt_mode = "user-scoped"
 
     #[test]
     fn ok_when_resolved_db_matches_manifest_test_catalog() {
-        let _lock = lock_test_env();
-        let _restore = SavedTestEnv::snapshot(SNAPSHOT_KEYS);
-        clear_guard_env();
-        env::set_var(PROFILE_ENV_VAR, "test");
-        env::set_var("COHERENCE_ENV", "test");
-
-        let tmp = tmp_git_repo();
-        std::fs::create_dir_all(tmp.path().join(".coherence")).unwrap();
-        std::fs::write(
-            tmp.path().join(".coherence/project.toml"),
+        let _harness = TestHarness::with_manifest(
             r#"version = 2
 project_slug = "svc"
 project_hash = "cafe"
 dolt_mode = "repo-local"
 "#,
-        )
-        .unwrap();
-        let _cwd = SaveCwd::chdir(tmp.path());
-
+        );
+        env::set_var("COHERENCE_ENV", "test");
         let config = dummy_config("svc_cafe_test");
         require_isolated_test_world_for_writes("test_ctx", &config).unwrap();
     }
 
     #[test]
     fn manifest_dev_catalog_allowed_when_explicitly_allowlisted() {
-        let _lock = lock_test_env();
-        let _restore = SavedTestEnv::snapshot(SNAPSHOT_KEYS);
-        clear_guard_env();
-        env::set_var(PROFILE_ENV_VAR, "test");
+        let _harness = TestHarness::with_manifest(
+            r#"version = 2
+project_slug = "svc"
+project_hash = "cafe"
+dolt_mode = "user-scoped"
+"#,
+        );
         env::set_var(TEST_WORLD_ALLOWLIST_ENV_VAR, "svc_cafe_dev");
-
-        let tmp = tmp_git_repo();
-        write_v2_manifest_with_hash(tmp.path());
-        let _cwd = SaveCwd::chdir(tmp.path());
-
         let config = dummy_config("svc_cafe_dev");
         require_isolated_test_world_for_writes("test_ctx", &config).unwrap();
     }

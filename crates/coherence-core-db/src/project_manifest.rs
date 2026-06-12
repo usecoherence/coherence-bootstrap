@@ -307,7 +307,6 @@ pub fn effective_dolt_catalog_name(
     project_hash: Option<&str>,
     env: CoherenceEnv,
 ) -> Result<String, String> {
-    let env_seg = env.as_str();
     let slug_full = sanitize_dolt_db_segment(project_slug);
     if slug_full.is_empty() {
         return Err(
@@ -316,43 +315,38 @@ pub fn effective_dolt_catalog_name(
         );
     }
 
-    let mut hash_owned = project_hash
+    let env_seg = env.as_str();
+    let hash = project_hash
         .map(|h| sanitize_dolt_db_segment(h.trim()))
         .filter(|s| !s.is_empty());
 
-    loop {
-        let suffix = catalog_suffix(hash_owned.as_deref(), env_seg);
-
-        if suffix.len() > DOLT_DB_NAME_MAX_LEN {
-            if shorten_hash_segment(&mut hash_owned) {
-                continue;
-            }
-            return Err(format!(
-                "{COHERENCE_ENV_VAR}: composed catalog suffix exceeds maximum identifier length"
-            ));
+    if let Some(ref h) = hash {
+        if let Some(name) = try_compose_catalog(&slug_full, Some(h), env_seg) {
+            return Ok(name);
         }
-
-        let max_base = DOLT_DB_NAME_MAX_LEN.saturating_sub(suffix.len());
-        let mut base = slug_full.clone();
-        trim_segment_to_fit(&mut base, max_base);
-
-        if base.is_empty() {
-            if max_base == 0 && hash_owned.is_none() {
-                return Err(
-                    "project_slug is too long to fit a stable catalog name (max 64 characters)"
-                        .to_string(),
-                );
-            }
-            if shorten_hash_segment(&mut hash_owned) {
-                continue;
-            }
-            continue;
-        }
-
-        let name = format!("{base}{suffix}");
-        debug_assert!(name.len() <= DOLT_DB_NAME_MAX_LEN);
-        return Ok(name);
     }
+
+    try_compose_catalog(&slug_full, None, env_seg).ok_or_else(|| {
+        format!(
+            "{COHERENCE_ENV_VAR}: project_slug is too long to fit a stable catalog name (max 64 characters)"
+        )
+    })
+}
+
+fn try_compose_catalog(slug_full: &str, hash: Option<&str>, env_seg: &str) -> Option<String> {
+    let suffix = catalog_suffix(hash, env_seg);
+    if suffix.len() > DOLT_DB_NAME_MAX_LEN {
+        return None;
+    }
+    let max_base = DOLT_DB_NAME_MAX_LEN.saturating_sub(suffix.len());
+    let mut base = slug_full.to_string();
+    trim_segment_to_fit(&mut base, max_base);
+    if base.is_empty() {
+        return None;
+    }
+    let name = format!("{base}{suffix}");
+    debug_assert!(name.len() <= DOLT_DB_NAME_MAX_LEN);
+    Some(name)
 }
 
 fn catalog_suffix(hash: Option<&str>, env_seg: &str) -> String {
@@ -360,17 +354,6 @@ fn catalog_suffix(hash: Option<&str>, env_seg: &str) -> String {
         Some(h) => format!("_{h}_{env_seg}"),
         None => format!("_{env_seg}"),
     }
-}
-
-fn shorten_hash_segment(hash: &mut Option<String>) -> bool {
-    let Some(h) = hash else {
-        return false;
-    };
-    if h.pop().is_some() {
-        return true;
-    }
-    *hash = None;
-    true
 }
 
 fn trim_segment_to_fit(segment: &mut String, max_len: usize) {
@@ -391,34 +374,40 @@ mod tests {
 
     use tempfile::TempDir;
 
+    fn assert_round_trip(manifest: ProjectManifest) {
+        let tmp = TempDir::new().unwrap();
+        write_manifest(tmp.path(), &manifest).unwrap();
+        let loaded = read_manifest(tmp.path()).unwrap();
+        assert_eq!(loaded, manifest);
+    }
+
+    fn assert_write_fails(manifest: ProjectManifest) {
+        let tmp = TempDir::new().unwrap();
+        assert!(write_manifest(tmp.path(), &manifest).is_err());
+    }
+
     #[test]
     fn round_trip_write_read() {
-        let tmp = TempDir::new().unwrap();
-        let manifest = ProjectManifest {
+        assert_round_trip(ProjectManifest {
             version: 1,
             project_slug: "my-project".to_string(),
             dolt_db_name: Some("my_catalog".to_string()),
             frozen_git_toplevel: Some("/tmp/repo".to_string()),
             project_hash: None,
             dolt_mode: None,
-        };
-        write_manifest(tmp.path(), &manifest).unwrap();
-        let loaded = read_manifest(tmp.path()).unwrap();
-        assert_eq!(loaded, manifest);
+        });
     }
 
     #[test]
     fn read_rejects_empty_slug() {
-        let tmp = TempDir::new().unwrap();
-        let bad = ProjectManifest {
+        assert_write_fails(ProjectManifest {
             version: 1,
             project_slug: "   ".to_string(),
             dolt_db_name: None,
             frozen_git_toplevel: None,
             project_hash: None,
             dolt_mode: None,
-        };
-        assert!(write_manifest(tmp.path(), &bad).is_err());
+        });
     }
 
     #[test]
@@ -481,32 +470,26 @@ mod tests {
 
     #[test]
     fn round_trip_write_read_with_project_hash_v2() {
-        let tmp = TempDir::new().unwrap();
-        let manifest = ProjectManifest {
+        assert_round_trip(ProjectManifest {
             version: CURRENT_MANIFEST_SCHEMA_VERSION,
             project_slug: "acme-core".to_string(),
             dolt_db_name: None,
             frozen_git_toplevel: None,
             project_hash: Some("a1b2".to_string()),
             dolt_mode: Some("user-scoped".to_string()),
-        };
-        write_manifest(tmp.path(), &manifest).unwrap();
-        let loaded = read_manifest(tmp.path()).unwrap();
-        assert_eq!(loaded, manifest);
+        });
     }
 
     #[test]
     fn write_rejects_project_hash_on_schema_v1() {
-        let tmp = TempDir::new().unwrap();
-        let bad = ProjectManifest {
+        assert_write_fails(ProjectManifest {
             version: 1,
             project_slug: "x".to_string(),
             dolt_db_name: None,
             frozen_git_toplevel: None,
             project_hash: Some("abcd".to_string()),
             dolt_mode: None,
-        };
-        assert!(write_manifest(tmp.path(), &bad).is_err());
+        });
     }
 
     #[test]
