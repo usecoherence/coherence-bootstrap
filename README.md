@@ -22,6 +22,18 @@ So this is how I'm gonnna do it.
 
 Reviewing 250 ACs is much easier than 10k LoC.
 
+## Table of Contents
+
+- [The grammar in 30 seconds](#the-grammar-in-30-seconds)
+- [Install On macOS Without Docker](#install-on-macos-without-docker)
+- [Load The Bootstrap Spec Catalog](#load-the-bootstrap-spec-catalog)
+- [CodeScene CLI](#codescene-cli)
+- [First Demo: From Requirement To Verified AC](#first-demo-from-requirement-to-verified-ac)
+- [Principle](#principle)
+- [Level Distribution](#level-distribution)
+- [Spec Tree (v3)](#spec-tree-v3)
+- [Actions Summary](#actions-summary)
+
 ## The grammar in 30 seconds
 
 Coherence has three primitives:
