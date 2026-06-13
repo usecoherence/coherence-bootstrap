@@ -25,6 +25,7 @@ Reviewing 250 ACs is much easier than 10k LoC.
 ## Table of Contents
 
 - [The grammar in 30 seconds](#the-grammar-in-30-seconds)
+- [Try demo](#try-demo)
 - [Is this Gherkin/BDD ?](#is-this-gherkinbdd-)
 - [Install On macOS Without Docker](#install-on-macos-without-docker)
 - [Load The Bootstrap Spec Catalog](#load-the-bootstrap-spec-catalog)
@@ -79,6 +80,18 @@ The test remains ordinary code in your repository. Coherence does not replace yo
 It records **what the system promises, where that promise is implemented, and what evidence currently supports it**.
 
 Instead of reviewing 10,000 lines of generated code, review the behavioral claims, and inspect the code only where the evidence or intent is uncertain.
+
+## Try demo
+
+```bash
+git clone https://github.com/usecoherence/coherence-bootstrap
+cd coherence-bootstrap
+make demo-container-shell   # you need docker tho
+```
+
+Then ask the agent you're using (Claude, Codex, opencode, etc.):
+
+> "explore the repo, read the readme and walk me through the demo section `First Demo: From Requirement To Verified AC` step by step and explain what is happening, I'm already running `demo-container-shell`"
 
 ## Is this Gherkin/BDD ?
 
