@@ -175,22 +175,28 @@ coherence_slice! {
 }
 ```
 
-This DSL is what you review before diving into the code in a pull request.
+This DSL is what engineers review before diving into the code in a pull request.
 
-It gives you the context, the why, and the intended behavioral change. Once those relationships are clear, the implementation becomes much easier to understand. And you can inspect it selectively instead of reviewing every generated line with equal attention.
+The same graph slice can be rendered as a simpler view for non-technical stakeholders. Design, GTM, HR, legal, security, and product teams can review the outcomes and claims that affect them without reading implementation details.
+
+They are not approving the code. They are confirming that the intended change is represented correctly.
+
+Once that shared intent is agreed upon, engineers and agents can implement it. The graph provides the context, the why, and the expected behavior, making the resulting code easier to understand and review selectively.
 
 The key trust boundary is `verified_by`.
 
-A passing test is not enough. A human must confirm that the linked evidence actually verifies the acceptance criterion it claims to verify. Once that relationship has been reviewed and signed off, future runs can continuously report whether the claim still holds.
+A passing test is not enough. A human must confirm that the linked evidence actually verifies the acceptance criterion it claims to verify. After that relationship has been reviewed and signed off, automation can continuously report whether the claim still holds.
 
 ```text
-human verifies meaning once
+stakeholders approve intent
+→ engineers implement and review
+→ humans validate the evidence link
 → automation verifies behavior repeatedly
 ```
 
 Yes, this is still work. You still have to understand the system you are building.
 
-Coherence _does not_ remove that responsibility. It makes the understanding explicit, structured, reviewable, and reusable. So the next person does not have to reconstruct it from code alone.
+Coherence _does not_ remove that responsibility. It makes that understanding explicit, structured, reviewable, and reusable, so the next person does not have to reconstruct it from code alone.
 
 ## Install On macOS Without Docker
 
