@@ -79,6 +79,119 @@ It records **what the system promises, where that promise is implemented, and wh
 
 Instead of reviewing 10,000 lines of generated code, review the behavioral claims, and inspect the code only where the evidence or intent is uncertain.
 
+## Is this Gherkin/BDD ?
+
+You might think this is another BDD syntax or testing methodology.
+
+It is not.
+
+Gherkin structures executable examples. TDD structures the feedback loop between tests and implementation.
+
+Coherence is a layer above.
+
+We structure the relationship between a behavioral claim and the evidence that supports it.
+
+It is a graph of requirements:
+
+```text
+┌──────────────────────┐
+│ SPEC: Authentication │
+└──────────┬───────────┘
+           │ required_by
+           ▼
+┌──────────────────────┐       constrained_by       ┌──────────────────────┐
+│  SPEC: Payment API   │ ─────────────────────────▶ │ SPEC: PCI Compliance │
+└──────────┬───────────┘                            └──────────────────────┘
+           │ has
+           ▼
+┌────────────────────────────┐
+│ AC: Rejects expired cards  │
+└──────────┬─────────────────┘
+           │ verified_by
+           ▼
+┌──────────────────────────────────────────┐
+│ TEST: cargo test rejects_expired_cards   │
+└──────────────────────────────────────────┘
+```
+
+`Payment API`, `Authentication`, and `PCI Compliance` are separate spec nodes. Their typed relationships explain how one outcome depends on or is constrained by another.
+
+Acceptance criteria then connect those outcomes to implementation and executable evidence.
+
+This is `Payment API` subgraph can be projected as a tree:
+```text
+```
+SPEC: Payment API
+  ├── depends_on → SPEC: Authentication
+  ├── constrained_by → SPEC: PCI compliance
+  └── has → AC: Rejects expired cards
+               ├── implemented_by → backend/payment.rs
+               ├── verified_by → cargo test rejects_expired_cards
+               └── verified_by → payment.feature
+```
+```
+
+From here, we can immediately jump to `payment.feature`, `reject_expired_cards`, or any connected spec and inspect surrounding context.
+
+The same graph slice can also be materialized as an editable DSL:
+
+```rust
+coherence_slice! {
+    changelist "payment-api-expired-cards" {
+        spec "product/payment-api" {
+            title: "Payment API"
+            level: System
+            status: Active
+
+            links {
+                depends_on "security/authentication"
+                constrained_by "compliance/pci-dss"
+            }
+
+            ac "rejects-expired-cards" {
+                title: "Rejects expired cards"
+                intent: "An expired card is rejected with INVALID_CARD"
+                risk: High
+                concerns: [Correctness, Security]
+
+                links {
+                    implemented_by file "backend/payment.rs"
+                    verified_by test "cargo test rejects_expired_cards"
+                    verified_by feature "features/payment.feature"
+                }
+            }
+        }
+
+        context {
+            spec "security/authentication" {
+                title: "Authentication"
+            }
+
+            spec "compliance/pci-dss" {
+                title: "PCI DSS compliance"
+            }
+        }
+    }
+}
+```
+
+This DSL is what you review before diving into the code in a pull request.
+
+It gives you the context, the why, and the intended behavioral change. Once those relationships are clear, the implementation becomes much easier to understand. And you can inspect it selectively instead of reviewing every generated line with equal attention.
+
+The key trust boundary is `verified_by`.
+
+A passing test is not enough. A human must confirm that the linked evidence actually verifies the acceptance criterion it claims to verify. Once that relationship has been reviewed and signed off, future runs can continuously report whether the claim still holds.
+
+```text
+human verifies meaning once
+→ automation verifies behavior repeatedly
+```
+
+Yes, this is still work. You still have to understand the system you are building.
+
+Coherence _does not_ remove that responsibility. It makes the understanding explicit, structured, reviewable, and reusable. So the next person does not have to reconstruct it from code alone.
+
 ## Install On macOS Without Docker
 
 This path installs the local bootstrap binary and uses a normal Dolt runtime on your Mac.
