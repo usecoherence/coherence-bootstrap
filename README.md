@@ -22,6 +22,50 @@ So this is how I'm gonnna do it.
 
 Reviewing 250 ACs is much easier than 10k LoC.
 
+## The grammar in 30 seconds
+
+Coherence has three primitives:
+
+1. A **spec** describes a promise the system makes. An outcome.
+2. An **acceptance criterion** makes that promise falsifiable. What needs to happen to achieve outcome?
+3. **Evidence** connects the claim to executable verification. How exactly it happens in code?
+
+```bash
+coherence-bootstrap spec add \
+  --slug product/payment-api \
+  --title "Payment API" \
+  --level system
+
+coherence-bootstrap ac add \
+  --spec-id SPEC-payment-api \
+  --slug rejects-expired-cards \
+  --title "Rejects expired cards" \
+  --intent "When a payment uses an expired card, the API returns HTTP 400 with code INVALID_CARD" \
+  --review-mode automated \
+  --risk-level high
+
+coherence-bootstrap ac-tests materialize-rust \
+  --ac-id AC-rejects-expired-cards
+```
+
+Coherence creates a durable, queryable relationship:
+
+```text
+SPEC: Payment API
+  └── has
+      AC: Rejects expired cards
+        └── verified_by
+            TEST: cargo test rejects_expired_cards
+              └── reports
+                  PASS / FAIL
+```
+
+The test remains ordinary code in your repository. Coherence does not replace your language, test framework, editor, or CI system. Use any language, as long as you can call the test programmatically.
+
+It records **what the system promises, where that promise is implemented, and what evidence currently supports it**.
+
+Instead of reviewing 10,000 lines of generated code, review the behavioral claims, and inspect the code only where the evidence or intent is uncertain.
+
 ## Install On macOS Without Docker
 
 This path installs the local bootstrap binary and uses a normal Dolt runtime on your Mac.
