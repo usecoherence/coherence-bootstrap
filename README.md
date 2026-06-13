@@ -25,11 +25,11 @@ Reviewing 250 ACs is much easier than 10k LoC.
 ## Table of Contents
 
 - [The grammar in 30 seconds](#the-grammar-in-30-seconds)
+- [Is this Gherkin/BDD ?](#is-this-gherkinbdd-)
 - [Install On macOS Without Docker](#install-on-macos-without-docker)
 - [Load The Bootstrap Spec Catalog](#load-the-bootstrap-spec-catalog)
 - [CodeScene CLI](#codescene-cli)
 - [First Demo: From Requirement To Verified AC](#first-demo-from-requirement-to-verified-ac)
-- [Is this Gherkin/BDD ?](#is-this-gherkinbdd-)
 - [WIP Coherence Specs aka "Normalized Spec Tree Decisions v3"](#wip-coherence-specs-aka-normalized-spec-tree-decisions-v3)
   - [Principle](#principle)
   - [Level Distribution](#level-distribution)
