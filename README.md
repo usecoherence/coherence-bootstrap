@@ -101,7 +101,7 @@ It is a graph of requirements:
            │ required_by
            ▼
 ┌──────────────────────┐       constrained_by       ┌──────────────────────┐
-│  SPEC: Payment API   │ ─────────────────────────▶ │ SPEC: PCI Compliance │
+│  SPEC: Payment API   │ ─────────────────────────▶│ SPEC: PCI Compliance │
 └──────────┬───────────┘                            └──────────────────────┘
            │ has
            ▼
