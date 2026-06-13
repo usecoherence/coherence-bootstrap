@@ -179,7 +179,7 @@ This DSL is what engineers review before diving into the code in a pull request.
 
 The same graph slice can be rendered as a simpler view for non-technical stakeholders. Design, GTM, HR, legal, security, and product teams can review the outcomes and claims that affect them without reading implementation details.
 
-They are not approving the code. They are confirming that the intended change is represented correctly.
+They are not approving the code, that's on you. They are confirming that the intended change is represented correctly.
 
 Once that shared intent is agreed upon, engineers and agents can implement it. The graph provides the context, the why, and the expected behavior, making the resulting code easier to understand and review selectively.
 
