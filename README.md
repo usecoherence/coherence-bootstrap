@@ -120,8 +120,8 @@ It is a graph of requirements:
 Acceptance criteria then connect those outcomes to implementation and executable evidence.
 
 This is `Payment API` subgraph can be projected as a tree:
+
 ```text
-```
 SPEC: Payment API
   ├── depends_on → SPEC: Authentication
   ├── constrained_by → SPEC: PCI compliance
@@ -129,7 +129,6 @@ SPEC: Payment API
                ├── implemented_by → backend/payment.rs
                ├── verified_by → cargo test rejects_expired_cards
                └── verified_by → payment.feature
-```
 ```
 
 From here, we can immediately jump to `payment.feature`, `reject_expired_cards`, or any connected spec and inspect surrounding context.
