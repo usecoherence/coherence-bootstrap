@@ -29,6 +29,7 @@ Reviewing 250 ACs is much easier than 10k LoC.
 - [Load The Bootstrap Spec Catalog](#load-the-bootstrap-spec-catalog)
 - [CodeScene CLI](#codescene-cli)
 - [First Demo: From Requirement To Verified AC](#first-demo-from-requirement-to-verified-ac)
+- [Is this Gherkin/BDD ?](#is-this-gherkinbdd-)
 - [WIP Coherence Specs aka "Normalized Spec Tree Decisions v3"](#wip-coherence-specs-aka-normalized-spec-tree-decisions-v3)
   - [Principle](#principle)
   - [Level Distribution](#level-distribution)
