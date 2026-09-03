@@ -5,22 +5,43 @@ This is bootstrap for [Coherence](https://usecoherence.dev/).
 [![CodeScene Missed Goals](https://codescene.io/projects/81147/status-badges/missed-goals)](https://codescene.io/projects/81147)
 [![CodeScene System Mastery](https://codescene.io/projects/81147/status-badges/system-mastery)](https://codescene.io/projects/81147)
 
-Coherence makes it easy to write / maintain claims which are also known as Acceptance Criteria or ACs.
+Coherence is an early-stage research project.
 
-The goal of this bootstrap is to provide minimal framework I can use to write the full system.
+It is an attempt to finally standardize human alignment on product specifications / intent. Almost 3 months spent into research on how exactly product intent can be decomposed and separated from the code, and then linked into semantic graph. The first idea was requirements tracing solution. And there are many existing paid, free, and [OSS projects](https://gist.github.com/stanislaw/aa40eb7de9f522ad482e5d239c435ff8), but they don't expand idea further.
 
-Yes, `coherence` builds itself 🤣
-Because it is a semantic graph. And you can describe semantic graph with a semantic graph... 💥 hope your mind didn't blow up
+The requirements tracing problem is not sufficient to produce high quality, low entropy software. The bottleneck is understanding requirements in first place. Coherence is trying to make understanding a simple process that can be adapted to anything. Programming, life goals, habits, science — you name it. As long as Acceptance Criteria can be measured and composed into Outcome (single specification), it can be verified by a human, validated by code, and then optimized.
 
-But really it's very simple idea: You have graph nodes, and you have graph edges.
+The goal is to make understanding itself easier. Cognitive load can be reduced.
+
+Coherence is an attempt to reduce NASA-TLX mental demand and effort required to understand and safely modify a software system, without reducing task success.
+
+Decomposition is one important aspect of it. Interactivity is another one. I am betting on making tooling around requirements traceability idea that will help visualize specifications using simple interactive components. One example is [HTML blocks with state and state transitions](https://github.com/user-attachments/assets/74a3c47f-4f1a-45bf-ab81-c214b1e6b9c2), plus ability to replay with sequences and interact with the system.
+
+It is certain we have to understand what are we building and why. Specifications help us capture world understanding but doesn't reduce cognitive load by itself, which means fewer people is able to contribute to increasingly difficult problems.
+
+It is absolutely essential to remove this understanding bottleneck as much as possible, and I believe I found exact way how to make it happen.
+
+The optimization for understanding starts here, with Coherence.
+
+## The goal of this repository and core idea
+
+This bootstrap provides minimal framework I can use to write the full system.
+
+Yes, `Coherence` builds itself.
+
+Because it is a semantic graph. And you can describe semantic graph with a semantic graph. Mind blown, right? 💥
+
+The core idea is graph nodes + graph edges.
 And the only thing semantic graph is doing is just EXISTING.
+Nodes are entities. Edges are named relationships.
 
-Engineers making this semantic graph entirely in their head, but this doesn't scale when LLM writes code.
-LLM writes too much code to be honest, and I can't keep up with it.
+- Coherence --(is a)-> Software.
+- Coherence --(is built with)-> Rust.
+- Coherence --(uses)-> Coherence.
 
-So this is how I'm gonnna do it.
+When developing a system, Software Engineers create this semantic graph entirely in their head, but this doesn't scale when LLM writes code, or when system grows too large, or when you have to collaborate with hundred people on many different topics and somehow make it all Coherent in your tiny limited brain.
 
-Reviewing 250 ACs is much easier than 10k LoC.
+Reviewing 250 ACs is easier than looking at 10k LoC. Filtering graph nodes and edges is easy, and code is simply a projection.
 
 ## Table of Contents
 
