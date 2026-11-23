@@ -1,0 +1,70 @@
+name: Bug report
+description: Report a defect with clear reproduction steps.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Write in simple English. Use short sentences. Put long logs in a
+        `<details>` block.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context (minimal viable context)
+      description: What is the smallest context that shows the defect?
+      placeholder: "Example: The session recorder stops after a VM reset."
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: Why does this defect matter? What is the impact?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List the smallest reproduction steps.
+      placeholder: |
+        1. Open ...
+        2. Click ...
+        3. See ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Add logs, screenshots, or links. Put long output in a `<details>` block.
+      render: text
+      placeholder: |
+        <details>
+        <summary>Logs</summary>
+
+        ```text
+        ...
+        ```
+        </details>
+    validations:
+      required: false

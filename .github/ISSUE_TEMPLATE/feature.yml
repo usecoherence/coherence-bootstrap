@@ -1,0 +1,63 @@
+name: Feature request
+description: Propose a feature with clear acceptance criteria.
+title: "[Feature] "
+labels: ["feature"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Write in simple English. Use short sentences. Put long details in a
+        `<details>` block.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context (minimal viable context)
+      description: What is the smallest context that shows the need?
+      placeholder: "Example: A candidate wants to download a session record."
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: Why does this feature matter? What problem does it solve?
+    validations:
+      required: true
+
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: |
+        Describe the feature. Include a user story if it helps. List the
+        acceptance criteria. Use one line per criterion.
+      placeholder: |
+        User story: As a candidate, I want ...
+
+        Acceptance criteria:
+        - [ ] ...
+        - [ ] ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification
+      description: How can a reviewer verify that the feature is ready?
+      placeholder: |
+        1. Run ...
+        2. Open ...
+        3. Confirm ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: sources
+    attributes:
+      label: Sources / decisions
+      description: Optional. Add links to docs, standards, related issues, or PRs.
+    validations:
+      required: false
