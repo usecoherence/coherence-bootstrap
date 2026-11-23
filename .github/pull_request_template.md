@@ -1,14 +1,21 @@
 ## Context
 
-<!-- Minimal viable context. What changed? Keep it short. -->
+<!-- What changed? Keep it short. -->
 
 ## Why
 
 <!-- Why is this change needed? Link the issue. -->
 
-## Verify
+## Verification
 
 <!-- Exact commands, tests, or steps. Show the result. -->
+
+## Stack
+
+<!--
+Optional. Link the previous PR and the next PR. Name the base branch.
+Remove this section for a single PR.
+-->
 
 ## Sources / decisions
 
