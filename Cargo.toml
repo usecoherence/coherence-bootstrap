@@ -24,8 +24,10 @@ authors = ["Nikolai Konovalov"]
 unsafe_code = "forbid"
 
 [workspace.lints.clippy]
-all = "warn"
-pedantic = "warn"
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+# assert!(x.is_empty()) reads better than assert_eq!(x, Vec::new()).
+assert_is_empty = "allow"
 unwrap_used = "warn"
 expect_used = "warn"
 
