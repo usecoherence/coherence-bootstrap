@@ -6,6 +6,23 @@ on:
     branches: [main, master]
 
 jobs:
+  commit-lint:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install commitizen
+        run: "pip install --only-binary :all: --require-hashes -r .github/scripts/requirements-commitizen.txt"
+      - name: Check commit messages
+        run: |
+          git fetch origin "${{ github.base_ref }}"
+          .github/scripts/check-commits.sh "origin/${{ github.base_ref }}..HEAD"
+
   rust:
     runs-on: ubuntu-latest
     env:
